@@ -730,3 +730,20 @@ resetting the old one, both registrations, and rejection of an unknown existing
 directory. `Test-SelectionIntegration.ps1`: 3 setup integration checks passed.
 All 16 public bootstrap parameters were compared with the README table; PowerShell
 syntax passed. Users run the real-model trial in Welcome after provisioning.
+
+## Managed VS Code startup and Settings Sync — 2026.11.18.24
+
+The profile migration tests cover new installations, existing personal preferences,
+custom terminal profiles, backups, repeated provisioning, malformed input and
+preservation of unrelated profiles. New tests verify 29 profile/VSIX assertions
+and ten startup scenarios, including missing Kilo, activation failure, an explicit
+startup opt-out, disposal during activation and inherited environment in a foreign
+profile. Workspace migration tests verify the AI policy on new and existing workspaces.
+
+A local VS Code 1.146.0 integration run installed the generated VSIX through the
+real CLI alongside Kilo 7.8.30. Extension-host assertions verified effective AI
+visibility configuration, sync exclusions, Kilo activation and the registered
+sidebar-focus command; the real helper invoked that command successfully. This
+isolated test used no user account, target GPU or model inference. Signed-in cloud
+sync and final visual acceptance on the target machine remain separate checks.
+The installer never edits the internal sync database or resolves cloud conflicts.

@@ -23,6 +23,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $PSNativeCommandUseErrorActionPreference=$false
 . (Join-Path $PSScriptRoot 'Common.ps1')
+. (Join-Path $PSScriptRoot 'VsCodeProfile.ps1')
 . (Join-Path $PSScriptRoot 'DependencyVersions.ps1')
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 . (Join-Path $PSScriptRoot 'ModelPool.ps1')
@@ -343,37 +344,7 @@ try {
     $profileRoot=Join-Path $InstallRoot 'vscode-data'
     $extensionsRoot=Join-Path $InstallRoot 'vscode-extensions'
     [IO.Directory]::CreateDirectory($extensionsRoot)|Out-Null
-    $managedSettings=[ordered]@{
-        'telemetry.telemetryLevel'='off';'extensions.autoUpdate'=$false
-        'terminal.integrated.defaultProfile.windows'='LoKiEnte PowerShell'
-        'kilo-code.new.autocomplete.enableAutoTrigger'=$false
-        'kilo-code.new.autocomplete.enableSmartInlineTaskKeybinding'=$false
-        'kilo-code.new.autocomplete.enableChatAutocomplete'=$false
-    }
-    # Own profile only. Existing personal VS Code / Codex / Copilot profiles are never edited.
-    $settingsFile=Join-Path $profileRoot 'User/settings.json'
-    $settings=[ordered]@{}
-    if (Test-Path -LiteralPath $settingsFile) {
-        $settings=Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json -AsHashtable -NoEnumerate
-        if ($settings -isnot [Collections.IDictionary]) { throw 'The managed VS Code profile settings.json must contain a JSON object.' }
-    }
-    foreach($key in $managedSettings.Keys){$settings[$key]=$managedSettings[$key]}
-    $profiles='terminal.integrated.profiles.windows'
-    if(-not $settings.Contains($profiles) -or $settings[$profiles] -isnot [Collections.IDictionary]){
-        $settings[$profiles]=[ordered]@{}
-    }
-    # Remove only the unchanged legacy managed terminal profile; preserve custom entries.
-    if($settings[$profiles].Contains('Shadow PowerShell')){
-        $legacyProfile=$settings[$profiles]['Shadow PowerShell']
-        if($legacyProfile -is [Collections.IDictionary] -and $legacyProfile.Count -eq 2 -and
-           $legacyProfile.Contains('path') -and $legacyProfile.Contains('args') -and
-           $legacyProfile.path -ieq $toolchain.powerShellExecutable -and
-           @($legacyProfile.args).Count -eq 1 -and @($legacyProfile.args)[0] -ceq '-NoLogo'){
-            $settings[$profiles].Remove('Shadow PowerShell')
-        }
-    }
-    $settings[$profiles]['LoKiEnte PowerShell']=[ordered]@{path=$toolchain.powerShellExecutable;args=@('-NoLogo')}
-    $null=Write-ShadowManagedFile -Path $settingsFile -Content ($settings|ConvertTo-Json -Depth 100) -BackupRoot (Join-Path $InstallRoot 'backups/vscode-settings')
+    Update-ShadowVsCodeProfile -InstallRoot $InstallRoot -PowerShellPath $toolchain.powerShellExecutable
     $codeArgs=@('--user-data-dir',$profileRoot,'--extensions-dir',$extensionsRoot,'--telemetry-level','off')
     $extensionList=Invoke-ShadowCodeCli -CodePath $code -Arguments ($codeArgs+@('--list-extensions','--show-versions'))
     $extensionVersion=Get-ShadowKiloExtensionVersion -Output $extensionList.StdOut
@@ -389,6 +360,8 @@ try {
     $report.kiloVsCodeExtensionVersion=$extensionVersion
     $bundledKilo=Get-ShadowBundledKilo -CodePath $code -InstallRoot $InstallRoot
     $toolchain.bundledKiloExecutable=$bundledKilo
+    Install-ShadowVsCodeStartup -CodePath $code -InstallRoot $InstallRoot
+    $report.steps+=@('Managed VS Code startup and Settings Sync exclusions configured')
     $report.steps+=@('Git/Node/curl/VSCode/LMStudio available','Kilo CLI available','Kilo VS Code extension available','Ripgrep verified')
 
     $lms=Resolve-ShadowSetupLms -StudioPath $studio

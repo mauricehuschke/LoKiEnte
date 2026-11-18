@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.18.23 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.18.24 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
@@ -25,6 +25,28 @@ Documentation is available in English and German as adjacent `.md` / `.de.md`
 files. Provisioning, menus, errors and workflow status use English. Generated
 agent instructions default to English; there is no runtime language switch.
 Technical identifiers and saved installation paths remain compatible with updates.
+
+### Managed VS Code and synchronization
+
+Provisioning sets `chat.disableAIFeatures=true` in the isolated user profile and
+new/existing managed workspaces. It installs the local `lokiente.managed-startup`
+VSIX helper, which opens Kilo's own view once per launcher window without starting
+a task. It checks the launcher marker and profile path; personal VS Code windows
+are unaffected. Set `lokiente.startup.openKilo=false` to keep your restored layout.
+The Command Palette still offers **LoKiEnte: Open Kilo**.
+
+`settingsSync.ignoredSettings` and `settingsSync.ignoredExtensions` are merged with
+custom exclusions. Managed terminal, telemetry, update, Kilo autocomplete and AI
+visibility settings stay local. Kilo, both Copilot extensions and the startup
+helper do not sync their state. Personal editor settings are preserved; changed
+settings are backed up. Conflicting explicit sync opt-ins are removed.
+
+Sync remains optional: sign in yourself and select Extensions, optionally Settings,
+Keyboard Shortcuts and Snippets. Prefer leaving UI State and Profiles unchecked.
+If initial sync already has a conflict, cancel it, close all LoKiEnte windows,
+provision again and configure sync anew. Resolve remaining personal conflicts
+individually instead of accepting an entire local or remote file. Cloud data and
+internal sync databases are not edited. Restart all LoKiEnte windows after updates.
 
 ### Local semantic indexing
 
@@ -96,7 +118,7 @@ functional acceptance, commit and push remain your responsibility.
 ### Build the installer from source
 
 On the development machine, update the version above and run
-`python .\Build-LoKiEnte.py 2026.11.18.23` from the repository root. The script
+`python .\Build-LoKiEnte.py 2026.11.18.24` from the repository root. The script
 rebuilds the embedded payload and checksum. The target Windows PC still needs
 only the generated PS1. A separate old ZIP is unnecessary for this process. The
 provisioning report records the version and checksum of the installer actually used.
