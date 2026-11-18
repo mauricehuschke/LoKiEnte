@@ -19,7 +19,7 @@ function Get-ShadowRipgrepArchive {
     $handler=[Net.Http.HttpClientHandler]::new()
     $handler.AllowAutoRedirect=$true
     $client=[Net.Http.HttpClient]::new($handler)
-    $client.DefaultRequestHeaders.UserAgent.ParseAdd('ShadowLocalAI/1.0')
+    $client.DefaultRequestHeaders.UserAgent.ParseAdd('LoKiEnte/1.0')
     $cancel=[Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds(120))
     $response=$null;$stream=$null;$memory=[IO.MemoryStream]::new()
     try{

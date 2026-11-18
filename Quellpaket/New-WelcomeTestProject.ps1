@@ -48,7 +48,7 @@ if(Test-Path -LiteralPath $project){
     $hooks=Join-Path $project '.git/loki-empty-hooks'
     [void][IO.Directory]::CreateDirectory($hooks)
     [IO.File]::WriteAllText($marker,'loki-discount-example-v1',[Text.UTF8Encoding]::new($false))
-    $prefix=@('-C',$project,'-c','core.longpaths=true','-c',('core.hooksPath='+$hooks),'-c','core.autocrlf=false','-c','commit.gpgsign=false','-c','user.name=LoKi Example','-c','user.email=loki-example@localhost')
+    $prefix=@('-C',$project,'-c','core.longpaths=true','-c',('core.hooksPath='+$hooks),'-c','core.autocrlf=false','-c','commit.gpgsign=false','-c','user.name=LoKiEnte Example','-c','user.email=loki-example@localhost')
     $null=Invoke-ShadowNative $git ($prefix+@('add','--','package.json','discount.cjs','README.md','.loki-welcome-example')) -Environment $environment -Quiet
     $null=Invoke-ShadowNative $git ($prefix+@('commit','--quiet','-m','test: initial intentionally faulty discount example')) -Environment $environment -Quiet
     }finally{Remove-Item -LiteralPath $emptyConfig -Force}

@@ -11,7 +11,7 @@ param(
     [ValidateRange(1024,65535)][int]$RouterPort=1235,
     [ValidateSet('Auto','Qwen27B','GptOss20B')][string]$PreferredModel='Auto',
     [string]$ModelKey,
-    [string]$ApiTokenEnvironmentVariable='SHADOW_LM_API_KEY',
+    [string]$ApiTokenEnvironmentVariable='LOKIENTE_LM_API_KEY',
     [ValidateRange(8192,65536)][int]$ContextLength=32768,
     [ValidateRange(1024,65535)][int]$Port=1234,
     [string[]]$ProjectPath=@(),
@@ -345,7 +345,7 @@ try {
     [IO.Directory]::CreateDirectory($extensionsRoot)|Out-Null
     $managedSettings=[ordered]@{
         'telemetry.telemetryLevel'='off';'extensions.autoUpdate'=$false
-        'terminal.integrated.defaultProfile.windows'='Shadow PowerShell'
+        'terminal.integrated.defaultProfile.windows'='LoKiEnte PowerShell'
         'kilo-code.new.autocomplete.enableAutoTrigger'=$false
         'kilo-code.new.autocomplete.enableSmartInlineTaskKeybinding'=$false
         'kilo-code.new.autocomplete.enableChatAutocomplete'=$false
@@ -362,7 +362,17 @@ try {
     if(-not $settings.Contains($profiles) -or $settings[$profiles] -isnot [Collections.IDictionary]){
         $settings[$profiles]=[ordered]@{}
     }
-    $settings[$profiles]['Shadow PowerShell']=[ordered]@{path=$toolchain.powerShellExecutable;args=@('-NoLogo')}
+    # Remove only the unchanged legacy managed terminal profile; preserve custom entries.
+    if($settings[$profiles].Contains('Shadow PowerShell')){
+        $legacyProfile=$settings[$profiles]['Shadow PowerShell']
+        if($legacyProfile -is [Collections.IDictionary] -and $legacyProfile.Count -eq 2 -and
+           $legacyProfile.Contains('path') -and $legacyProfile.Contains('args') -and
+           $legacyProfile.path -ieq $toolchain.powerShellExecutable -and
+           @($legacyProfile.args).Count -eq 1 -and @($legacyProfile.args)[0] -ceq '-NoLogo'){
+            $settings[$profiles].Remove('Shadow PowerShell')
+        }
+    }
+    $settings[$profiles]['LoKiEnte PowerShell']=[ordered]@{path=$toolchain.powerShellExecutable;args=@('-NoLogo')}
     $null=Write-ShadowManagedFile -Path $settingsFile -Content ($settings|ConvertTo-Json -Depth 100) -BackupRoot (Join-Path $InstallRoot 'backups/vscode-settings')
     $codeArgs=@('--user-data-dir',$profileRoot,'--extensions-dir',$extensionsRoot,'--telemetry-level','off')
     $extensionList=Invoke-ShadowCodeCli -CodePath $code -Arguments ($codeArgs+@('--list-extensions','--show-versions'))
@@ -425,10 +435,10 @@ try {
         $report.warnings+=@('Lokale Indexierung ist konfiguriert; die Freigabe und der Abschluss muessen in Kilo fuer jedes Projekt geprueft werden.')
         foreach($profile in $pool.Profiles){
             if($profile.VerificationState -ceq 'Deferred'){$report.warnings+=@("Modell $($profile.Alias) ist heruntergeladen, aber noch ungeprueft: $($profile.VerificationMessage)")}
-            elseif((Get-LrProperty $profile.Estimate 'ReserveOverride' $false)){$report.warnings+=@("Modell $($profile.Alias) wurde ohne LoKi-Speicherreserve getestet.")}
+            elseif((Get-LrProperty $profile.Estimate 'ReserveOverride' $false)){$report.warnings+=@("Modell $($profile.Alias) wurde ohne LoKiEnte-Speicherreserve getestet.")}
         }
         if($embedding.Status -ceq 'Deferred'){$report.warnings+=@("CPU-Embeddingmodell ist noch nicht betriebsbereit: $($embedding.Message)")}
-        elseif(Get-LrProperty $embedding 'ReserveOverride' $false){$report.warnings+=@('CPU-Embeddingmodell wurde ohne LoKi-Speicherreserve getestet.')}
+        elseif(Get-LrProperty $embedding 'ReserveOverride' $false){$report.warnings+=@('CPU-Embeddingmodell wurde ohne LoKiEnte-Speicherreserve getestet.')}
         $report.smokeTests=@($pool.Profiles|ForEach-Object {@{model=$_.Alias;checks=$_.SmokeTests}})
     }else{
         $report.warnings+=@('Die lokale semantische Indexierung wird im Single-Modus nicht eingerichtet.')
@@ -439,9 +449,9 @@ try {
         $singleProfile=if($selectedDefinitions.Count){$selectedDefinitions[0].Definition}else{$null}
         $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -PreferredModel $PreferredModel -ModelKey $ModelKey -SelectedProfile $singleProfile -ContextLength $ContextLength -Port $Port -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable -AllowUnfitAttempt:$AllowUnfitAttempt
         if($runtime.Status -cnotin @('Ready','Deferred')){throw "Unbekannter Modellstatus: $($runtime.Status)"}
-        $singleName=if($runtime.Status -ceq 'Deferred'){'Shadow local [NOCH NICHT GEPRUEFT]'}else{'Shadow local - verified workflow'}
+        $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOCH NICHT GEPRUEFT]'}else{'LoKiEnte local - verified workflow'}
         if($runtime.Status -ceq 'Deferred'){$report.warnings+=@("Einzelmodell ist heruntergeladen, aber noch ungeprueft: $($runtime.VerificationMessage)")}
-        elseif(Get-LrProperty $runtime.Estimate 'ReserveOverride' $false){$report.warnings+=@('Einzelmodell wurde ohne LoKi-Speicherreserve getestet.')}
+        elseif(Get-LrProperty $runtime.Estimate 'ReserveOverride' $false){$report.warnings+=@('Einzelmodell wurde ohne LoKiEnte-Speicherreserve getestet.')}
         $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
         $report.runtime=$runtime;$report.smokeTests=$runtime.SmokeTests
     }
@@ -462,11 +472,11 @@ try {
     $welcome=Join-Path $InstallRoot 'welcome'
     [IO.Directory]::CreateDirectory($welcome)|Out-Null
     $welcomeText=@'
-# Shadow Local AI
+# LoKiEnte
 
 Dieses Fenster verwendet ein eigenes VS-Code-Profil und lokale Modelle.
 
-1. Starte die Desktopverknuepfung Shadow Local AI. Waehle ein bekanntes Projekt per Nummer oder N fuer einen weiteren vorhandenen Projektordner (Pfad eingeben). 0 bricht vor dem Modellstart ab. Ein direkter Launcher-Aufruf mit -ProjectPath oeffnet das Projekt ohne Menue.
+1. Starte die Desktopverknuepfung LoKiEnte. Waehle ein bekanntes Projekt per Nummer oder N fuer einen weiteren vorhandenen Projektordner (Pfad eingeben). 0 bricht vor dem Modellstart ab. Ein direkter Launcher-Aufruf mit -ProjectPath oeffnet das Projekt ohne Menue.
 2. Chat/Planung: Kilo-Seitenleiste. Rollen und /feature, /bugfix, /refactor, /review, /architecture sind vordefiniert.
 3. Codeaenderungen direkt in shadow-chat eingeben. Kriterien und checks.json werden automatisch vorbereitet und unabhaengig geprueft.
 4. Zum Ausprobieren im Launcher welcome/workflow-test waehlen. Der fertige Testauftrag steht in [workflow-test/README.md](workflow-test/README.md). Das Beispiel nutzt nur kuenstliche Daten, Node-Bordmittel und ein eigenes lokales Git-Repository.
@@ -492,7 +502,7 @@ Anmeldungen bei GitHub/Lovable und projektspezifische Geheimnisse werden nicht d
     if (-not $NoShortcut) {
         $desktop=[Environment]::GetFolderPath('Desktop')
         if ($desktop) {
-            $shortcutPath=Join-Path $desktop 'Shadow Local AI.lnk'
+            $shortcutPath=Join-Path $desktop 'LoKiEnte.lnk'
             if (Test-Path -LiteralPath $shortcutPath) {
                 [IO.Directory]::CreateDirectory((Join-Path $InstallRoot 'backups/shortcuts'))|Out-Null
                 Copy-Item -LiteralPath $shortcutPath -Destination (Join-Path $InstallRoot ('backups/shortcuts/'+[DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')+'.lnk'))
@@ -505,7 +515,23 @@ Anmeldungen bei GitHub/Lovable und projektspezifische Geheimnisse werden nicht d
             $shortcut.Arguments='-NoLogo -NoProfile -ExecutionPolicy Bypass -File "'+$launcher+'" -InstallRoot "'+$InstallRoot+'" -PauseOnError'
             $shortcut.WorkingDirectory=$InstallRoot
             $shortcut.Description='Lokales Modell, eigene VS-Code-Umgebung und gepruefte Agentenablaeufe'
+            $iconPath=Join-Path $InstallRoot 'app/assets/lokiente.ico'
+            if(-not(Test-Path -LiteralPath $iconPath -PathType Leaf)){throw 'LoKiEnte-Desktopicon fehlt im Installationspaket.'}
+            $shortcut.IconLocation=$iconPath+',0'
             $shortcut.Save()
+            # Rename only shortcuts managed by this same installation.
+            foreach($legacyName in @('Shadow Local AI.lnk','LoKi.lnk')){
+                $legacyPath=Join-Path $desktop $legacyName
+                if(Test-Path -LiteralPath $legacyPath -PathType Leaf){
+                    $legacy=$shell.CreateShortcut($legacyPath)
+                    if($legacy.TargetPath -ieq $shortcut.TargetPath -and $legacy.Arguments -ceq $shortcut.Arguments){
+                        $backupDirectory=Join-Path $InstallRoot 'backups/shortcuts'
+                        [void][IO.Directory]::CreateDirectory($backupDirectory)
+                        Copy-Item -LiteralPath $legacyPath -Destination (Join-Path $backupDirectory ([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')+'-'+$legacyName))
+                        Remove-Item -LiteralPath $legacyPath
+                    }
+                }
+            }
         }
     }
     $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'toolchain.json') -Content ($toolchain|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/toolchain')

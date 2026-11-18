@@ -197,7 +197,7 @@ try{
     Write-Fixture (Join-Path $wrapperSource 'app\fixture.ps1') '# wrapper copy fixture'
     foreach($mode in @('decline','confirm','audit','noninteractive','copy-failure','copy-success')){
         $directory=Join-Path $root $mode
-        $fixture=Join-Path $directory 'Provision-ShadowLocalAI.ps1'
+        $fixture=Join-Path $directory 'Provision-LoKiEnte.ps1'
         $stubs="`n`$env:LOCALAPPDATA='"+(Join-Path $root 'absent legacy').Replace("'","''")+"';`n"
         if($mode -eq 'decline'){$stubs+="function Read-Host {param(`$Prompt) return 'n'}`n"}
         if($mode -in @('confirm','copy-failure','copy-success')){$stubs+="function Read-Host {param(`$Prompt) return 'y'}`n"}

@@ -15,7 +15,7 @@ export const inside = (root, candidate) => normalized(candidate).startsWith(norm
 
 export async function managedPath(root, candidate, { missing = false } = {}) {
   const absolute = path.resolve(candidate);
-  if (!inside(root, absolute)) throw new Error('Pfad liegt ausserhalb der verwalteten LoKi-Dateien.');
+  if (!inside(root, absolute)) throw new Error('Pfad liegt ausserhalb der verwalteten LoKiEnte-Dateien.');
   let cursor = path.resolve(root);
   for (const part of path.relative(root, absolute).split(path.sep)) {
     cursor = path.join(cursor, part);
@@ -30,7 +30,7 @@ export async function managedPath(root, candidate, { missing = false } = {}) {
 
 export async function readJson(file, limit = 1024 * 1024) {
   const info = await fs.lstat(file);
-  if (!info.isFile() || info.isSymbolicLink() || info.size > limit) throw new Error('Ungueltige oder zu grosse LoKi-Zustandsdatei.');
+  if (!info.isFile() || info.isSymbolicLink() || info.size > limit) throw new Error('Ungueltige oder zu grosse LoKiEnte-Zustandsdatei.');
   return JSON.parse(await fs.readFile(file, 'utf8'));
 }
 
@@ -65,7 +65,7 @@ export async function registeredProject(root, directory) {
     if (!item || typeof item.project !== 'string' || !path.isAbsolute(item.project)) continue;
     if (samePath(item.project, real)) matches.push(item);
   }
-  if (matches.length !== 1) throw new Error('Projekt ist nicht eindeutig registriert. Ueber die LoKi-Verknuepfung oeffnen oder neu provisionieren.');
+  if (matches.length !== 1) throw new Error('Projekt ist nicht eindeutig registriert. Ueber die LoKiEnte-Verknuepfung oeffnen oder neu provisionieren.');
   const entry = matches[0];
   const checks = await managedPath(root, entry.checks, { missing: true });
   if (!inside(path.join(root, 'projects'), checks) || path.basename(checks) !== 'checks.json') throw new Error('Projekt besitzt keinen gueltigen verwalteten Pruefpfad.');
@@ -77,7 +77,7 @@ export async function registeredProject(root, directory) {
 export function lockName(project) { return createHash('sha256').update(normalized(project)).digest('hex') + '.json'; }
 
 export async function jobPaths(root, runId) {
-  if (typeof runId !== 'string' || !UUID.test(runId)) throw new Error('Ungueltige LoKi-Auftragskennung.');
+  if (typeof runId !== 'string' || !UUID.test(runId)) throw new Error('Ungueltige LoKiEnte-Auftragskennung.');
   const job = await managedPath(root, path.join(root, 'workflow-jobs', runId));
   return { job, request: await managedPath(root, path.join(job, 'request.json')), status: await managedPath(root, path.join(job, 'status.json')) };
 }
@@ -99,7 +99,7 @@ export function stateView(state, request, now = Date.now()) {
 }
 
 export function renderStatus(state, request) {
-  const lines = [`## LoKi: ${cell(state.status)}`, '', `Auftrag: \`${request.runId}\``, `Projekt: ${cell(request.project)}`, ''];
+  const lines = [`## LoKiEnte: ${cell(state.status)}`, '', `Auftrag: \`${request.runId}\``, `Projekt: ${cell(request.project)}`, ''];
   const phases = new Map();
   for (const event of state.phaseSummary ?? state.events ?? []) {
     const key = `${event.phase ?? 'Workflow'}\0${event.role ?? ''}`;
@@ -121,7 +121,7 @@ export function renderStatus(state, request) {
 }
 
 async function authorize(context, permission) {
-  if (process.env.LOKI_WORKFLOW_CHILD === '1') throw new Error('Ein Workflow-Unteragent darf keinen weiteren LoKi-Auftrag starten oder steuern.');
+  if (process.env.LOKI_WORKFLOW_CHILD === '1') throw new Error('Ein Workflow-Unteragent darf keinen weiteren LoKiEnte-Auftrag starten oder steuern.');
   if (typeof context?.ask !== 'function') throw new Error('Kilo stellt keine pruefbare Werkzeugberechtigung bereit.');
   await context.ask({ permission, patterns: ['*'], always: ['*'], metadata: { purpose: 'Lokaler gepruefter Entwicklungsauftrag' } });
 }
@@ -166,7 +166,7 @@ export function createWorkflowTools({ installRoot = path.resolve(path.dirname(fi
       catch (error) {
         if (error.code !== 'EEXIST') throw error;
         const owner = await readJson(lock);
-        throw new Error(`Fuer dieses Projekt ist bereits ein LoKi-Auftrag registriert: ${owner.runId}. Dessen Status pruefen; keinen parallelen Lauf starten.`);
+        throw new Error(`Fuer dieses Projekt ist bereits ein LoKiEnte-Auftrag registriert: ${owner.runId}. Dessen Status pruefen; keinen parallelen Lauf starten.`);
       }
       const request = { schemaVersion: 1, runId, ...entry, createdUtc: new Date().toISOString(), parentSessionId: typeof context.sessionID === 'string' ? context.sessionID : null };
       const job = path.join(jobs, runId);
@@ -190,7 +190,7 @@ export function createWorkflowTools({ installRoot = path.resolve(path.dirname(fi
     },
   };
   const statusTool = {
-    description: 'Zeigt echte Phasen, Agenten, Modelle und Testergebnis eines LoKi-Auftrags; wartet bis zu 30 Sekunden auf Fortschritt. Bis zu einem Endstatus weiter aufrufen.',
+    description: 'Zeigt echte Phasen, Agenten, Modelle und Testergebnis eines LoKiEnte-Auftrags; wartet bis zu 30 Sekunden auf Fortschritt. Bis zu einem Endstatus weiter aufrufen.',
     args: { runId: { type: 'string', description: 'Auftragskennung aus loki_start.' } },
     async execute({ runId }, context) {
       await authorize(context, 'loki_status');
@@ -206,7 +206,7 @@ export function createWorkflowTools({ installRoot = path.resolve(path.dirname(fi
     },
   };
   const cancelTool = {
-    description: 'Fordert auf ausdruecklichen Nutzerwunsch den Abbruch dieses LoKi-Auftrags an. Der eigene Worker beendet nur seinen gestarteten Prozessbaum; Code wird nicht zurueckgesetzt.',
+    description: 'Fordert auf ausdruecklichen Nutzerwunsch den Abbruch dieses LoKiEnte-Auftrags an. Der eigene Worker beendet nur seinen gestarteten Prozessbaum; Code wird nicht zurueckgesetzt.',
     args: { runId: { type: 'string', description: 'Zu stoppende eigene Auftragskennung.' } },
     async execute({ runId }, context) {
       await authorize(context, 'loki_cancel');
@@ -217,7 +217,7 @@ export function createWorkflowTools({ installRoot = path.resolve(path.dirname(fi
     },
   };
   const detailsTool = {
-    description: 'Liest den begrenzten Pruefbericht und die letzten protokollierten Ereignisse des an dieses Projekt gebundenen LoKi-Auftrags. Keine freien Dateipfade.',
+    description: 'Liest den begrenzten Pruefbericht und die letzten protokollierten Ereignisse des an dieses Projekt gebundenen LoKiEnte-Auftrags. Keine freien Dateipfade.',
     args: { runId: { type: 'string', description: 'Auftragskennung.' } },
     async execute({ runId }, context) {
       await authorize(context, 'loki_details');

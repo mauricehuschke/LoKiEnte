@@ -41,7 +41,7 @@ function Select-ShadowProject {
     }
     while($true){
         Write-Host ''
-        Write-Host 'Shadow Local AI - Projekt auswaehlen'
+        Write-Host 'LoKiEnte - Projekt auswaehlen'
         for($i=0;$i -lt $projects.Count;$i++){
             $missing=if(Test-Path -LiteralPath $projects[$i] -PathType Container){''}else{' [nicht erreichbar]'}
             Write-Host "$($i+1): $($projects[$i])$missing"

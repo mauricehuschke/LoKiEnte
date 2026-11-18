@@ -33,7 +33,7 @@ try{
        $disabled -cnotcontains 'GitHub.copilot-chat' -or $args -cnotcontains '--new-window' -or
        $args -cnotcontains $project -or $args -cnotcontains (Join-Path $root 'vscode-data') -or
        $args -cnotcontains (Join-Path $root 'vscode-extensions')){
-        throw 'LoKi launch must disable both Copilot extensions only in its isolated new window'
+        throw 'LoKiEnte launch must disable both Copilot extensions only in its isolated new window'
     }
     $launcher=Join-Path $root 'app\Start-LocalAI.ps1'
     [IO.File]::WriteAllText($launcher,@'

@@ -1,4 +1,4 @@
-# Configuration templates for the isolated ShadowLocalAI profile. Requires PowerShell 7.
+# Configuration templates for the isolated LoKiEnte profile. Requires PowerShell 7.
 Set-StrictMode -Version Latest
 
 function Get-ShadowLocalEnvironment {
@@ -65,7 +65,7 @@ function Set-ShadowImplementationModel {
     if($CoderProfile -eq 'High'){return}
     if(-not $Config.provider.lmstudio.models.Contains('coder-fast')){throw 'Coder-Fast ist nicht provisioniert.'}
     foreach($role in @('shadow-implementer','shadow-frontend','shadow-backend')){
-        if(-not $Config.agent.Contains($role)){throw "Shadow-Implementierungsrolle fehlt: $role"}
+        if(-not $Config.agent.Contains($role)){throw "LoKiEnte-Implementierungsrolle fehlt: $role"}
     }
     foreach($role in @('shadow-implementer','shadow-frontend','shadow-backend')){$Config.agent[$role].model='lmstudio/coder-fast'}
 }
@@ -188,7 +188,7 @@ function New-ShadowAgentConfiguration {
     # Preserve the original single-model API while accepting a verified catalog.
     if(-not $ModelCatalog){
         if([string]::IsNullOrWhiteSpace($ModelId)){throw 'Provide ModelId or a nonempty ModelCatalog.'}
-        $singleName=if($ModelDisplayName){$ModelDisplayName}else{'Shadow local - verified workflow'}
+        $singleName=if($ModelDisplayName){$ModelDisplayName}else{'LoKiEnte local - verified workflow'}
         $ModelCatalog=[ordered]@{'shadow-local'=@{id=$ModelId;name=$singleName;context=$ContextLength;output=$OutputLimit}}
     } elseif($ModelId){throw 'ModelId and ModelCatalog are mutually exclusive.'}
     if($ModelCatalog.Count -lt 1 -or $ModelCatalog.Count -gt 8){throw 'ModelCatalog must contain between one and eight local entries.'}
@@ -203,7 +203,7 @@ function New-ShadowAgentConfiguration {
         $context=[int]$entry.context;$output=[int]$entry.output
         if($context -lt 8192 -or $context -gt 262144 -or $output -lt 1024 -or $output -gt 32768){throw "Unsupported context/output limit in catalog entry $alias."}
         $output=[math]::Min($output,[int]($context/4))
-        $name=if($entry.Contains('name') -and $entry.name){[string]$entry.name}else{"Shadow local - $alias"}
+        $name=if($entry.Contains('name') -and $entry.name){[string]$entry.name}else{"LoKiEnte local - $alias"}
         $normalizedCatalog[$alias]=[ordered]@{id=$id;name=$name;context=$context;output=$output}
         $providerModels[$alias]=[ordered]@{id=$id;name=$name;tool_call=$true;limit=@{context=$context;output=$output};cost=@{input=0;output=0}}
         if($entry.Contains('reasoning')){
@@ -241,7 +241,7 @@ function New-ShadowAgentConfiguration {
     $rulesPath=Join-Path $directory 'LOCAL-AI-RULES.md'
     $configPath=Join-Path $directory 'kilo.json'
     $rules=@'
-# Verbindliche Arbeitsweise fuer den lokalen Shadow-Assistenten
+# Verbindliche Arbeitsweise fuer den lokalen LoKiEnte-Assistenten
 
 Antworte auf Deutsch. Arbeite an klar abgegrenzten Teilaufgaben. Lies zuerst vorhandene
 AGENTS.md, README, SSOT und relevante Architekturentscheidungen. Erhalte bestehende
@@ -356,7 +356,7 @@ keine Betriebssystem-Sandbox gegen absichtlich boesartigen Projektcode.
     }
     if($RoleModels){
         foreach($roleName in $RoleModels.Keys){
-            if($roleName -cnotlike 'shadow-*' -or -not $roleDefinitions.Contains($roleName)){throw "Unknown Shadow role in RoleModels: $roleName"}
+            if($roleName -cnotlike 'shadow-*' -or -not $roleDefinitions.Contains($roleName)){throw "Unknown LoKiEnte role in RoleModels: $roleName"}
             $alias=[string]$RoleModels[$roleName]
             if($alias.StartsWith('lmstudio/')){$alias=$alias.Substring('lmstudio/'.Length)}
             if(-not $providerModels.Contains($alias)){throw "Unknown local model alias for role $roleName : $alias"}
@@ -455,27 +455,27 @@ function Assert-ShadowKiloWorkflowTools {
     $primary=@('shadow-chat','shadow-chat-fast')
     if(-not $Config.Contains('agent') -or $Config.agent -isnot [Collections.IDictionary] -or
        -not $Config.Contains('permission') -or $Config.permission -isnot [Collections.IDictionary]){
-        throw 'LoKi-Werkzeugpruefung: Agenten oder globale Berechtigungen fehlen.'
+        throw 'LoKiEnte-Werkzeugpruefung: Agenten oder globale Berechtigungen fehlen.'
     }
     foreach($tool in $tools){
         if(-not $Config.permission.Contains($tool) -or $Config.permission[$tool] -cne 'deny'){
-            throw "LoKi-Werkzeugpruefung: Globale Berechtigung fuer $tool muss deny sein."
+            throw "LoKiEnte-Werkzeugpruefung: Globale Berechtigung fuer $tool muss deny sein."
         }
     }
     foreach($required in @('shadow-chat','shadow-implementer','shadow-preparer','shadow-preparation-reviewer')){
-        if(-not $Config.agent.Contains($required)){throw "LoKi-Werkzeugpruefung: Pflichtrolle fehlt: $required"}
+        if(-not $Config.agent.Contains($required)){throw "LoKiEnte-Werkzeugpruefung: Pflichtrolle fehlt: $required"}
     }
     $roles=@($Config.agent.Keys | Where-Object {$_ -clike 'shadow-*'} | Sort-Object)
     foreach($role in $roles){
         $definition=$Config.agent[$role]
-        if($definition.Contains('disable') -and $definition.disable){throw "LoKi-Werkzeugpruefung: Verwaltete Rolle ist deaktiviert: $role"}
+        if($definition.Contains('disable') -and $definition.disable){throw "LoKiEnte-Werkzeugpruefung: Verwaltete Rolle ist deaktiviert: $role"}
         if(-not $definition.Contains('permission') -or $definition.permission -isnot [Collections.IDictionary]){
-            throw "LoKi-Werkzeugpruefung: Explizite Rechte fehlen fuer $role."
+            throw "LoKiEnte-Werkzeugpruefung: Explizite Rechte fehlen fuer $role."
         }
         $wanted=if($role -cin $primary){'allow'}else{'deny'}
         foreach($tool in $tools){
             if(-not $definition.permission.Contains($tool) -or $definition.permission[$tool] -cne $wanted){
-                throw "LoKi-Werkzeugpruefung: $role muss $tool explizit auf $wanted setzen."
+                throw "LoKiEnte-Werkzeugpruefung: $role muss $tool explizit auf $wanted setzen."
             }
         }
     }
@@ -498,7 +498,7 @@ function Assert-ShadowKiloWorkflowTools {
         $enabled=$role -cin $primary
         foreach($tool in $tools){
             if(-not $resolved.tools.Contains($tool) -or $resolved.tools[$tool] -isnot [bool] -or $resolved.tools[$tool] -ne $enabled){
-                throw "LoKi-Werkzeug $tool wurde fuer $role nicht mit dem erwarteten Recht geladen. Provisionierung erneut ausfuehren."
+                throw "LoKiEnte-Werkzeug $tool wurde fuer $role nicht mit dem erwarteten Recht geladen. Provisionierung erneut ausfuehren."
             }
         }
         $checked[$role]=$enabled
@@ -539,7 +539,7 @@ function Assert-ShadowKiloToolImports {
                 $expectedName=$file.BaseName -creplace '^loki_',''
                 $isManaged=$toolDirectory -ceq $allowed -and $file.Name -cin @('loki_start.js','loki_status.js','loki_cancel.js','loki_details.js')
                 if(-not $isManaged -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)){
-                    throw "Fremdes Kilo-Customtool wuerde trotz PURE geladen: $($file.FullName). Start abgebrochen, Datei unveraendert. Dieses Tool vor dem LoKi-Start selbst aus Kilos tool/tools-Verzeichnis verschieben."
+                    throw "Fremdes Kilo-Customtool wuerde trotz PURE geladen: $($file.FullName). Start abgebrochen, Datei unveraendert. Dieses Tool vor dem LoKiEnte-Start selbst aus Kilos tool/tools-Verzeichnis verschieben."
                 }
                 $expected="export { $($expectedName)Tool as default } from '../../app/KiloWorkflowTools.mjs';"
                 if($file.Length -gt 1024 -or ([IO.File]::ReadAllText($file.FullName)).Trim() -cne $expected){

@@ -1,6 +1,6 @@
-# Shadow Local AI – Provisionierung und geprüfte Agentenabläufe
+# LoKiEnte – Provisionierung und geprüfte Agentenabläufe
 
-Version: 2026.11.18.20 · Zielsystem: Windows x64 auf dem Shadow PC · Sprache der Arbeitsanweisungen: Deutsch
+Version: 2026.11.18.21 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Sprache der Arbeitsanweisungen: Deutsch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.md) enthält den
@@ -9,11 +9,11 @@ New-WelcomeTestProject.ps1 -NewExample erzeugt einen frischen Versuch.
 
 Dieses Paket richtet LM Studio, einen Pool lokaler Modelle, Kilo CLI und eine eigene VS-Code-Umgebung ein. Standard sind Coding und Review als getrennte Rollen; eine dritte Rolle ist optional. Für jede Rolle kann ein Modell ausgewählt werden, auch dasselbe Modell für mehrere Rollen. Es liefert vordefinierte Rollen und wiederverwendbare Arbeitsabläufe für Feature-Entwicklung, Bugfixes, Refactoring, Review und Architektur. Bestehende Software wird erkannt und möglichst weiterverwendet. Bestehende Repository-Dateien werden bei der Einrichtung nicht verändert.
 
-LoKi-Starts öffnen ein neues Fenster mit isolierten Daten und Erweiterungen und
+LoKiEnte-Starts öffnen ein neues Fenster mit isolierten Daten und Erweiterungen und
 übergeben zusätzlich die VS-Code-Option `--disable-extension` für
 `GitHub.copilot` und `GitHub.copilot-chat`. Die Option gilt nur für das so
 gestartete Fenster; bestehende Fenster und persönliche Profile bleiben unverändert.
-Auch bereits registrierte Projekte erhalten sie beim nächsten LoKi-Start.
+Auch bereits registrierte Projekte erhalten sie beim nächsten LoKiEnte-Start.
 
 ### Lokale semantische Indexierung
 
@@ -29,7 +29,7 @@ ungeprüft. Nur `-AllowUnfitAttempt` erlaubt einen Versuch ohne die Reserven des
 Pakets. LM Studios Schutzregeln bleiben aktiv. Wird das Embeddingmodell nicht geladen
 oder besteht es den Test nicht, bleibt die Einrichtung mit einer Warnung
 benutzbar, aber die Indexierung ist noch nicht betriebsbereit. Beim nächsten
-LoKi-Start wird sie erneut versucht. Beschädigte Modelldateien, unklare
+LoKiEnte-Start wird sie erneut versucht. Beschädigte Modelldateien, unklare
 Eigentumsverhältnisse und Authentifizierungsfehler bleiben ausdrücklich Fehler.
 Im Single-Modus wird diese Indexierung derzeit nicht eingerichtet.
 Die Integration ist für die VS-Code-Erweiterungen Kilo 7.8.28 und 7.8.30
@@ -38,7 +38,7 @@ Eine bereits neuere Version wird bei der Provisionierung auf die benötigten
 Schnittstellen und Einstellungen geprüft. Die separat installierte Kilo CLI
 hat eine eigene Versionsnummer.
 
-Nach vollständigem Schließen der LoKi-Fenster und erneutem Start des Projekts
+Nach vollständigem Schließen der LoKiEnte-Fenster und erneutem Start des Projekts
 in Kilo **Einstellungen > Indexing** öffnen und für das jeweilige Projekt
 freigeben. Diese Freigabe verwaltet Kilo pro Projekt; das Paket verändert nicht
 dessen interne VS-Code-Datenbank. Erst der Status **Complete** und eine
@@ -90,24 +90,24 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-ShadowLocalAI.py 2026.11.18.18` ausführen. Das Skript baut
-die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Shadow PC benötigt
+`python .\Build-LoKiEnte.py 2026.11.18.21` ausführen. Das Skript baut
+die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält
 Paketversion und Prüfsumme des tatsächlich verwendeten Installers.
 
-**Wichtig für die Einordnung:** Das Paket ist entwickelt und mit ausführbaren Parser-, Verhaltens- und Fehlertests geprüft. Es wurde hier nicht auf einem echten Windows-Shadow-PC mit GPU installiert. Der Installationslauf prüft die tatsächliche Hardware, die wirksame CLI-Konfiguration und, soweit das Laden gelingt, echte Chat-/Tool-Antworten. Nicht geprüfte Modelle werden ausdrücklich gekennzeichnet und ergeben `PROVISIONED_WITH_WARNINGS`, nicht den Nachweis vollständiger Modellbereitschaft.
+**Wichtig für die Einordnung:** Das Paket ist entwickelt und mit ausführbaren Parser-, Verhaltens- und Fehlertests geprüft. Es wurde hier nicht auf einem echten Windows-PC mit GPU installiert. Der Installationslauf prüft die tatsächliche Hardware, die wirksame CLI-Konfiguration und, soweit das Laden gelingt, echte Chat-/Tool-Antworten. Nicht geprüfte Modelle werden ausdrücklich gekennzeichnet und ergeben `PROVISIONED_WITH_WARNINGS`, nicht den Nachweis vollständiger Modellbereitschaft.
 
 ## 1. Start in wenigen Schritten
 
-Lade die aktualisierte `Provision-ShadowLocalAI.ps1` auf den Shadow PC. Die einzelne Datei enthält das vollständige Paket einschließlich dieser Anleitung und der Regressionstests für die Reparaturen. Ein separates ZIP einer älteren Version wird durch diese Aktualisierung nicht verändert und darf nicht als identische Ausgabe dieser Version angesehen werden.
+Lade die aktualisierte `Provision-LoKiEnte.ps1` auf den Windows-PC. Die einzelne Datei enthält das vollständige Paket einschließlich dieser Anleitung und der Regressionstests für die Reparaturen. Ein separates ZIP einer älteren Version wird durch diese Aktualisierung nicht verändert und darf nicht als identische Ausgabe dieser Version angesehen werden.
 
 Öffne **Windows PowerShell 64 Bit** im Downloadordner. Verwende zunächst dein normales Windows-Benutzerkonto. Ein Installationsprogramm kann bei Bedarf einen Windows-UAC-Dialog anzeigen.
 
 ### Erweitertes Audit ohne Provisionierung
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -AuditOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -AuditOnly
 ```
 
 Dieser Modus benötigt kein installiertes PowerShell 7. Er prüft die Integrität des eingebetteten Pakets und führt das Audit direkt im Speicher unter Windows PowerShell 5.1 oder neuer aus. Er installiert nichts, schreibt keine Paketdateien und fordert weder Modellladen/-entladen noch einen API-Serverstart oder eine Inferenz an.
@@ -160,7 +160,7 @@ Die Ausgabe ist JSON, Schema 2, mit `checks`, `summary`, `status` und `exitCode`
 Optional den Bericht selbst speichern:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -AuditOnly > .\ShadowLocalAI-Audit.json
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -AuditOnly > .\ShadowLocalAI-Audit.json
 $LASTEXITCODE
 ```
 
@@ -169,7 +169,7 @@ Die Dateiumleitung schreibt den Bericht ausdrücklich auf deinen Wunsch, nicht d
 ### Installation
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1
 ```
 
 `ExecutionPolicy Bypass` gilt nur für den gestarteten Prozess. Das Paket ändert keine globale Ausführungsrichtlinie und umgeht keine durch Gruppenrichtlinien erzwungene Vorgabe.
@@ -229,7 +229,7 @@ Der Desktop-Shortcut wird dabei neu erstellt, sofern nicht `-NoShortcut` gesetzt
 Optional kannst du gleich ein vorhandenes Repository registrieren:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -ProjectPath "C:\Dev\MeinProjekt"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ProjectPath "C:\Dev\MeinProjekt"
 ```
 
 ### Modellauswahl und Downloads
@@ -290,7 +290,7 @@ Wenn ein Modell mit vollständiger GPU-Auslagerung nicht passt, kann für den
 Modellpool ausdrücklich `-AllowPartialGpuOffload` aktiviert werden:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload
 ```
 
 Dann prüft das Setup pro Modell GPU-Offload `max`, `0.8` und `0.6`, jeweils
@@ -298,9 +298,9 @@ mit der angeforderten Kontextlänge und, falls kleiner, den Fallbacks 16384 und
 8192. Die erste Kombination mit ausreichendem GPU-Speicher (1 GiB Reserve),
 ausreichendem freiem RAM (Gesamtschätzung plus 3 GiB Reserve) und bestandenen
 LM-Studio-Guardrails wird zuerst geladen. Gibt es keinen solchen Fit,
-bleibt das Modell ungeprüft. Nur mit `-AllowUnfitAttempt` versucht LoKi
+bleibt das Modell ungeprüft. Nur mit `-AllowUnfitAttempt` versucht LoKiEnte
 eine geschätzte Konfiguration außerhalb der eigenen Reserven. Die
-LM-Studio-Guardrails bleiben aktiv. Ein Versuch ohne LoKi-Reserve
+LM-Studio-Guardrails bleiben aktiv. Ein Versuch ohne LoKiEnte-Reserve
 kann das System stark auslasten oder hängen lassen. Der wirksame Kontext wird für den Pool
 vereinheitlicht und geladene Modelle durchlaufen weiterhin Smoke-Tests. Die
 gespeicherte Option gilt auch bei späteren Modellwechseln; jeder neue
@@ -311,7 +311,7 @@ Schalter wird nur `max` verwendet.
 Der Schalter ist nur für `-ModelMode Dual` gültig.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -ModelMode Dual -IncludeFastModel
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel
 ```
 
 `Dual` bezeichnet die Basis aus Coding- und Review-Modell. Der zusätzliche Schalter
@@ -321,7 +321,7 @@ keinen gemessenen Geschwindigkeitsvorteil.
 Für den bisherigen Einmodellbetrieb:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -ModelMode Single
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single
 ```
 
 ### VS Code mit deinem Projekt starten
@@ -334,7 +334,7 @@ pwsh.exe -NoProfile -ExecutionPolicy Bypass -File ".\app\Start-LocalAI.ps1" -Ins
 
 Das Setup gibt für jedes dort registrierte Projekt einen vollständigen Startbefehl
 mit seinem tatsächlichen Pfad aus; ohne registriertes Projekt öffnet der
-Startbefehl die Projektauswahl. Der Desktop-Shortcut **Shadow Local AI** zeigt
+Startbefehl die Projektauswahl. Der Desktop-Shortcut **LoKiEnte** zeigt
 ebenfalls ein PowerShell-Menü: bekannte Projekte per Nummer auswählen,
 mit **N** einen weiteren vorhandenen Projektordner per Pfad öffnen oder mit
 **0** abbrechen. Pfade mit Leerzeichen und optionalen äußeren Anführungszeichen
@@ -373,7 +373,7 @@ Einmal registrierte Projekte bleiben im Arbeitsbereichsindex erhalten.
 | Rollen und Workflows | Feste lokale Modellzuordnung pro Rolle; Hauptagent, Spezialisten, Gegenprüfung und Komprimierung bleiben lokal. Rechte und Schleifengrenzen sind vorkonfiguriert. |
 | Projektanbindung | Externe `.code-workspace`-Datei, Auftragsdatei und Prüfdefinitionen. Die Einrichtung schreibt nicht in dein Repository. |
 
-Standardverzeichnis: Ordner der `Provision-ShadowLocalAI.ps1`; alternativ das beim Start gewählte Stammverzeichnis oder `-InstallRoot`.
+Standardverzeichnis: Ordner der `Provision-LoKiEnte.ps1`; alternativ das beim Start gewählte Stammverzeichnis oder `-InstallRoot`.
 
 Die Bereitstellung deckt die geprüften Kilo-Grundwerkzeuge ab, nicht pauschal
 alle Build-Abhängigkeiten oder Sprachserver beliebiger Projekte. Installiere
@@ -407,8 +407,9 @@ Das Paket verändert keine Grafiktreiber, öffnet keine Firewall-Ports, installi
 
 ## 3. Mehrere Modelle, ein kontrollierter GPU-Arbeitsplatz
 
-Für Power Pro nennt Shadow eine RTX A4500 mit 20 GB VRAM und 28 GB RAM.
-Die Erkennung auf deiner tatsächlichen Maschine ist maßgeblich.
+Modellwahl und Ladegrenzen richten sich nach dem tatsächlich erkannten RAM,
+VRAM und der Unterstützung durch LM Studio. Es gibt keine Bindung an einen
+bestimmten PC-Hersteller oder Hosting-Anbieter.
 
 | Profil | Modell | Gewichtsdatei | Standardzuordnung |
 |---|---|---|---|
@@ -460,24 +461,24 @@ ein Chat-/Tool-Test durchgeführt. Wenn LM Studio das Modell weiterhin nicht
 laden kann oder der Test scheitert, wird diese Anfrage mit einer konkreten
 Fehlermeldung abgelehnt; das ist keine Garantie für Ausführbarkeit bei
 unzulänglichem Speicher. Freier Speicher ermöglicht einen erneuten Versuch
-ohne erneute Provisionierung. Im Single-Modus meldet LoKi bei fehlendem
+ohne erneute Provisionierung. Im Single-Modus meldet LoKiEnte bei fehlendem
 Speicherfit einen Startfehler. Mit `-AllowUnfitAttempt` kann die Provisionierung
 einen Versuch außerhalb der eigenen Reserven erlauben. Es gibt keinen stillen
 Modell- oder Cloudwechsel.
-Die sichtbare Kennzeichnung wird beim nächsten LoKi-Start aus dem gespeicherten
+Die sichtbare Kennzeichnung wird beim nächsten LoKiEnte-Start aus dem gespeicherten
 Modellstatus neu erzeugt; nach einem erfolgreichen Nachtest kann sie im
 bereits geöffneten Fenster bis dahin bestehen bleiben.
 Der vorherige Einmodellweg bleibt verfügbar, etwa:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -ModelMode Single -PreferredModel GptOss20B
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single -PreferredModel GptOss20B
 ```
 
 Ein vorhandenes eigenes Einzelmodell lässt sich weiterhin über den exakten
 `path` aus `lms ls --json` wählen:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -ModelMode Single -ModelKey "EXAKTER-PFAD-AUS-LMS-LS" -SkipModelDownload
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single -ModelKey "EXAKTER-PFAD-AUS-LMS-LS" -SkipModelDownload
 ```
 
 ### Qualität und Wechselkosten
@@ -532,9 +533,9 @@ separaten Aufgabenablaufs nicht.
 Frühere `coder`-Auswahlen werden beim nächsten Setup als Vorschlag für
 `coder-high` übernommen; das bisherige `fast` kann als Ausgangsvorschlag für
 `coder-fast` dienen. Vorhandene Modelle und der Embedding-Index bleiben erhalten.
-Nach dem Update alle LoKi-Fenster schließen und eine neue Kilo-Sitzung öffnen;
+Nach dem Update alle LoKiEnte-Fenster schließen und eine neue Kilo-Sitzung öffnen;
 alte Sitzungen können noch den nicht mehr angebotenen Alias `coder` gespeichert
-haben. Eingebaute auswählbare Kilo-Agenten sind im LoKi-Profil deaktiviert;
+haben. Eingebaute auswählbare Kilo-Agenten sind im LoKiEnte-Profil deaktiviert;
 interne Hilfsrollen wie die Kontextkomprimierung bleiben bestehen.
 
 Die Kilo-Seitenleiste erhält `/feature`, `/bugfix`, `/refactor`, `/review` und
@@ -546,7 +547,7 @@ Der Chat selbst erhält damit keine allgemeinen Schreib- oder Shellrechte.
 Das Werkzeug bindet den Auftrag an das registrierte Projekt und startet den
 festen Runner mit `-AutoPrepare -Workflow Auto`. Vorbereitung und unabhängiger
 Review müssen bestanden sein, bevor Testautor und Implementierer ihre begrenzten
-Schreibrechte erhalten. Unteragenten dürfen keine neuen LoKi-Aufträge starten.
+Schreibrechte erhalten. Unteragenten dürfen keine neuen LoKiEnte-Aufträge starten.
 Die vorhandenen VS-Code-Tasks bleiben eine Alternative für `task.md`; auch sie
 verwenden `-AutoPrepare`. Eigene Taskdefinitionen bleiben bei Updates erhalten.
 
@@ -643,19 +644,20 @@ setzt bestätigtes Prozessende oder einen Systemneustart voraus.
 
 Modellserver und Router sind an Loopback gebunden. Ein vorhandener öffentlich gebundener Server wird nicht still umgestellt; die Einrichtung stoppt mit einem Hinweis. Haupt-, Hilfs-, Unteragenten-, Memory- und Komprimierungsmodelle sind auf den lokalen Provider und den ausgewählten Modellkatalog festgelegt. Noch ungeprüfte Modelle sind ausdrücklich gekennzeichnet. Vor CLI-Arbeit wird die wirksame Konfiguration geprüft, einschließlich möglicher verwalteter Vorgaben. Abweichungen führen zu einem Fehler.
 
-Kilo-Telemetrie wird für die gestarteten Prozesse abgeschaltet; VS-Code-Telemetrie im eigenen Profil ebenfalls. Automatische Code-Vektorindizierung ist in diesem Profil deaktiviert; die Agenten verwenden Dateisuche und gezielte Lesezugriffe. Es wird kein zusätzlicher Embedding-Dienst eingerichtet. Die Einrichtung selbst benötigt Internet für Software und Modell-Dateien. „Lokal“ bedeutet Modellinferenz auf deiner Shadow-VM, also weiterhin auf der Infrastruktur des Shadow-Anbieters. Das Paket ist kein Netzwerk-Isolationssystem und enthält keine pauschale Garantie, dass jedes Drittprogramm nie eine Update- oder Metadatenabfrage macht.
+Kilo-Telemetrie wird für die gestarteten Prozesse abgeschaltet; VS-Code-Telemetrie im eigenen Profil ebenfalls. Automatische Code-Vektorindizierung ist in diesem Profil deaktiviert; die Agenten verwenden Dateisuche und gezielte Lesezugriffe. Es wird kein zusätzlicher Embedding-Dienst eingerichtet. Die Einrichtung selbst benötigt Internet für Software und Modell-Dateien. „Lokal“ bedeutet Modellinferenz auf dem Windows-Rechner, auf dem du LoKiEnte installierst. Bei einer gehosteten Windows-VM liegt dieser Rechner auf der Infrastruktur deines Hosting-Anbieters. Das Paket ist kein Netzwerk-Isolationssystem und enthält keine pauschale Garantie, dass jedes Drittprogramm nie eine Update- oder Metadatenabfrage macht.
 
 Wenn dein bestehender LM-Studio-Server Authentifizierung verlangt, stelle das Token im Prozess bereit, bevor du Setup bzw. Launcher startest:
 
 ```powershell
-$env:SHADOW_LM_API_KEY = 'DEIN_BESTEHENDES_TOKEN'
+$env:LOKIENTE_LM_API_KEY = 'DEIN_BESTEHENDES_TOKEN'
+# Bei Updates gilt der gespeicherte Variablenname, sofern nicht explizit geaendert.
 ```
 
 Konfiguration und Bericht speichern nur den Namen der Umgebungsvariable, nicht das bestehende LM-Studio-API-Token. Der Router erhält es als Prozessumgebung. Für sein eigenes kontrolliertes Beenden erzeugt das Paket zusätzlich ein lokales zufälliges Kontrolltoken in `runtime\router-control.json`; dieses ist kein Modellanbieter-Zugang. Der Desktop-Shortcut erbt keine nur in einem anderen Terminal gesetzte Variable. Starte den Launcher in diesem Fall aus demselben Terminal. Das Paket schaltet vorhandene Authentifizierung nicht aus.
 
 ## 9. Lovable und weitere Projekte
 
-Verbinde das gewünschte Lovable-Projekt mit seinem GitHub-Repository und klone es auf den Shadow, oder verwende einen vorhandenen Klon. Anmeldung, Organisation, Repository-URL und Branch sind deine bestehenden Projektdaten. Anschließend registrierst du den lokalen Ordner mit dem Launcher.
+Verbinde das gewünschte Lovable-Projekt mit seinem GitHub-Repository und klone es auf den Windows-PC, oder verwende einen vorhandenen Klon. Anmeldung, Organisation, Repository-URL und Branch sind deine bestehenden Projektdaten. Anschließend registrierst du den lokalen Ordner mit dem Launcher.
 
 Ein lokaler Klon kann weiterhin denselben Supabase-/Cloud-Backendzustand verwenden wie die veröffentlichte Anwendung. Ein Git-Branch schafft keine getrennte Datenbank. Das Paket migriert, veröffentlicht, merged oder pusht deshalb nichts. Lokale Änderungen lassen sich später über deinen üblichen Review-/Git-Prozess in den mit Lovable synchronisierten Branch übernehmen.
 
@@ -712,7 +714,7 @@ Modelldateien behalten ihre vom Paket geprüften Versionen bzw. Hashes.
 für Updates nicht mehr nötig. Freigaben und ausgewählte Werkzeugversionen
 stehen im Provisionierungsbericht.
 
-Der Installer verwaltet die LoKi-Werkzeuge. Die Manifest- und Lockdateien deiner
+Der Installer verwaltet die LoKiEnte-Werkzeuge. Die Manifest- und Lockdateien deiner
 Projekt-Repositories gehören weiterhin zum jeweiligen Repository.
 
 Die npm-Abfrage akzeptiert eine einzelne Versionszeichenfolge, ein einelementiges Array oder ein Versionsobjekt. Ein fehlendes `engines`-Feld ist kein Fehler. Mehrdeutige/leere Antworten werden vor der Installation abgewiesen; StrictMode bleibt aktiv. Nach der Installation wird die angeforderte Version mit dem installierten Manifest verglichen.
@@ -765,7 +767,6 @@ Sichere insbesondere Anforderungen, Aufgaben, angepasste Vorlagen, Sitzungsdaten
 
 Die Umsetzung wurde gegen die aktuellen Herstellerdokumentationen und CLI-Quellen geprüft:
 
-- Shadow Power Pro: https://support.shadow.tech/hc/en-us/articles/33442461134609-Shadow-PC-Pro-Offers-Frequently-Asked-Questions
 - LM Studio CLI: https://lmstudio.ai/docs/cli
 - LM Studio lokale Modellladeoptionen: https://github.com/lmstudio-ai/lms/blob/main/src/subcommands/load.ts
 - LM Studio REST-Modellstatus: https://lmstudio.ai/docs/developer/rest/list
@@ -788,4 +789,4 @@ Die Umsetzung wurde gegen die aktuellen Herstellerdokumentationen und CLI-Quelle
 - WinGet-Installation: https://learn.microsoft.com/en-us/windows/package-manager/winget/install
 - Lovable/Git-Synchronisierung: https://docs.lovable.dev/integrations/git-sync-overview
 
-Die beiliegenden Tests verwenden PowerShell 7 und echte temporäre Prozesse/Git-Repositories, simulieren aber Modellantworten und Windows-/GPU-Grenzen. Sie testen das Kontrollverhalten, keine Modellintelligenz. Der separate `VALIDATION.md` beschreibt den konkret ausgeführten Stand. Der abschließende Windows-/GPU-/VS-Code-Test erfolgt beim ersten Einsatz auf deinem Shadow.
+Die beiliegenden Tests verwenden PowerShell 7 und echte temporäre Prozesse/Git-Repositories, simulieren aber Modellantworten und Windows-/GPU-Grenzen. Sie testen das Kontrollverhalten, keine Modellintelligenz. Der separate `VALIDATION.md` beschreibt den konkret ausgeführten Stand. Der abschließende Windows-/GPU-/VS-Code-Test erfolgt beim ersten Einsatz auf deinem Windows-PC.

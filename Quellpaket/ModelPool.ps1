@@ -323,7 +323,7 @@ function Set-SmpActiveProfile {
         $fit=if($guardrailCandidate){$guardrailCandidate}else{$lastCandidate}
         if(-not $fit){throw 'Keine auswertbare LM-Studio-Speicherschaetzung vorhanden.'}
         $fit.ReserveOverride=$true
-        Write-Warning "$fitMessage Ladeversuch ohne LoKi-Reserve; LM-Studio-Schutzregeln bleiben aktiv."
+        Write-Warning "$fitMessage Ladeversuch ohne LoKiEnte-Reserve; LM-Studio-Schutzregeln bleiben aktiv."
     }
     $profile.ContextLength=[int]$fit.ContextLength
     $profile.OutputLimit=[math]::Min(8192,[int]($profile.ContextLength/4))
@@ -408,7 +408,7 @@ function Configure-LocalModelPool {
         [object[]]$SelectedDefinitions,
         [bool]$DownloadModel=$true,
         [string]$LmsPath,
-        [string]$ApiTokenEnvironmentVariable='SHADOW_LM_API_KEY',
+        [string]$ApiTokenEnvironmentVariable='LOKIENTE_LM_API_KEY',
         [string]$LegacyModelKey
     )
     if(-not $IsWindows){throw 'Der Modellpool ist fuer Windows mit NVIDIA-GPU vorgesehen.'}
@@ -611,7 +611,7 @@ function Start-ShadowEmbeddingModel {
                     throw $error
                 }
                 $reserveOverride=$true
-                Write-Warning 'Kein gepruefter RAM-Fit fuer das CPU-Embeddingmodell. Ladeversuch ohne LoKi-Reserve; LM-Studio-Schutzregeln bleiben aktiv.'
+                Write-Warning 'Kein gepruefter RAM-Fit fuer das CPU-Embeddingmodell. Ladeversuch ohne LoKiEnte-Reserve; LM-Studio-Schutzregeln bleiben aktiv.'
             }
             $owner.Entries=@($owner.Entries|Where-Object {$_.InstanceId -cne $id})+@(
                 [pscustomobject]@{InstanceId=$id;ModelPath=$path;Verified=$false;Origin='pending-cpu-embedding';ExpectedPath=$Definition.ExpectedPath;SelectedVariant='';GpuOffload='off'}

@@ -73,9 +73,9 @@ try {
 '@)
     $prior=Read-BootstrapOptionState $existingRoot
     Assert-BootstrapTest ($prior.ModelMode -ceq 'Dual' -and $prior.IncludeFastModel -and $prior.AllowPartialGpuOffload -and $prior.AllowUnfitAttempt -and $prior.Port -eq 4590 -and $prior.RouterPort -eq 4591) 'Legacy registered installation retains pool options'
-    [IO.File]::WriteAllText((Join-Path $existingRoot 'provisioning-options.json'),'{"ModelMode":"Single","ModelKey":"existing/custom.gguf","ContextLength":8192}')
+    [IO.File]::WriteAllText((Join-Path $existingRoot 'provisioning-options.json'),'{"ModelMode":"Single","ModelKey":"existing/custom.gguf","ContextLength":8192,"ApiTokenEnvironmentVariable":"EXISTING_LOCAL_TOKEN"}')
     $prior=Read-BootstrapOptionState $existingRoot
-    Assert-BootstrapTest ($prior.ModelMode -ceq 'Single' -and $prior.ModelKey -ceq 'existing/custom.gguf' -and $prior.ContextLength -eq 8192) 'Recorded desired options supersede inferred legacy state'
+    Assert-BootstrapTest ($prior.ModelMode -ceq 'Single' -and $prior.ModelKey -ceq 'existing/custom.gguf' -and $prior.ContextLength -eq 8192 -and $prior.ApiTokenEnvironmentVariable -ceq 'EXISTING_LOCAL_TOKEN') 'Recorded desired options supersede inferred legacy state'
     Assert-BootstrapTest ((ConvertTo-WindowsArgument '') -ceq '""') 'Empty native argument is quoted'
     Assert-BootstrapTest ((ConvertTo-WindowsArgument 'C:\with space\') -ceq '"C:\with space\\"') 'Trailing backslash is doubled before closing quote'
     Assert-BootstrapTest ((ConvertTo-WindowsArgument 'a"b') -ceq '"a\"b"') 'Embedded double quote is escaped'

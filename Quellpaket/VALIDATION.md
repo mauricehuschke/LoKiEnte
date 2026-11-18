@@ -1,3 +1,32 @@
+## LoKiEnte-Logo und anbieterneutrale Benennung — Paket 2026.11.18.21
+
+39 eigenständige PowerShell-/Node-Testsuiten bestanden. Dazu gehören der
+Bootstrap einschließlich Windows PowerShell 5.1, Welcome-Projekt, Modell- und
+Updateprüfungen sowie der Kilo-Chat-zu-Runner-Ablauf mit synthetischen Modellantworten.
+Der gespeicherte Name der API-Token-Umgebungsvariable bleibt beim Update erhalten.
+
+Der neue Windows-Test `tests/Test-LauncherIcon.ps1` prüft acht Aspekte: ICO-Größen,
+Windows-Dekodierung, gespeicherte Verknüpfungseigenschaften, Neuanlage,
+Wiederholungsupdate und Sicherung/Umbenennung passender alter Verknüpfungen.
+Eine Verknüpfung mit abweichendem Zielaufruf bleibt erhalten. Alle Verknüpfungen
+werden in temporären Testordnern erzeugt; der echte Desktop wird nicht verändert.
+Sechs Prüfungen bestätigen außerdem den Erhalt eigener VS-Code-Einstellungen,
+Sicherungen und angepasster Terminalprofile bei der Umbenennung des verwalteten Profils.
+Zusätzlich wurden die PNG-Frames aller sieben ICO-Größen und die bytegenaue
+Übereinstimmung der eingebetteten Nutzlast mit dem Quellpaket geprüft.
+
+Aktuelle Dateien, Bilddateien, entpackte Nutzlast und historische Inhalte wurden
+mit Gitleaks und ergänzenden Prüfungen auf private Identifikatoren untersucht.
+Keine Zugangsdaten oder privaten Identifikatoren im aktuellen Dateistand gefunden.
+Eine Dateiprüfung ersetzt keine Prüfung der Autorenmetadaten der Git-Historie.
+
+Der Projekttitel und sichtbare Meldungen verwenden LoKiEnte. Anbieterbezogene
+Hardwareannahmen wurden aus der Beschreibung entfernt; technische Kennungen und
+vorhandene Installationspfade bleiben für Updates kompatibel. Das Paket ist für
+Windows x64 mit dem bestehenden NVIDIA-Prüfpfad ausgelegt, kein Linux-/macOS-Installer.
+Eine echte Neuinstallation und Modellinferenz auf zusätzlicher Hardware sind
+durch diese Regressionstests nicht belegt.
+
 ## Gesamtprüfung — Paket 2026.11.18.20
 
 Der erneute Pakettest umfasst alle eigenständigen vorhandenen PowerShell- und
@@ -21,7 +50,7 @@ Aufbauten bleiben als getrennte Diagnoseordner erhalten und blockieren keinen
 neuen Versuch am normalen Ziel.
 
 Eigene Checks, Aufgaben und nicht verwaltete Einstellungen bleiben erhalten.
-Verwaltete Agentenkonfiguration, LoKi-Tasks und festgelegte Profileinstellungen
+Verwaltete Agentenkonfiguration, LoKiEnte-Tasks und festgelegte Profileinstellungen
 werden bewusst auf den Paketstand gebracht; Vorzustände werden gesichert.
 Nicht erreichbare Projekte bleiben registriert und werden als Warnung gemeldet.
 Freigegebene Abhängigkeiten werden aktualisiert, neuere Versionen nicht
@@ -32,7 +61,7 @@ Die frühere separate ZIP ist archiviert und wird vom Installer nicht benutzt.
 Modelle/Installationen/Benutzerprojekte wurden für diesen Test nicht verändert:
 Installations- und Modellgrenzen sind simuliert, Git/Node/PowerShell und lokale
 HTTP-Testprozesse laufen tatsächlich. Echte GPU-/GUI-Abnahme erfolgt auf dem
-Shadow PC mit dem Welcome-Auftrag.
+Windows-PC mit dem Welcome-Auftrag.
 
 ## Automatische Aufträge und sichtbarer Ablauf — Paket 2026.11.18.18
 
@@ -91,7 +120,7 @@ Die lokalen Frameworkadapter sind ohne Download testbar. Der Node-Lauf verwendet
 echte Assertions; Jest wird hier mit repräsentativen Assertion-Berichten geprüft,
 Vitest/Playwright/pytest benötigen zusätzlich den tatsächlichen Projektlauf.
 
-Zielabnahme nach erneuter Provisionierung auf dem Shadow PC:
+Zielabnahme nach erneuter Provisionierung auf dem Windows-PC:
 
 1. Ein neues und ein bestehendes registriertes Git-Projekt über den Launcher
    öffnen; eigene VS-Code-Tasks und vorhandene Checks auf Erhalt kontrollieren.
@@ -131,7 +160,7 @@ Neue ausführbare Prüfungen:
 
 Die Modelle und der echte VS-Code-/Kilo-Ablauf werden dadurch nicht simuliert
 zu einem Hardware-Abnahmenachweis. Nach Provisionierung einen kleinen Auftrag
-mit den realen Modellen auf dem Shadow PC ausführen. Die unten folgenden
+mit den realen Modellen auf dem Windows-PC ausführen. Die unten folgenden
 Abschnitte dokumentieren frühere Teststände und ihre damaligen Grenzen.
 
 ## Provisionierung und Updates — Paket 2026.11.17.16
@@ -141,7 +170,7 @@ das Aktualisieren einer bestehenden Registrierung, eigene Einstellungen und
 Aufgaben sowie den Erhalt einer vorübergehend nicht erreichbaren Registrierung
 ab. Die Versionstests verwenden simulierte WinGet- und npm-Aufrufe und prüfen
 genaue Identität, Freigabe, Verifikation und den Erhalt bereits neuerer Versionen.
-Die reale Installation und der erste Kilo-Lauf auf dem Shadow PC sind eigene
+Die reale Installation und der erste Kilo-Lauf auf dem Windows-PC sind eigene
 Abnahmeschritte.
 
 ## Qualitätsprüfungen — Paket 2026.11.17.15
@@ -154,7 +183,7 @@ Die Modelltests verwenden simulierte Speicherwerte und LM-Studio-Antworten.
 Der Router-Lebenszyklus prüft den Prozessstart und die Wiederverwendung nach
 einer Änderung der Speicherschätzung über echtes Loopback-HTTP.
 
-## Semantische Suche auf dem Shadow PC abnehmen
+## Semantische Suche auf dem Windows-PC abnehmen
 
 1. Im Installationsordner mit PowerShell 7 `./app/New-ShadowIndexProbe.ps1`
    ausführen. Das Skript legt ausschließlich künstliche Testdateien unter
@@ -193,13 +222,13 @@ Unter Windows mit PowerShell 7 wurden fuer diese Aenderung ausgefuehrt:
 
 Die Launcher-Abbruchtests verwenden inerte Laufzeitmodule. Sie starten keine
 Modelle und kein VS Code. Desktopverknuepfung, GPU und der vollstaendige Start
-auf dem Shadow PC muessen nach der erneuten Provisionierung geprueft werden.
+auf dem Windows-PC muessen nach der erneuten Provisionierung geprueft werden.
 Die historischen Pruefberichte weiter unten ersetzen diese Zielmaschinenpruefung nicht.
 # Prüfbericht zum Provisionierungspaket
 
 ## Speicherfit als Warnung: 2026.11.17.13
 
-Ein nicht nachgewiesener LoKi-Speicherfit führt zu einem ausdrücklich
+Ein nicht nachgewiesener LoKiEnte-Speicherfit führt zu einem ausdrücklich
 angezeigten Ladeversuch, ohne die Schutzregeln von LM Studio zu deaktivieren.
 Wird dieser Versuch abgelehnt, bleiben Modelldateien erhalten und die
 Provisionierung endet mit `PROVISIONED_WITH_WARNINGS` und Exitcode 0.
@@ -209,18 +238,18 @@ Ein späterer Modellaufruf versucht Laden und Tests erneut.
 Lokale Regressionen simulieren zu wenig Speicher, erfolgreiche und abgelehnte
 Ladeversuche, spätere Wiederherstellung, Routerfehler, Single-Modus und das
 CPU-Embeddingmodell. Tatsächlicher Speicherbedarf und LM-Studio-Verhalten auf
-dem Shadow-PC sind damit nicht nachgewiesen.
+dem Windows-PC sind damit nicht nachgewiesen.
 
 ## Kilo-Erweiterung 7.8.30: 2026.11.17.12
 
 Das VS-Code-Backend 7.8.30 wurde isoliert mit den vier Modellkennzeichnungen
-und den Shadow-Agenten geprüft. Es indexierte eine synthetische Python-Datei
+und den LoKiEnte-Agenten geprüft. Es indexierte eine synthetische Python-Datei
 mit LanceDB 0.26.2 und einem simulierten lokalen Embedding-Endpunkt bis
 `Complete`. Die separat installierte Kilo CLI 7.8.27 bestand die Prüfung
 der wirksamen Konfiguration und Agenten. Die Dateisuche und Dateiauflistung
 des VS-Code-Backends 7.8.30 bestanden mit geprüftem Windows-ripgrep.
 Die reale LM-Studio-Inferenz und
-Indexierung auf dem Shadow-PC bleiben gesondert zu prüfen.
+Indexierung auf dem Windows-PC bleiben gesondert zu prüfen.
 
 ## Getrennte Codingprofile: 2026.11.17.11
 
@@ -233,7 +262,7 @@ rollenmarkierten Modellnamen über seine Provider-API; die auswählbaren
 eingebauten Agenten fehlten in der Agentenliste. Interne Hilfsagenten bleiben
 erhalten. Weitere Tests prüfen die Pool-Migration, den Routerwechsel und den
 echten Review-Ablauf mit synthetischen Modellantworten. Die UI und LM Studio
-auf dem Shadow-PC bleiben gesondert zu prüfen.
+auf dem Windows-PC bleiben gesondert zu prüfen.
 
 ## Lokale CPU-Embeddings und Index-Konfiguration: 2026.11.17.10
 
@@ -246,9 +275,9 @@ VS-Code-Backend von Kilo 7.8.28 in einem isolierten Profil ausgelesen.
 Auch die separate Kilo CLI 7.8.27 bestand die Konfigurationsprüfung.
 Dasselbe Backend indexierte eine synthetische Python-Datei mit LanceDB und einem
 simulierten lokalen Embedding-Endpunkt bis Status `Complete`. Eine echte
-Indexierung und Modellinferenz auf dem Shadow-PC sind damit nicht belegt.
+Indexierung und Modellinferenz auf dem Windows-PC sind damit nicht belegt.
 
-## LoKi-Fenster und Copilot: 2026.11.17.9
+## LoKiEnte-Fenster und Copilot: 2026.11.17.9
 
 Der Launcher übergibt beim Öffnen eines neuen isolierten VS-Code-Fensters
 `--disable-extension` für beide GitHub-Copilot-Erweiterungen. Dies verändert
@@ -287,7 +316,7 @@ PowerShell-Sonderzeichen in Argumenten.
 
 ## Zitierte Smoke-Test-Antwort: 2026.11.17.6
 
-Auf dem Shadow-PC lieferte das Modell nach einem korrekten Tool-Aufruf die
+Auf dem Windows-PC lieferte das Modell nach einem korrekten Tool-Aufruf die
 Quittung als `"LOCAL_TOOL_OK"` statt als unzitierte Zeichenfolge. Chat- und
 Tool-Rückantwort akzeptieren jetzt genau den erwarteten Text mit oder ohne
 äußere doppelte Anführungszeichen und optionalen äußeren Leerraum. Zusätzliche
@@ -297,7 +326,7 @@ Formen und weiterhin die Ablehnung von Zusatztext und falschen Tool-Antworten.
 
 ## Tool-Auswahl im Smoke-Test: 2026.11.17.5
 
-LM Studio auf dem Shadow-PC lehnte ein Objekt als `tool_choice` mit HTTP 400
+LM Studio auf dem Windows-PC lehnte ein Objekt als `tool_choice` mit HTTP 400
 ab und bestätigte die unterstützten Zeichenfolgen `none`, `auto`, `required`.
 Ein anschließender echter Test mit `required` lieferte `report_value(17)` und
 mit `none` die erwartete Tool-Rückantwort. Der Smoke-Test verwendet nun
@@ -343,12 +372,12 @@ unverbindliche neue Vorschläge und bleibt ohne Downloads/Modellwechsel.
 Persistenz der GPU-Strategie, unveränderte Standardwerte, Kontextfallback,
 GPU-/RAM-Reserven, Guardrails und Übereinstimmung der geschätzten und tatsächlich
 angeforderten GPU-Option. LM-Studio- und GPU-Grenzen werden simuliert; reale
-Leistung, CPU-Auslagerung und Inferenz bleiben auf dem Shadow-PC zu prüfen.
+Leistung, CPU-Auslagerung und Inferenz bleiben auf dem Windows-PC zu prüfen.
 
 ## Modellvarianten in LM Studio: 2026.11.17.1
 
 CLI-Commit 43d4b26 meldet Modell-IDs als `path` und Dateipfade in
-`indexedModelIdentifier` der Variantenliste. Anhand der vom Shadow-PC gelieferten
+`indexedModelIdentifier` der Variantenliste. Anhand der vom Windows-PC gelieferten
 Ausgabe prüft `Test-ModelVariants.ps1` die Zuordnung aller drei exakten Dateien,
 die Erhaltung älterer Dateipfade und Abbrüche bei geänderten, fehlenden oder
 mehrdeutigen Varianten. Der Audit testet die gleiche Zuordnung unter PS5.1/PS7.
@@ -416,7 +445,7 @@ selbst vor der Veröffentlichung, auch wenn sie erst nach dem Menü entstehen.
 
 ## Kilo-Hilfeausgabe: 2026.11.16.6
 
-Auf dem Shadow-PC lieferte `kilo run --help` bei umgeleiteter Ausgabe
+Auf dem Windows-PC lieferte `kilo run --help` bei umgeleiteter Ausgabe
 Exitcode 0, eine leere stdout und die vollständige Hilfe auf stderr. Das Setup
 wertet beide Kanäle aus, ohne den erforderlichen erfolgreichen Exitcode und
 die Optionsprüfung aufzugeben. `Test-KiloHelp.ps1` testet stdout, stderr,
@@ -457,7 +486,7 @@ aus den tatsächlichen Ladebefehlen entfernt.
 
 CLI-Ausgaben und GPU-/LM-Studio-Grenzen werden simuliert; native
 PowerShell-Unterprozesse, JSON-Konvertierung und Dateizugriffe sind real.
-Die aktualisierte Version muss auf dem Shadow-PC erneut mit `-AuditOnly`
+Die aktualisierte Version muss auf dem Windows-PC erneut mit `-AuditOnly`
 geprüft werden. Es wurde hier kein reales Modell geladen.
 
 ## Verzeichnisauswahl und Kopie: 2026.11.16.3
@@ -473,8 +502,8 @@ teilweise veröffentlichter Kopien. Alle Kopien verwenden temporäre Testdaten.
 Aus dem gewählten Stammverzeichnis:
 
 ```powershell
-pwsh -NoProfile -File ".\app\tests\Test-InstallationLocation.ps1" -BootstrapPath ".\Provision-ShadowLocalAI.ps1"
-powershell -NoProfile -File ".\app\tests\Test-InstallationLocation.ps1" -BootstrapPath ".\Provision-ShadowLocalAI.ps1"
+pwsh -NoProfile -File ".\app\tests\Test-InstallationLocation.ps1" -BootstrapPath ".\Provision-LoKiEnte.ps1"
+powershell -NoProfile -File ".\app\tests\Test-InstallationLocation.ps1" -BootstrapPath ".\Provision-LoKiEnte.ps1"
 ```
 
 ## Manueller LM-Studio-Erststart: 2026.11.16.2
@@ -513,14 +542,14 @@ Beispiel nach dem Entpacken, im gewählten Stammverzeichnis und mit explizitem P
 pwsh -NoProfile -File ".\app\tests\Test-KiloMetadata.ps1"
 pwsh -NoProfile -File ".\app\tests\Test-ModelPool.ps1"
 pwsh -NoProfile -File ".\app\tests\Test-RouterLifecycle.ps1"
-pwsh -NoProfile -File ".\app\tests\Test-Audit.ps1" -BootstrapPath "C:\Downloads\Provision-ShadowLocalAI.ps1"
-powershell -NoProfile -File ".\app\tests\Test-Audit.ps1" -BootstrapPath "C:\Downloads\Provision-ShadowLocalAI.ps1"
-pwsh -NoProfile -File ".\app\tests\Test-Bootstrap.ps1" -BootstrapPath "C:\Downloads\Provision-ShadowLocalAI.ps1"
+pwsh -NoProfile -File ".\app\tests\Test-Audit.ps1" -BootstrapPath "C:\Downloads\Provision-LoKiEnte.ps1"
+powershell -NoProfile -File ".\app\tests\Test-Audit.ps1" -BootstrapPath "C:\Downloads\Provision-LoKiEnte.ps1"
+pwsh -NoProfile -File ".\app\tests\Test-Bootstrap.ps1" -BootstrapPath "C:\Downloads\Provision-LoKiEnte.ps1"
 ```
 
 Diese Tests prüfen nicht die aktuell installierten LM-Studio-/Kilo-Versionen
-oder die reale Shadow-GPU. Die vollständige Zielsysteminstallation und erste
-GUI-/Agentennutzung bleiben eine notwendige Abnahme auf dem Shadow-PC.
+oder die reale GPU des Zielsystems. Die vollständige Zielsysteminstallation und erste
+GUI-/Agentennutzung bleiben eine notwendige Abnahme auf dem Windows-PC.
 
 ## Historischer Prüfbericht zur Vorversion
 
@@ -532,16 +561,16 @@ Stand: 13. November 2026 (UTC), Paket 2026.11.14.1. Die folgenden Prüfungen wur
 portablen, anhand der offiziellen SHA256-Prüfsumme geprüften PowerShell 7.6.6
 ausgeführt. Für die echten Kilo-Prüfungen wurde `@kilocode/cli` 7.8.27 in einem
 separaten Testverzeichnis installiert. Die Testwerkzeuge gehören nicht zur
-Installation auf dem Shadow-PC.
+Installation auf dem Windows-PC.
 
 ## Ergebnis
 
 Alle nachfolgend aufgeführten Prüfungen bestanden. Das bestätigt die geprüfte
 Skriptlogik, Konfiguration und Fehlerbehandlung. Eine vollständige Installation
-auf Windows oder ein Lauf des vorgesehenen LLM auf der Shadow-GPU wurde hier nicht
+auf Windows oder ein Lauf des vorgesehenen LLM auf der GPU des Zielsystems wurde hier nicht
 ausgeführt. Die Hardware und das Modell werden beim tatsächlichen Provisionierungslauf mit
 verpflichtenden Chat-/Tool-Smoke-Tests geprüft. Die erste GUI-Nutzung und ein
-kleiner echter Projektauftrag bleiben Teil der Abnahme auf dem Shadow.
+kleiner echter Projektauftrag bleiben Teil der Abnahme auf dem Windows-PC.
 
 | Prüfung | Umfang | Ergebnis |
 |---|---|---|
@@ -580,7 +609,7 @@ keine Modellintelligenz und kein Verhalten der realen GPU.
 Für Qwen sind die Metadaten auf `reasoning_content` ausgerichtet. Für GPT-OSS
 wird das von LM Studio dokumentierte Feld `reasoning` verwendet. Beide Varianten
 wurden mit echten Kilo-SDK-Requests gegen synthetische Antworten geprüft. Die
-auf dem Shadow tatsächlich aktivierten Modelltemplates und Ausgabeformate sind
+auf dem Windows-PC tatsächlich aktivierten Modelltemplates und Ausgabeformate sind
 weiterhin durch die dortigen Funktionsprüfungen zu bestätigen.
 
 ### Abgedeckte Mehrmodell-Fehlerfälle
@@ -733,7 +762,7 @@ einer passenden vorhandenen Instanz, die Ablehnung eines öffentlichen Listeners
 der Erhalt eines fremden geladenen Modells sowie das Zurückweisen falscher
 Tool-Argumente. Es wurde kein automatisches Entladen fremder Modelle beobachtet.
 
-## Noch auf dem tatsächlichen Shadow-PC zu prüfen
+## Noch auf dem tatsächlichen Windows-PC zu prüfen
 
 Windows PowerShell 5.1/ISE, WinGet, Installer/UAC, Windows-Verknüpfungen, die
 VS-Code-Oberfläche und die NVIDIA-GPU wurden nicht unter Windows ausgeführt.
@@ -753,7 +782,7 @@ kein Beweis allgemeiner Fehlerfreiheit.
 Die ausführbaren Prüfungen des aktuellen Pakets liegen unter `tests/`.
 Die Testdateien, die in historischen Abschnitten genannt werden, können aus
 früheren Auslieferungen stammen. Synthetische Testserver und Agenten liefern
-keinen Nachweis über die realen Modelle auf dem Shadow PC.
+keinen Nachweis über die realen Modelle auf dem Windows-PC.
 
 Herstellerquellen für den Telemetrieschalter und das geprüfte Ereignisformat:
 
@@ -767,7 +796,7 @@ Herstellerquellen für den Telemetrieschalter und das geprüfte Ereignisformat:
 Im Projektordner, mit PowerShell 7 und Node/Git:
 
 ```powershell
-pwsh -NoProfile -File .\Quellpaket\tests\Test-Bootstrap.ps1 -BootstrapPath .\Provision-ShadowLocalAI.ps1
+pwsh -NoProfile -File .\Quellpaket\tests\Test-Bootstrap.ps1 -BootstrapPath .\Provision-LoKiEnte.ps1
 pwsh -NoProfile -File .\Quellpaket\tests\Test-CoderWorkflow.ps1
 pwsh -NoProfile -File .\Quellpaket\tests\Test-ProjectSelection.ps1
 pwsh -NoProfile -File .\Quellpaket\tests\Test-WorkspaceGuide.ps1
@@ -780,7 +809,7 @@ node .\Quellpaket\tests\Test-ModelRouter.mjs
 ```
 
 Einen echten kleinen Codeauftrag und die semantische Suchprobe nach der
-Provisionierung zusätzlich auf dem Shadow PC ausführen.
+Provisionierung zusätzlich auf dem Windows-PC ausführen.
 ## Welcome-Projekt — Paket 2026.11.18.19
 
 Test-WelcomeProject.ps1: 11 Prüfungen bestanden mit echtem Git und Node.

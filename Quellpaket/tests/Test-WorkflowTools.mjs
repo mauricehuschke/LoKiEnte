@@ -34,7 +34,7 @@ async function waitFor(runId, predicate, timeout = 15000) {
 async function start(task) {
   const card = await tools.startTool.execute({ task }, context);
   const runId = runIdFrom(card); started.push(runId);
-  assert.match(card, /QUEUED/); assert.doesNotMatch(card, /## LoKi: VERIFIED/);
+  assert.match(card, /QUEUED/); assert.doesNotMatch(card, /## LoKiEnte: VERIFIED/);
   return runId;
 }
 async function finish(runId) { return waitFor(runId, current => TERMINAL_STATES.has(current.status)); }
@@ -118,7 +118,7 @@ try {
 
   await test('visible phases, project lock, binding and verified receipt', async () => {
     const runId = await start('success');
-    await assert.rejects(tools.startTool.execute({ task: 'parallel' }, context), /bereits ein LoKi-Auftrag/);
+    await assert.rejects(tools.startTool.execute({ task: 'parallel' }, context), /bereits ein LoKiEnte-Auftrag/);
     await assert.rejects(tools.statusTool.execute({ runId }, { ...context, directory: secondProject }), /gehoert nicht/);
     const done = await finish(runId);
     assert.equal(done.status, 'VERIFIED', JSON.stringify(done)); assert.equal(done.exitCode, 0);

@@ -1,16 +1,23 @@
-# LoKi – lokale KI-Entwicklung mit VS Code, Kilo und LM Studio
+# LoKiEnte – lokale KI-Entwicklung mit VS Code, Kilo und LM Studio
 
-LoKi richtet eine lokale Entwicklungsumgebung unter Windows ein. Du arbeitest
+<p align="center">
+  <img src="assets/lokiente-preview.png" width="280" alt="LoKiEnte: eine freche Ente mit gruenem Loki-Helm und goldenen Hoernern">
+</p>
+
+LoKiEnte richtet eine lokale Entwicklungsumgebung unter Windows ein. Du arbeitest
 in VS Code, nutzt Kilo für Analyse und Entwicklung und führst die Modelle über
-LM Studio auf deinem Rechner aus. Das Paket ist auf einen Shadow PC mit
-NVIDIA-GPU ausgerichtet und prüft die tatsächlich verfügbaren Ressourcen.
+LM Studio auf deinem Rechner aus. Das Paket ist für Windows x64 auf lokalen PCs, Workstations und geeigneten
+virtuellen Maschinen ausgelegt. Es prüft die tatsächlich verfügbaren Ressourcen.
+Die automatischen GPU-Prüfungen sind derzeit auf NVIDIA ausgerichtet; andere
+GPU-Hersteller und reine CPU-Systeme sind nicht als gleichwertige Zielkonfiguration
+validiert. Linux und macOS werden vom Provisionierer nicht unterstützt.
 
 **Schwerpunkt ist überprüfbare Codequalität:** Getrennte Agenten erstellen Tests,
 implementieren eine begrenzte Änderung und prüfen anschließend Code und Ergebnisse.
 Die Modelle arbeiten lokal. Für Installation und Downloads wird Internet benötigt;
 Projektwerkzeuge können unabhängig davon Netzwerkzugriffe ausführen.
 
-Paketversion: **2026.11.18.20**.
+Paketversion: **2026.11.18.21**.
 
 ## Voraussetzungen
 
@@ -28,12 +35,12 @@ gehören nicht in das Repository.
 
 ## Installieren oder aktualisieren
 
-1. Kopiere die aktuelle `Provision-ShadowLocalAI.ps1` auf den Zielrechner.
+1. Kopiere die aktuelle `Provision-LoKiEnte.ps1` auf den Zielrechner.
    Die einzelne Datei enthält das Quellpaket; eine zusätzliche ZIP ist nicht nötig.
 2. Öffne Windows PowerShell im Ordner der Datei. Für eine neue Installation etwa:
 
    ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -InstallRoot "D:\LoKi"
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "$env:LOCALAPPDATA\LoKiEnte"
    ```
 
 3. Prüfe das angezeigte Ziel und bestätige die Provisionierung mit `y`.
@@ -44,7 +51,7 @@ gehören nicht in das Repository.
    Funktionen oder Modelle noch nicht vollständig betriebsbereit geprüft sind.
 
 **Für Updates denselben Installationsordner verwenden.** Vorher laufende
-KI-Aufträge und LoKi-Fenster schließen. Der Provisionierer aktualisiert auch
+KI-Aufträge und LoKiEnte-Fenster schließen. Der Provisionierer aktualisiert auch
 erreichbare, bereits registrierte Projekte. Eigene Aufgaben, Projektdateien und
 Testbefehle bleiben erhalten. Die verwalteten Aufgaben und Kilo-Werkzeuge erhalten
 die automatische Auftragsvorbereitung auch für bestehende Projekte.
@@ -54,14 +61,14 @@ Installationsordner gesteuert. Das Paket liefert die geprüfte Kilo-Erweiterung
 mit einer Versionsfreigabe. Es aktualisiert nicht eigenständig die Bibliotheken
 deiner Anwendungsprojekte. Details stehen in der [technischen README](Quellpaket/README.md).
 
-## Erneut auf dem Shadow PC provisionieren
+## Bestehende Installation aktualisieren
 
-Laufende LoKi-Aufträge beenden und die LoKi-VS-Code-Fenster schließen.
-Die aktuelle PS1 auf den Shadow PC kopieren und PowerShell im Ordner dieser
+Laufende LoKiEnte-Aufträge beenden und die LoKiEnte-VS-Code-Fenster schließen.
+Die aktuelle PS1 auf den Windows-PC kopieren und PowerShell im Ordner dieser
 Datei öffnen. Für die bestehende Installation unter D:\LoKi:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-ShadowLocalAI.ps1 -InstallRoot "D:\LoKi"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "D:\LoKi"
 ```
 
 Bei einem anderen bisherigen Installationsort genau diesen als InstallRoot
@@ -76,9 +83,8 @@ und erzwingt keine neuen Modelloptionen. Ein anderes Ziel lässt sich mit
 `-InstallRoot` wählen. `Project-Run.ps1` öffnet für dasselbe Ziel die
 Projektauswahl; `-ProjectPath` ist optional.
 
-Die alte separate `ShadowLocalAI-Provisioning.zip` wurde in die Paketsicherung
-verschoben. Sie gehört zu einem früheren Stand und wird nicht benötigt.
-Maßgeblich ist die aktuelle einzelne PS1 mit ihrer eingebetteten Nutzlast.
+Eine separate ZIP wird nicht benötigt. Maßgeblich ist die aktuelle einzelne
+PS1 mit ihrer eingebetteten Nutzlast.
 
 ## Sämtliche Parameter des Provisionierungsskripts
 
@@ -89,7 +95,7 @@ Setup-Parameter.
 
 | Parameter | Standard / zulässige Werte | Wirkung |
 |---|---|---|
-| `-InstallRoot` | Ordner der gestarteten PS1; nicht leer | LoKi-Installationsordner. Beim Update denselben Ordner verwenden. Basisprogramme und LM-Studio-Modelle behalten ihre eigenen Speicherorte. |
+| `-InstallRoot` | Ordner der gestarteten PS1; nicht leer | LoKiEnte-Installationsordner. Beim Update denselben Ordner verwenden. Basisprogramme und LM-Studio-Modelle behalten ihre eigenen Speicherorte. |
 | `-AuditOnly` | Schalter | Prüft Hardware, Werkzeuge, lokale Zustände und Online-Metadaten ohne Installation oder Modelldownload. Werkzeuge können eigene Logs/Caches schreiben oder Dienste initialisieren. Kein Provisionierungslauf. |
 | `-ModelMode` | `Dual`; `Single` oder `Dual` | Dual: Rollenmodellpool mit Router und lokaler Indexierung. Modelle werden kontrolliert nacheinander verwendet; der Name bedeutet nicht zwei gleichzeitig geladene Codingmodelle. Single: ein Codingmodell, derzeit ohne eingerichtete semantische Indexierung. |
 | `-IncludeFastModel` | Schalter | Zusätzliches kleines Fast-Modell im Dual-Pool anbieten; nur mit Dual zulässig. Nicht mit dem regulären Coder-Fast-Profil verwechseln. |
@@ -98,7 +104,7 @@ Setup-Parameter.
 | `-RouterPort` | `1235`; 1024–65535 | Lokaler Modellrouter-Port im Dual-Modus. Anderen Port als den LM-Studio-Port wählen. |
 | `-PreferredModel` | `Auto`; `Auto`, `Qwen27B`, `GptOss20B` | Bevorzugtes Modell für die Auswahl. Auto nutzt Hardware und gespeicherte Auswahl; die konkrete Auswahl wird bestätigt. GptOss20B als explizite Vorgabe verlangt Single. |
 | `-ModelKey` | nicht gesetzt; Zeichenfolge | Eindeutiger lokaler modelKey oder vollständiger Modellpfad aus `lms ls --json`; nur Single. Modell muss bereits vorhanden sein. |
-| `-ApiTokenEnvironmentVariable` | `SHADOW_LM_API_KEY` | Name der Umgebungsvariable für den lokalen API-Token, nicht der Token selbst. Keine Geheimnisse als Parameter oder in Projektdateien ablegen. |
+| `-ApiTokenEnvironmentVariable` | `LOKIENTE_LM_API_KEY` | Name der Umgebungsvariable für den lokalen API-Token, nicht der Token selbst. Keine Geheimnisse als Parameter oder in Projektdateien ablegen. |
 | `-ContextLength` | `32768`; 8192–65536 | Gewünschte Kontextgröße in Tokens. Ressourcenprüfung kann eine kleinere tatsächlich nutzbare Größe wählen. Größerer Kontext benötigt mehr Speicher. |
 | `-Port` | `1234`; 1024–65535 | Lokaler LM-Studio-API-Port. |
 | `-ProjectPath` | leeres String-Array | Zusätzliche vorhandene Projektordner registrieren/aktualisieren. Bereits registrierte erreichbare Projekte werden auch ohne diesen Parameter aktualisiert. Welcome-Testprojekt wird automatisch ergänzt. |
@@ -119,7 +125,7 @@ Für mehrere Projektpfade das Skript direkt aus einer PowerShell aufrufen,
 damit das Array erhalten bleibt:
 
 ```powershell
-& .\Provision-ShadowLocalAI.ps1 -InstallRoot 'D:\LoKi' -ProjectPath @('D:\Projekte\AppA', 'D:\Projekte\AppB')
+& .\Provision-LoKiEnte.ps1 -InstallRoot 'D:\LoKi' -ProjectPath @('D:\Projekte\AppA', 'D:\Projekte\AppB')
 ```
 
 Ist die Ausführungsrichtlinie dafür eingeschränkt, zuvor eine neue PowerShell
@@ -168,12 +174,12 @@ Es ist keine Betriebssystem-Sandbox: Auch diese Prozesse laufen mit deinem Konto
 ## Im Alltag starten
 
 Öffne die erzeugte Desktopverknüpfung. Im PowerShell-Menü wählst du ein bekanntes
-Projekt oder einen weiteren vorhandenen Ordner aus. LoKi bereitet den lokalen
+Projekt oder einen weiteren vorhandenen Ordner aus. LoKiEnte bereitet den lokalen
 Modellzugriff vor und öffnet den verwalteten VS-Code-Arbeitsbereich.
 
 Für ein neues Projekt zunächst einen Ordner und das Grundgerüst anlegen sowie
 Git initialisieren und einen ersten Commit erstellen. Danach den Ordner auswählen.
-LoKi legt keinen zusätzlichen Git-Worktree an.
+LoKiEnte legt keinen zusätzlichen Git-Worktree an.
 
 Wähle in Kilo `shadow-chat` und beschreibe direkt die gewünschte Änderung samt
 Grenzen und erwartetem Verhalten. Kilo startet den geprüften Ablauf; ein
@@ -184,7 +190,7 @@ Auftrag ist nicht nötig. Bei unklaren Anforderungen oder fehlender Testumgebung
 meldet Kilo den konkreten Klärungsbedarf.
 
 Die Statusausgabe in Kilo zeigt Phase, Agentenrolle, Rollenmodell und Ergebnis.
-Im LoKi-Auftragsordner steht zusätzlich `LOKI-STATUS.md`. Mit „Zeige die Details“
+Im LoKiEnte-Auftragsordner steht zusätzlich `LOKI-STATUS.md`. Mit „Zeige die Details“
 oder „Brich den Auftrag ab“ kannst du Bericht bzw. Abbruch anfordern. Die Rollen
 laufen als getrennte externe CLI-Sitzungen; der Status ist keine native
 Kilo-Task-Baumansicht. `task.md` und die VS-Code-Tasks bleiben eine optionale
@@ -224,14 +230,14 @@ einen unabhängig geprüften strukturierten Ersatz. Fehlen Werkzeuge oder wurde 
 automatisch verwaltetes Feld manuell geändert, zeigt `NEEDS_INPUT` den Konflikt.
 Der ursprüngliche Stand bleibt in der Sicherung erhalten.
 
-**Warum meldet LoKi ein fremdes Kilo-Werkzeug?**
+**Warum meldet LoKiEnte ein fremdes Kilo-Werkzeug?**
 Kilo kann eigene JavaScript-/TypeScript-Werkzeuge aus seinem Benutzerprofil laden,
-auch bei abgeschalteten externen Plugins. LoKi prüft diese Importpfade vorab und
+auch bei abgeschalteten externen Plugins. LoKiEnte prüft diese Importpfade vorab und
 stoppt bei Konflikten. Die Meldung nennt die betroffene Datei; sichere und verlagere
-sie bei Bedarf selbst außerhalb des angegebenen Kilo-Werkzeugordners. LoKi löscht
+sie bei Bedarf selbst außerhalb des angegebenen Kilo-Werkzeugordners. LoKiEnte löscht
 oder überschreibt diese eigenen Werkzeuge nicht.
 
-**Welche Tests erkennt LoKi?**
+**Welche Tests erkennt LoKiEnte?**
 Node-Tests sowie lokal installierte Vitest-, Jest- und Playwright-Runner werden
 mit passenden Berichtadaptern angeboten; Python/pytest und TypeScript-Typechecks
 werden ebenfalls unterstützt. Fehlende Projektabhängigkeiten installiert diese
@@ -239,7 +245,7 @@ Vorbereitung nicht. Für andere Buildketten kannst du eigene Projektchecks einma
 einrichten. Ein erfolgreicher Typecheck allein ersetzt keine Verhaltenstests.
 
 **Kann ich während eines Auftrags weiter an demselben Projekt ändern?**
-Vermeide das. LoKi sperrt parallele eigene Workflow-Läufe und kontrolliert den
+Vermeide das. LoKiEnte sperrt parallele eigene Workflow-Läufe und kontrolliert den
 Quellstand. Änderungen durch den Editor oder andere Prozesse können den Nachweis
 ungültig machen; sie werden nicht automatisch zurückgesetzt.
 
@@ -267,13 +273,44 @@ Verwende bestätigte Testbefehle und lokale Testdaten ohne Produktionszugänge.
 ## Für Paketentwickler
 
 `Quellpaket` enthält die bearbeitbaren Skripte, Anleitungen und Tests.
-`Build-ShadowLocalAI.py` erzeugt daraus die eingebettete Nutzlast mit SHA-256.
+`Build-LoKiEnte.py` erzeugt daraus die eingebettete Nutzlast mit SHA-256.
 Nach Änderung der Versionsangabe in `Quellpaket/README.md`:
 
 ```powershell
-python .\Build-ShadowLocalAI.py 2026.11.18.20
+python .\Build-LoKiEnte.py 2026.11.18.21
 ```
 
 Ausführbare Prüfungen und deren Grenzen sind in
 [VALIDATION.md](Quellpaket/VALIDATION.md) dokumentiert. Ein echter Probeauftrag
 und die GPU-/GUI-Abnahme müssen zusätzlich auf dem Zielrechner erfolgen.
+
+## Logo und Projektname
+
+Das Projekt heißt **LoKiEnte**. Der Desktop-Launcher erhält bei der Provisionierung
+den Namen **LoKiEnte** und das Enten-Logo. Das gilt auch für Updates; passende alte
+Verknüpfungen derselben Installation werden gesichert und ersetzt. `-NoShortcut`
+überspringt diesen Schritt. Verknüpfungen zu anderen Installationen bleiben erhalten.
+
+- [Transparentes PNG-Original, 1254 × 1254 Pixel](assets/lokiente-logo.png)
+- [PNG-Vorschau, 512 × 512 Pixel](assets/lokiente-preview.png)
+- [Windows-Icon, 16 bis 256 Pixel](Quellpaket/assets/lokiente.ico)
+- [Asset-Herkunft und Generierungsprompt](assets/README.md)
+
+`scripts/Build-Logo.ps1` erzeugt unter Windows mit PowerShell 7 aus dem Original
+die Vorschau und das mehrstufige ICO erneut. Anschließend den Installer mit
+`python .\Build-LoKiEnte.py 2026.11.18.21` neu bauen. Nur das kleine ICO wird
+für die Desktopverknüpfung im Installer benötigt; das PNG-Original bleibt im Repo.
+
+Die bisherigen technischen Kennungen (`loki_*`, `LOKI_*`, `shadow-*`),
+Dateien wie `LOKI-STATUS.md` und Installationsmarker bleiben für bestehende
+Projekte kompatibel. Vorhandene Installationsordner werden nicht umbenannt;
+die Starthelfer verwenden weiterhin `D:\LoKi`, sofern kein `-InstallRoot`
+angegeben wird. Neue Installationen können beispielsweise `D:\LoKiEnte` nutzen.
+
+### Kompatibilität bestehender Installationen
+
+Der neue Standard für den **Namen** einer optionalen Token-Umgebungsvariable ist
+`LOKIENTE_LM_API_KEY`. Das ist kein Token. Beim Update bleibt der gespeicherte
+Variablenname erhalten; mit `-ApiTokenEnvironmentVariable` kannst du ihn ausdrücklich
+ändern. Den Wert weiterhin nur lokal bereitstellen. Interne historische Präfixe
+sind keine Anbieterbindung und enthalten keine persönlichen Daten.

@@ -473,7 +473,7 @@ function Configure-LocalRuntime {
         $SelectedProfile,
         [string]$ModelKey,
         [string]$LmsPath,
-        [string]$ApiTokenEnvironmentVariable = 'SHADOW_LM_API_KEY',
+        [string]$ApiTokenEnvironmentVariable = 'LOKIENTE_LM_API_KEY',
         [switch]$AllowUnfitAttempt
     )
     if (-not $IsWindows) { throw 'Configure-LocalRuntime ist fuer Windows mit einer NVIDIA-GPU vorgesehen.' }
@@ -581,7 +581,7 @@ function Configure-LocalRuntime {
             if(-not $memoryEstimate){throw 'Keine auswertbare LM-Studio-Speicherschaetzung vorhanden.'}
             $memoryEstimate.ReserveOverride=$true
             $effectiveContext=[int]$memoryEstimate.ContextLength
-            Write-Warning "$fitMessage Ladeversuch ohne LoKi-Reserve; LM-Studio-Schutzregeln bleiben aktiv."
+            Write-Warning "$fitMessage Ladeversuch ohne LoKiEnte-Reserve; LM-Studio-Schutzregeln bleiben aktiv."
         }
         Write-Host "Lade Modell mit $effectiveContext Kontext-Tokens, GPU-Offload max und genau einem Inferenz-Slot ..."
         if(-not $ModelKey){Assert-LrSelectedModel -LmsPath $lms -LogDirectory $logDirectory -ExpectedPath $profile.ExpectedPath -ModelPath $selectedPath}

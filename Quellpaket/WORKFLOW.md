@@ -1,4 +1,4 @@
-# LoKi anwenden: vom Auftrag zum geprüften Code
+# LoKiEnte anwenden: vom Auftrag zum geprüften Code
 
 Diese Anleitung beschreibt den Workflow ab Paket **2026.11.18.18**. Sie richtet
 sich an Anwender, die mit VS Code und Git arbeiten können. Die lokale KI
@@ -11,8 +11,8 @@ einen weiteren vorhandenen Projektordner an. Für ein ganz neues Projekt zunäch
 den Ordner und das gewünschte Grundgerüst selbst anlegen. Schreibende Workflows
 benötigen die Wurzel eines Git-Repositories mit mindestens einem Commit.
 
-VS Code öffnet den Quellordner und den zugehörigen LoKi-Auftragsordner. Die
-Arbeitsbereichsdateien und LoKi-Konfiguration liegen außerhalb deines Repositories
+VS Code öffnet den Quellordner und den zugehörigen LoKiEnte-Auftragsordner. Die
+Arbeitsbereichsdateien und LoKiEnte-Konfiguration liegen außerhalb deines Repositories
 unter `<InstallRoot>\projects\<Projektkennung>` bzw. `workspaces`.
 
 Wähle in Kilo `shadow-chat` und gib deinen Auftrag direkt ein. Der Chat kann
@@ -219,7 +219,7 @@ Testfälle; Import-/Syntaxfehler sind kein gültiger Regressionsnachweis.
 Nach `loki_start` verfolgt Kilo den Auftrag mit `loki_status`. Die Werkzeugausgabe
 zeigt Phase, Agentenrolle, angefordertes Rollenmodell und Zustand sowie aktuelle
 Werkzeugaktivität. `loki_details` liefert den begrenzten Laufbericht und Ereignisse.
-Zusätzlich steht im LoKi-Auftragsordner `LOKI-STATUS.md`; dort kannst du den Verlauf
+Zusätzlich steht im LoKiEnte-Auftragsordner `LOKI-STATUS.md`; dort kannst du den Verlauf
 auch neben dem Chat ansehen. Die Anzeigen stammen aus tatsächlichen Laufereignissen.
 
 Die kontrollierten Phasen laufen als getrennte externe Kilo-CLI-Sitzungen. Sie
@@ -265,7 +265,7 @@ Statusabruf kann einen wieder erreichbaren Worker zeigen; ein Abbruch kann
 weiterhin vorgemerkt werden. Wiederherstellung erst nach bestätigtem Prozessende
 oder Systemneustart, ohne den Auftrag dadurch als erfolgreich zu behandeln.
 
-Prüfe den Git-Diff und die Anwendung selbst, bevor du committest. LoKi erzeugt
+Prüfe den Git-Diff und die Anwendung selbst, bevor du committest. LoKiEnte erzeugt
 keinen separaten Worktree und führt keine automatischen Commits oder Pushes aus.
 Bestehende Änderungen werden nicht zurückgesetzt. Nach Änderungen am geprüften
 Quellstand ist ein neuer Prüflauf nötig.
@@ -278,7 +278,7 @@ beweisen nicht, dass Tests fachlich sinnvoll oder manipulationssicher sind.
 
 ## 8. Bestehende Projekte aktualisieren
 
-Beende aktive LoKi-Aufträge und Fenster. Führe den neuen Provisionierer mit dem
+Beende aktive LoKiEnte-Aufträge und Fenster. Führe den neuen Provisionierer mit dem
 bisherigen Installationsverzeichnis aus. Er aktualisiert alle erreichbaren
 registrierten Projekte, ihre Aufgaben und `LOKI-WORKFLOW.md`.
 

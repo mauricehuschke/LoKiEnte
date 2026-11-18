@@ -48,7 +48,7 @@ try {
         $state=Get-Content -LiteralPath $runtimeFile -Raw|ConvertFrom-Json
         $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -LmsPath $state.LmsPath -ModelKey $state.ModelPath -ContextLength $state.ContextLength -Port $state.Port -DownloadModel $false -ApiTokenEnvironmentVariable $state.ApiTokenEnvironmentVariable -AllowUnfitAttempt:($chain.ContainsKey('allowUnfitAttempt') -and $chain.allowUnfitAttempt -eq $true)
         if($runtime.Status -cnotin @('Ready','Deferred')){throw 'Lokaler Modellstatus ist unbekannt.'}
-        $singleName=if($runtime.Status -ceq 'Deferred'){'Shadow local [NOCH NICHT GEPRUEFT]'}else{'Shadow local - verified workflow'}
+        $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOCH NICHT GEPRUEFT]'}else{'LoKiEnte local - verified workflow'}
         $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
     }
     if($ProjectPath) {

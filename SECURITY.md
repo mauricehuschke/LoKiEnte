@@ -7,7 +7,7 @@ Die .gitignore schließt diese Dateien aus. Bereits getrackte Dateien werden
 dadurch nicht automatisch aus älteren Commits entfernt.
 
 API-Tokens über die vorgesehenen Umgebungsvariablen bzw. lokale
-Zugangsdatenverwaltung bereitstellen. Variablennamen wie SHADOW_LM_API_KEY sind
+Zugangsdatenverwaltung bereitstellen. Variablennamen wie LOKIENTE_LM_API_KEY sind
 keine Zugangsdaten. Keine echten Werte in Skripte, Tests, Screenshots oder Issues
 kopieren. Nur synthetische Testdaten und neutrale Beispielpfade verwenden.
 

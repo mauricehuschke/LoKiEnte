@@ -224,7 +224,7 @@ try {
     $script:loaded=@();$script:noFitPath=$script:fixtures[0].path;$script:rejectNoFit=$false
     $overridePool=Configure-LocalModelPool -InstallRoot (Join-Path $root 'no-fit-success') -ContextLength 16384 -DownloadModel:$false -AllowUnfitAttempt
     $overrideHigh=@($overridePool.Profiles|Where-Object {$_.Alias -ceq 'coder-high'})[0]
-    Assert-Pool ($overrideHigh.VerificationState -ceq 'Verified' -and $overrideHigh.Estimate.ReserveOverride -eq $true) 'A successful load without LoKi reserve still requires all smoke tests'
+    Assert-Pool ($overrideHigh.VerificationState -ceq 'Verified' -and $overrideHigh.Estimate.ReserveOverride -eq $true) 'A successful load without LoKiEnte reserve still requires all smoke tests'
     $script:noFitPath='';$script:loaded=@()
     $legacyRoot=Join-Path $root 'legacy';[void][IO.Directory]::CreateDirectory((Join-Path $legacyRoot 'runtime'))
     $legacy=[ordered]@{SchemaVersion=1;Status='Ready';ModelId='shadow-local-coder';ModelPath='known.gguf';ReusedLoadedModel=$true;SmokeTests=@{Chat='Passed';ToolCall='Passed';ToolResultRoundTrip='Passed'}}

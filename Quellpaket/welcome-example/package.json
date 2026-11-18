@@ -2,6 +2,6 @@
   "name": "loki-welcome-workflow-test",
   "version": "1.0.0",
   "private": true,
-  "description": "Local disposable LoKi workflow exercise; no external dependencies",
+  "description": "Local disposable LoKiEnte workflow exercise; no external dependencies",
   "scripts": { "test": "node --test" }
 }

@@ -20,7 +20,7 @@ def main():
 
     root = Path(__file__).resolve().parent
     source = root / "Quellpaket"
-    installer = root / "Provision-ShadowLocalAI.ps1"
+    installer = root / "Provision-LoKiEnte.ps1"
     readme = (source / "README.md").read_text(encoding="utf-8-sig")
     if not re.search(r"^Version: " + re.escape(args.version) + r"\s", readme, re.M):
         parser.error("Update the version in Quellpaket/README.md first")
@@ -28,13 +28,13 @@ def main():
     files = {}
     for file in paths:
         # Reject name-surrogate tags such as junctions. Sync placeholders can
-        # still be read and packed when the source lives on ShadowDrive.
+        # still be read and packed when the source lives in a synchronized folder.
         if file.is_symlink() or getattr(file.lstat(), "st_reparse_tag", 0) & 0x20000000:
             parser.error(f"Link in source package: {file}")
         if file.is_file():
             files[file.relative_to(source).as_posix()] = file.read_bytes()
     required = {
-        "Setup.ps1", "Start-LocalAI.ps1", "Invoke-SetupRequest.ps1",
+        "assets/lokiente.ico", "Setup.ps1", "Start-LocalAI.ps1", "Invoke-SetupRequest.ps1",
         "WorkflowPolicy.ps1", "Invoke-ReviewedTask.ps1", "TaskPreparation.ps1",
         "WorkflowProgress.ps1", "KiloWorkflowTools.mjs", "WorkflowJob.mjs",
         "Run-ProjectCheck.mjs", "AcceptancePolicy.ps1", "AgentTemplates.ps1",

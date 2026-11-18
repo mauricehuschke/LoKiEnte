@@ -6,7 +6,7 @@ $root=Join-Path ([IO.Path]::GetTempPath()) ("loki-entry user's & [x]-"+[guid]::N
 try{
     [void][IO.Directory]::CreateDirectory($root)
     foreach($name in @('Provision-Run.ps1','Project-Run.ps1')){Copy-Item -LiteralPath (Join-Path $PackageRoot $name) -Destination $root}
-    [IO.File]::WriteAllText((Join-Path $root 'Provision-ShadowLocalAI.ps1'),@'
+    [IO.File]::WriteAllText((Join-Path $root 'Provision-LoKiEnte.ps1'),@'
 param($InstallRoot,[switch]$AuditOnly)
 @{root=$InstallRoot;audit=[bool]$AuditOnly}|ConvertTo-Json -Compress
 '@)
