@@ -1,0 +1,27 @@
+{
+  "name": "managed-startup",
+  "displayName": "LoKiEnte Managed Startup",
+  "description": "Open Kilo in the local environment started by the LoKiEnte desktop launcher.",
+  "publisher": "lokiente",
+  "version": "0.1.1",
+  "engines": { "vscode": "^1.105.1" },
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "main": "./extension.cjs",
+  "activationEvents": ["onStartupFinished"],
+  "extensionKind": ["ui"],
+  "capabilities": { "untrustedWorkspaces": { "supported": true } },
+  "contributes": {
+    "commands": [{ "command": "lokiente.openKilo", "title": "Open Kilo", "category": "LoKiEnte" }],
+    "configuration": {
+      "title": "LoKiEnte",
+      "properties": {
+        "lokiente.startup.openKilo": {
+          "type": "boolean",
+          "default": true,
+          "scope": "machine",
+          "description": "Open the Kilo view once when a window starts through the LoKiEnte launcher. Disable to keep the restored layout."
+        }
+      }
+    }
+  }
+}

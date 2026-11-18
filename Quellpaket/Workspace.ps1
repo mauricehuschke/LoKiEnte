@@ -137,6 +137,7 @@ function New-ShadowWorkspace {
     $workspace=[ordered]@{
         folders=@(@{name=$safeName;path=$projectFull},@{name='Local AI - Task and checks';path=$projectState})
         settings=[ordered]@{
+            'chat.disableAIFeatures'=$true
             'kilo-code.new.autocomplete.enableAutoTrigger'=$false
             'kilo-code.new.autocomplete.enableSmartInlineTaskKeybinding'=$false
             'kilo-code.new.autocomplete.enableChatAutocomplete'=$false

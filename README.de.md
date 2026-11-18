@@ -224,6 +224,54 @@ Die [Anwenderanleitung mit vollständigem Beispiel](Quellpaket/WORKFLOW.de.md)
 erklärt die Freigaben, Testberichte und Workflows. Nach Installation liegt sie
 unter `app\WORKFLOW.md` und für jedes registrierte Projekt als `LOKI-WORKFLOW.md` vor.
 
+## Copilot, Kilo-Start und Settings Sync
+
+Der Desktoplauncher öffnet Kilo automatisch im verwalteten LoKiEnte-Fenster.
+Die eingebauten KI-/Copilot-Funktionen von VS Code werden dort ausgeblendet.
+Deine normale persönliche VS-Code-Umgebung bleibt unverändert; die erzeugten
+LoKiEnte-Arbeitsbereiche enthalten dieselbe KI-Vorgabe. Schließe nach einem Update
+alle LoKiEnte-Fenster vollständig und starte anschließend über das Desktopicon.
+
+Die mitgelieferte Erweiterung **LoKiEnte Managed Startup** öffnet Kilo einmal pro
+Fensterstart. Sie arbeitet nur mit der Launcher-Umgebung und dem dazugehörigen
+isolierten Profil. Sie sendet keine Prompts und startet keinen Auftrag. Möchtest
+du stattdessen das wiederhergestellte Layout behalten, setze
+`lokiente.startup.openKilo` in den verwalteten Benutzereinstellungen auf `false`.
+**LoKiEnte: Open Kilo** bleibt in der Befehlspalette verfügbar. Kann Kilo nicht
+geöffnet werden, beachte die Warnung und den Ausgabekanal **LoKiEnte Startup**.
+
+Über **Backup and Sync Settings** kannst du deine üblichen Erweiterungen und
+Editor-Einstellungen übernehmen. Die Provisionierung meldet dich nicht an und
+aktiviert keine Cloud-Synchronisierung. Wähle beim Einrichten von Sync:
+
+- **Extensions**; bei Bedarf zusätzlich **Settings**, **Keyboard Shortcuts** und
+  **Snippets**. Themes und Formatierer bleiben deine persönliche Auswahl.
+- Lasse **UI State** und **Profiles** für LoKiEnte vorzugsweise abgewählt, damit
+  Layout und Profile einer anderen Umgebung nicht importiert werden. Diese Auswahl
+  erfolgt im Sync-Dialog von VS Code; der Installer ändert sie nicht heimlich.
+- Die Provisionierung erweitert `settingsSync.ignoredSettings`, damit das verwaltete
+  Terminal, Kilo-Autocomplete-Vorgaben, Telemetrie-/Updatevorgaben, Startpräferenz
+  und Copilot-Sichtbarkeit lokal bleiben. Die gesamte Windows-Terminalprofil-Liste
+  wird ausgeschlossen, weil sie maschinenspezifische Programmpfade enthält.
+- `settingsSync.ignoredExtensions` schließt Kilo, den Startup-Helfer und beide
+  GitHub-Copilot-Erweiterungen aus. Installation und Aktivierungszustand bleiben
+  damit von deiner persönlichen Umgebung getrennt; andere Erweiterungen können
+  normal synchronisieren. Kilo aktualisiert die Provisionierung, nicht Settings Sync.
+
+Updates erhalten persönliche Einstellungen und eigene Ausnahmen, sichern geänderte
+Einstellungen unter `backups/vscode-settings` und entfernen ausdrückliche
+Sync-Freigaben, die den verwalteten Ausnahmen widersprechen. Auch bestehende
+registrierte Arbeitsbereiche erhalten die KI-Vorgabe.
+
+**Falls beim erstmaligen Aktivieren bereits ein Merge-Konflikt angezeigt wird:**
+Brich diese Einrichtung ab, schließe die LoKiEnte-Fenster, provisioniere erneut mit
+demselben Installationsordner und öffne danach LoKiEnte und die Sync-Einrichtung.
+Für Erweiterungen allein lasse **Settings** abgewählt. Synchronisierst du auch
+Einstellungen, löse verbleibende persönliche Konflikte gezielt auf. Ersetze nicht
+die gesamte Datei pauschal über **Accept Remote Settings** oder **Accept Local Settings**.
+Persönliche Konflikte bleiben möglich; die Provisionierung überschreibt keine
+Cloud-Einstellungen und manipuliert nicht die interne Sync-Datenbank von VS Code.
+
 ## Wie die Codeprüfung funktioniert
 
 1. Vorbereitung und unabhängiger Vorbereitungsreview legen den überprüfbaren Auftrag fest.

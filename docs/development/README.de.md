@@ -125,6 +125,23 @@ und eigene Auftragstexte bleiben erhalten. Eine unveränderte mitgelieferte deut
 Welcome-README wird gesichert und durch die englische Anleitung ersetzt; angepasste
 Welcome-Inhalte bleiben erhalten.
 
+## Verwalteter VS-Code-Start
+
+`Quellpaket/VsCodeProfile.ps1` führt lokale Profilvorgaben zusammen und paketiert
+den Helfer ohne externe Abhängigkeiten aus `Quellpaket/vscode-startup/` als VSIX.
+Setup installiert ihn über den regulären VS-Code-CLI im isolierten Erweiterungsordner
+und prüft die Version. Versionen in package.json und extension.vsixmanifest müssen
+übereinstimmen. Der Helfer verwendet öffentliche VS-Code-Erweiterungs-APIs und
+Kilos eigenen Befehl zum Fokussieren der Seitenleiste. Er prüft Launcher-Umgebung
+und tatsächlichen Profilspeicherpfad. VS-Code-SQLite-Speicher, Cloud-Sync-Zustand
+und persönliche Profile dürfen dafür nicht verändert werden.
+
+Profilerhaltung, Entfernung widersprechender Sync-Freigaben, Wiederholbarkeit,
+VSIX-Inhalt, Arbeitsbereichsmigration und Startup-/Fehlerverhalten prüfen
+Test-ProvisionSettings.ps1, Test-VsCodeProfile.ps1, Test-WorkspaceGuide.ps1 und
+Test-VsCodeStartup.mjs. Ein echtes VS-Code-/Kilo-Fenster und angemeldeter Settings
+Sync sind separate Integrationsprüfungen.
+
 ## Lizenz und Forks
 
 [Apache License 2.0 mit Commons Clause 1.0](../../LICENSE.txt) gilt für LoKiEnte

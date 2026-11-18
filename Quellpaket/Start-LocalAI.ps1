@@ -67,6 +67,8 @@ try {
     $null=Assert-ShadowKiloEffectiveConfig -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $workingDirectory
     $null=Assert-ShadowKiloWorkflowTools -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $workingDirectory
     $environment=Get-ShadowLocalEnvironment -InstallRoot $InstallRoot -ConfigJson ($configuration.Config|ConvertTo-Json -Depth 40 -Compress)
+    $environment['LOKIENTE_MANAGED_VSCODE']='1'
+    $environment['LOKIENTE_VSCODE_DATA_DIR']=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
     $start=[Diagnostics.ProcessStartInfo]::new()
     $start.FileName=[string]$chain.codeExecutable
     $start.WorkingDirectory=$workingDirectory

@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.18.23 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.18.24 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den
@@ -20,6 +20,31 @@ LoKiEnte-Starts öffnen ein neues Fenster mit isolierten Daten und Erweiterungen
 `GitHub.copilot` und `GitHub.copilot-chat`. Die Option gilt nur für das so
 gestartete Fenster; bestehende Fenster und persönliche Profile bleiben unverändert.
 Auch bereits registrierte Projekte erhalten sie beim nächsten LoKiEnte-Start.
+
+### Verwaltetes VS Code und Synchronisierung
+
+Die Provisionierung setzt `chat.disableAIFeatures=true` im isolierten Benutzerprofil
+und in neuen/bestehenden verwalteten Arbeitsbereichen. Sie installiert den lokalen
+VSIX-Helfer `lokiente.managed-startup`, der Kilos eigene Ansicht einmal pro
+Launcher-Fenster öffnet, ohne einen Auftrag zu starten. Er prüft Launcher-Markierung
+und Profilpfad; persönliche VS-Code-Fenster bleiben unbeeinflusst. Mit
+`lokiente.startup.openKilo=false` lässt sich das automatische Öffnen abschalten.
+Die Befehlspalette bietet weiterhin **LoKiEnte: Open Kilo**.
+
+`settingsSync.ignoredSettings` und `settingsSync.ignoredExtensions` werden mit
+eigenen Ausnahmen zusammengeführt. Verwaltete Terminal-, Telemetrie-, Update-,
+Kilo-Autocomplete- und KI-Sichtbarkeitseinstellungen bleiben lokal. Kilo, beide
+Copilot-Erweiterungen und der Startup-Helfer synchronisieren ihren Zustand nicht.
+Eigene Editor-Einstellungen bleiben erhalten; geänderte Einstellungen werden
+gesichert. Widersprechende ausdrückliche Sync-Freigaben werden entfernt.
+
+Sync bleibt freiwillig: Melde dich selbst an und wähle Extensions sowie bei Bedarf
+Settings, Keyboard Shortcuts und Snippets. UI State und Profiles vorzugsweise
+abwählen. Bei einem bereits offenen Ersteinrichtungs-Konflikt abbrechen, alle
+LoKiEnte-Fenster schließen, erneut provisionieren und Sync neu einrichten.
+Verbleibende persönliche Konflikte gezielt zusammenführen, nicht die gesamte
+Datei durch lokale oder entfernte Werte ersetzen. Cloud-Daten und interne
+Sync-Datenbanken werden nicht bearbeitet. Nach Updates alle LoKiEnte-Fenster neu starten.
 
 ### Lokale semantische Indexierung
 
@@ -96,7 +121,7 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.18.23` ausführen. Das Skript baut
+`python .\Build-LoKiEnte.py 2026.11.18.24` ausführen. Das Skript baut
 die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält

@@ -20,6 +20,7 @@ try{
         if(-not $content.Contains($required)){throw "Guide is missing: $required"}
     }
     $workspace=Get-Content -LiteralPath $entry.workspace -Raw|ConvertFrom-Json
+    if($workspace.settings.'chat.disableAIFeatures' -ne $true){throw 'Fresh workspace must hide built-in AI'}
     foreach($task in $workspace.tasks.tasks){
         if($task.args[2] -cne '-ExecutionPolicy' -or $task.args[3] -cne 'Bypass'){throw 'VS Code task lacks a process-local execution policy'}
         if($task.args -notcontains '-AutoPrepare'){throw 'Managed workflow task does not prepare criteria and checks automatically'}
@@ -38,6 +39,7 @@ try{
     [IO.File]::WriteAllText($guide,$guideText)
     $oldWorkspace=Get-Content -LiteralPath $entry.workspace -Raw|ConvertFrom-Json -AsHashtable
     $oldWorkspace.settings['editor.tabSize']=3
+    $oldWorkspace.settings['chat.disableAIFeatures']=$false
     $oldWorkspace.tasks.tasks+=@(@{label='Personal Task';type='process';command='personal.exe'})
     $oldWorkspace.tasks.tasks[0].command='old-powershell.exe'
     [IO.File]::WriteAllText($entry.workspace,($oldWorkspace|ConvertTo-Json -Depth 20))
@@ -56,6 +58,7 @@ try{
         throw 'Checks migration did not preserve user data and add safe defaults'
     }
     $workspace=Get-Content -LiteralPath $entry.workspace -Raw|ConvertFrom-Json
+    if($workspace.settings.'chat.disableAIFeatures' -ne $true){throw 'Existing workspace AI policy was not updated'}
     if($workspace.settings.'editor.tabSize' -ne 3 -or $workspace.tasks.tasks.label -notcontains 'Personal Task' -or
        $workspace.tasks.tasks[0].command -ceq 'old-powershell.exe'){
         throw 'Managed workspace task was not updated or custom settings were lost'
@@ -73,7 +76,7 @@ try{
        [IO.File]::ReadAllText($guide) -cne $guideText -or [IO.File]::ReadAllText($projectFile) -cne 'existing project'){
         throw 'Existing project or user-managed task, checks or guide was overwritten'
     }
-    [pscustomobject]@{suite='Workspace guide and provisioning migration';passed=$true;checks=12}|ConvertTo-Json
+    [pscustomobject]@{suite='Workspace guide and provisioning migration';passed=$true;checks=14}|ConvertTo-Json
 }finally{
     $resolved=[IO.Path]::GetFullPath($root)
     if(-not $resolved.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()),[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($resolved) -notlike 'shadow-workspace-guide-*'){throw 'Unsafe cleanup path'}

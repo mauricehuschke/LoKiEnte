@@ -866,3 +866,22 @@ Test-SelectionIntegration.ps1: 3 Setup-Integrationsprüfungen bestanden.
 Alle 16 öffentlichen Bootstrapparameter sind gegen die README-Tabelle geprüft;
 PowerShell-Syntaxprüfung bestanden. Der Probeauftrag mit echten lokalen
 Modellen wird nach Provisionierung vom Anwender im Welcome-Beispiel gestartet.
+
+## Verwalteter VS-Code-Start und Settings Sync — 2026.11.18.24
+
+Die Profilmigrationstests prüfen neue Installationen, bestehende persönliche
+Einstellungen, eigene Terminalprofile, Backups, wiederholte Provisionierung,
+fehlerhafte Eingaben und die Erhaltung anderer Profile. Neue Tests prüfen
+29 Profil-/VSIX-Bedingungen und zehn Startup-Szenarien, darunter fehlendes Kilo,
+Aktivierungsfehler, abgeschaltetes automatisches Öffnen, Schließen während der
+Aktivierung und eine geerbte Launcher-Umgebung in einem fremden Profil.
+Arbeitsbereichstests prüfen die KI-Vorgabe bei neuen und bestehenden Arbeitsbereichen.
+
+Ein lokaler Integrationstest mit VS Code 1.146.0 installierte die erzeugte VSIX
+über den echten CLI zusammen mit Kilo 7.8.30. Prüfungen im Erweiterungshost
+bestätigten die wirksame KI-Sichtbarkeitseinstellung, Sync-Ausnahmen, Kilo-Aktivierung
+und den registrierten Fokusbefehl. Der echte Helfer rief diesen Befehl erfolgreich
+auf. Der isolierte Test verwendete kein Benutzerkonto, keine Ziel-GPU und keine
+Modellinferenz. Angemeldeter Cloud-Sync und die abschließende visuelle Abnahme auf
+der Zielmaschine bleiben eigene Prüfungen. Der Installer bearbeitet weder die
+interne Sync-Datenbank noch löst er Cloud-Konflikte automatisch auf.

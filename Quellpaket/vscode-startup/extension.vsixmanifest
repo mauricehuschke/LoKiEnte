@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Language="en-US" Id="managed-startup" Version="0.1.1" Publisher="lokiente" />
+    <DisplayName>LoKiEnte Managed Startup</DisplayName>
+    <Description xml:space="preserve">Open Kilo in the managed LoKiEnte window.</Description>
+    <Properties><Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.105.1" /></Properties>
+    <License>extension/LICENSE.txt</License>
+  </Metadata>
+  <Installation><InstallationTarget Id="Microsoft.VisualStudio.Code" /></Installation>
+  <Dependencies />
+  <Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true" /></Assets>
+</PackageManifest>

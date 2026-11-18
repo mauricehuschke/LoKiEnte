@@ -35,6 +35,10 @@ try{
        $args -cnotcontains (Join-Path $root 'vscode-extensions')){
         throw 'LoKiEnte launch must disable both Copilot extensions only in its isolated new window'
     }
+    $launcherText=[IO.File]::ReadAllText((Join-Path $SourceRoot 'Start-LocalAI.ps1'))
+    foreach($required in @('LOKIENTE_MANAGED_VSCODE','LOKIENTE_VSCODE_DATA_DIR')){
+        if(-not $launcherText.Contains($required)){throw "Managed startup marker missing: $required"}
+    }
     $launcher=Join-Path $root 'app\Start-LocalAI.ps1'
     [IO.File]::WriteAllText($launcher,@'
 param([string]$InstallRoot,[string]$ProjectPath)
@@ -48,5 +52,9 @@ param([string]$InstallRoot,[string]$ProjectPath)
     if($received.InstallRoot -cne $root -or $received.ProjectPath -cne $project -or $received.Policy -cne 'Bypass'){
         throw 'Generated command did not preserve literal arguments or process policy'
     }
-    [pscustomobject]@{suite='PowerShell 7 start commands';passed=$true;checks=5}|ConvertTo-Json
-}finally{Remove-Item -LiteralPath $root -Recurse -Force}
+    [pscustomobject]@{suite='PowerShell 7 start commands';passed=$true;checks=7}|ConvertTo-Json
+}finally{
+    $resolved=[IO.Path]::GetFullPath($root)
+    if(-not $resolved.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($resolved) -notlike 'shadow start*'){throw 'Unsafe cleanup'}
+    if(Test-Path -LiteralPath $resolved){Remove-Item -LiteralPath $resolved -Recurse -Force}
+}

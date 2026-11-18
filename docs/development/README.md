@@ -118,6 +118,21 @@ Updates deploy paired English/German guides. Personal `ANLEITUNG.md` files and
 custom task text remain. An untouched bundled German Welcome README is backed up
 and replaced with the English guide; customized Welcome content is preserved.
 
+## Managed VS Code startup
+
+`Quellpaket/VsCodeProfile.ps1` merges the local profile policy and packages the
+dependency-free helper from `Quellpaket/vscode-startup/` as a VSIX. Setup installs
+it through the regular VS Code CLI into the isolated extension directory and
+verifies its version. Keep package.json and extension.vsixmanifest versions aligned.
+The helper uses public VS Code extension APIs and Kilo's own sidebar focus command.
+It checks both launcher environment and the extension's actual profile storage path.
+Do not edit VS Code's SQLite storage, cloud sync state or personal profiles.
+
+Validate profile preservation, sync opt-in removal, idempotence, VSIX contents,
+workspace migration and startup/failure behavior using Test-ProvisionSettings.ps1,
+Test-VsCodeProfile.ps1, Test-WorkspaceGuide.ps1 and Test-VsCodeStartup.mjs. A real
+VS Code/Kilo window and signed-in sync acceptance are separate integration checks.
+
 ## License and forks
 
 [Apache License 2.0 with Commons Clause 1.0](../../LICENSE.txt) applies to LoKiEnte
