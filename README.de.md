@@ -47,6 +47,79 @@ Lade das [aktuelle Release](https://github.com/mauricehuschke/LoKiEnte/releases/
 oder direkt den [eigenständigen Installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1) herunter. Die PS1 enthält das
 vollständige Quellpaket; die GitHub-Quellcode-ZIP und ein Repository-Klon sind nicht nötig.
 
+### Installer herunterladen und direkt aus seinem Ordner starten
+
+1. Lade [Provision-LoKiEnte.ps1](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
+   herunter und speichere sie in dem Ordner, in dem LoKiEnte dauerhaft liegen soll,
+   beispielsweise `D:\LoKiEnte`. Für ein Update verwende deinen bisherigen Installationsordner.
+2. Öffne diesen Ordner im Explorer, tippe `powershell` in die Adresszeile und
+   drücke Enter. Windows PowerShell startet dadurch im Ordner mit der PS1.
+3. Kopiere **einen** der folgenden Befehle. Prüfe und bestätige anschließend
+   den Installationsordner und die vorgeschlagene Modellauswahl.
+
+Ohne `-InstallRoot` verwendet der Installer **den Ordner, in dem die PS1 liegt**
+für seine verwaltete Umgebung. Der Downloadordner wird damit zum Installationsordner;
+verwende einen eigenen, dauerhaften Ordner. Die Basisprogramme und die Modelldateien
+von LM Studio behalten ihre eigenen Speicherorte.
+
+Der aktuelle Dateiname lautet `Provision-LoKiEnte.ps1`. Wenn du bisher
+`Provision-ShadowLocalAI.ps1` verwendet hast, ersetze diesen Namen im Befehl.
+Die neue PS1 kann die bestehende Installation im selben Ordner aktualisieren.
+Liegt der Download woanders, ergänze den Befehl um `-InstallRoot "D:\LoKi"` und
+ersetze `D:\LoKi` durch deinen tatsächlichen bisherigen Installationspfad.
+
+#### Empfohlener Einstieg: Dual-Modellpool
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual
+```
+
+Verwendet den Modellpool für Coding-/Review-Rollen und den lokalen Router.
+Hardwareprüfungen unterstützen die Modellauswahl; teilweises CPU/RAM-Offload ist
+bei einer neuen Installation nicht aktiviert. `Dual` ist auch der Standard ohne
+diese Option. Es bedeutet nicht, dass zwei Modelle gleichzeitig Inferenz ausführen.
+
+#### Dual-Pool mit zusätzlichem Fast-Modell
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel
+```
+
+Bietet zusätzlich ein kleines Modell für die optionale, lesende Fast-Rolle an.
+Es ist vom regulären Profil Coder Fast getrennt und benötigt zusätzlichen
+Modellspeicher auf dem Datenträger. Der Name garantiert keinen gemessenen Geschwindigkeitsgewinn.
+
+#### Dual-Pool mit Fast-Modell und teilweisem GPU-Offload
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload
+```
+
+Dies ist die bisher mit dem alten Installernamen verwendete Kombination. Sie erlaubt
+zusätzlich, Teile eines Modells über CPU/RAM auszuführen, wenn vollständiges GPU-Offload
+nicht passt. Sie kommt bei knappem Grafikspeicher und ausreichend Arbeitsspeicher
+infrage. Größere Modelle können dadurch nutzbar werden, Antworten aber deutlich
+langsamer ausfallen. Die Hardwareprüfungen bleiben aktiv.
+
+#### Einfachere Alternative: ein Coding-Modell
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single
+```
+
+Verwendet ein Coding-Modell statt des rollenbasierten Modellpools. Geeignet für eine
+einfachere Modellkonfiguration, derzeit ohne semantische Indizierung. Nicht mit
+`-IncludeFastModel` oder `-AllowPartialGpuOffload` kombinieren.
+
+Diese Kombinationen beschreiben neue Installationen. Updates übernehmen nicht
+ausdrücklich gesetzte, gespeicherte Modelloptionen; ein ausdrücklicher Wechsel von
+`ModelMode` setzt übernommene Modelloptionen zurück. Lasse `-AllowUnfitAttempt` bei
+einer normalen Installation weg: Es erlaubt Ladeversuche ohne nachgewiesene
+Speicherreserven und ist keine Qualitätseinstellung. Details stehen unter
+[allen Optionen](#sämtliche-parameter-des-provisionierungsskripts).
+
+Für einen automatischen Download mit Prüfsummenprüfung verwende den folgenden Abschnitt.
+
 ### PowerShell (empfohlen, mit Prüfsummenprüfung)
 
 Öffne Windows PowerShell in einem beschreibbaren Downloadordner und füge den

@@ -46,6 +46,77 @@ Download the [latest release](https://github.com/mauricehuschke/LoKiEnte/release
 or its [standalone installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1). The installer embeds the complete source
 package; the GitHub source ZIP and a repository clone are not required.
 
+### Download the installer and run it from its folder
+
+1. Download [Provision-LoKiEnte.ps1](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
+   and save it in the folder where you want to keep LoKiEnte, for example
+   `D:\LoKiEnte`. For an update, use your existing installation folder.
+2. Open that folder in File Explorer, type `powershell` in the address bar and
+   press Enter. This opens Windows PowerShell in the folder containing the PS1.
+3. Copy **one** of the commands below, then review and confirm the installation
+   directory and proposed model selection.
+
+Without `-InstallRoot`, the installer uses **the folder containing the PS1** for
+its managed environment. The download folder therefore becomes the installation
+folder; use a dedicated, permanent directory. Base applications and LM Studio's
+model files retain their own locations.
+
+The current filename is `Provision-LoKiEnte.ps1`. If you previously used
+`Provision-ShadowLocalAI.ps1`, replace that filename in your command. The new PS1
+can update an existing installation in the same folder. If you keep the download
+elsewhere, append `-InstallRoot "D:\LoKi"` to the command, replacing `D:\LoKi` with
+your actual existing installation path.
+
+#### Recommended starting point: Dual model pool
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual
+```
+
+Uses the role-based coding/review model pool and local router. Hardware checks
+guide model selection; partial CPU/RAM offload is not enabled for a fresh setup.
+`Dual` is also the default when the option is omitted. It does not mean that two
+models perform inference simultaneously.
+
+#### Dual pool with an additional Fast model
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel
+```
+
+Also offers a small model for the optional read-oriented Fast role. This is
+separate from the regular Coder Fast profile and needs additional model storage.
+The name does not guarantee a measured speed improvement.
+
+#### Dual pool with Fast model and partial GPU offload
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload
+```
+
+This is the combination used with the previous installer filename. It also allows
+part of a model to run on CPU/RAM when full GPU offload does not fit. Consider it
+when VRAM is limited but sufficient system RAM is available. Larger models may
+become usable, but responses can be much slower; hardware checks still apply.
+
+#### Simpler alternative: one coding model
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single
+```
+
+Uses one coding model instead of the role-based model pool. Choose this for a
+simpler model setup; it currently has no semantic indexing. Do not combine it
+with `-IncludeFastModel` or `-AllowPartialGpuOffload`.
+
+These combinations describe fresh setups. Updates retain unspecified saved model
+options; explicitly changing `ModelMode` resets inherited model options. For
+normal installation, leave `-AllowUnfitAttempt` off: it permits loading attempts
+without proven memory reserves and is not a quality setting. See
+[all options](#all-provisioning-parameters-and-options) for details.
+
+For an automated download with checksum verification, use the following section.
+
 ### PowerShell (recommended, with checksum verification)
 
 Open Windows PowerShell in a writable download directory and paste the entire
