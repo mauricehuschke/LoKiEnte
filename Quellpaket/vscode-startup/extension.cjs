@@ -2,6 +2,7 @@
 
 const vscode = require('vscode');
 const path = require('node:path');
+const { registerSyncGuide } = require('./sync-guide.cjs');
 
 async function activate(context) {
     // Do not affect personal VS Code windows, even if this extension is copied there.
@@ -13,6 +14,7 @@ async function activate(context) {
     const output = vscode.window.createOutputChannel('LoKiEnte Startup', { log: true });
     let disposed = false;
     context.subscriptions.push(output, { dispose() { disposed = true; } });
+    void registerSyncGuide(vscode, context, output);
     const openKilo = async () => {
         try {
             const kilo = vscode.extensions.getExtension('kilocode.kilo-code');

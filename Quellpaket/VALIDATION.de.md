@@ -6,6 +6,42 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
+## Embedding-Kompatibilität und nur Erweiterungen synchronisieren — Paket 2026.11.18.25
+
+Dieser Kandidat ist vom stabilen Release getrennt. Die neuen Tests für Embedding-
+Router und Sync-Hilfe sowie die bestehenden Router- und Startup-Tests bestanden
+alle 33 Node-Tests. PowerShell-Regressionen prüfen Embedding-Bereitschaft und
+Diagnose, Router-Austausch, Profilerhalt, Provisionierungseinstellungen, Launcher,
+Projektauswahl, Workspace-Migration, Modellpools und GPU-Teiloffloading.
+Alle 14 ausgewählten PowerShell-Suiten bestanden 334 Prüfungen, einschließlich
+vollständigem Qualitätsworkflow (54), Bootstrap (42), Sprachmigration (28),
+Startskripten (4) und Installationsort-Migration mit Windows PowerShell 5.1 (51).
+Die Tests verwenden synthetische Agentenantworten und installieren keine Programme
+oder Modelle. Der Installer enthält alle 98 Quelldateien bytegenau mit passender
+Prüfsumme. Syntaxprüfungen bestanden für 67 PowerShell-Dateien, 14 Node-Dateien und
+den Python-Builder; 72 lokale Markdown-Links, zwei JSON-Dateien und sechs
+JSON-Beispiele wurden validiert.
+
+Der echte Kilo-Indexer 7.8.30 reproduzierte die gemeldete Initialisierungsmeldung,
+wenn ein synthetischer lokaler Server `dimensions` ablehnte. Derselbe Indexer
+erreichte über die neue Route Complete, mit echtem LanceDB 0.26.2 und synthetischen
+768-dimensionalen Embeddings. Ein direkter Server, der das Feld akzeptierte,
+funktionierte ebenfalls. Das belegt die Kompatibilitätskorrektur, aber weder die
+Ursache auf einem Zielrechner ohne Logs noch die Suchqualität mit einem echten Modell.
+
+Der gepackte Startup-Helfer 0.1.2 wurde in einem isolierten Profil von VS Code
+1.146.0 mit Kilo 7.8.30 installiert und aktiviert. Beide LoKiEnte-Befehle, der
+offizielle Sync-Konfigurationsbefehl und der Kilo-Fokusbefehl waren verfügbar;
+Kilo war aktiv und die verwaltete Vorgabe zur KI-Sichtbarkeit blieb gesetzt.
+Es wurde kein angemeldetes Konto verwendet. Der Helfer öffnet die offizielle
+Auswahlliste; nur Extensions auszuwählen und zu bestätigen bleibt beim Nutzer.
+Die Tests prüfen Hinweise und Fehlerbehandlung, keine vorgetäuschte automatische
+Kategorieauswahl. Lokale Vorlieben und Daten des entfernten Kontos bleiben erhalten.
+
+Installation auf dem Zielrechner, echte LM-Studio-Embeddings/GPU-Inferenz, fertige
+Projektindizierung und angemeldeter Erweiterungs-Sync bleiben Abnahmeprüfungen.
+Ein erfolgreicher Vorabtest oder geöffneter Sync-Dialog belegt diese Ergebnisse nicht.
+
 ## Englisch als Standard und deutsche Dokumentation — Paket 2026.11.18.22
 
 40 eigenstaendige PowerShell-/Node-Testsuiten bestanden nach der Sprachumstellung.

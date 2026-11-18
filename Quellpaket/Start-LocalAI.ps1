@@ -43,7 +43,7 @@ try {
         $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $chain.nodeExecutable -PowerShellPath $chain.powerShellExecutable
         $embedding=Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)
         $primary=[string](Get-LrProperty $pool 'PrimaryAlias' 'coder')
-        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $primary -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable -EmbeddingModelId $embedding.InstanceId -EmbeddingApiBaseUrl $pool.BackendApiBaseUrl
+        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $primary -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable -EmbeddingModelId $embedding.InstanceId -EmbeddingApiBaseUrl $router.ApiBaseUrl
     }else{
         $state=Get-Content -LiteralPath $runtimeFile -Raw|ConvertFrom-Json
         $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -LmsPath $state.LmsPath -ModelKey $state.ModelPath -ContextLength $state.ContextLength -Port $state.Port -DownloadModel $false -ApiTokenEnvironmentVariable $state.ApiTokenEnvironmentVariable -AllowUnfitAttempt:($chain.ContainsKey('allowUnfitAttempt') -and $chain.allowUnfitAttempt -eq $true)

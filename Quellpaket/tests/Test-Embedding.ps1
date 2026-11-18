@@ -67,7 +67,7 @@ function Invoke-LrNative {
 }
 function Invoke-LrApi {
     param($Uri,$Headers,$Method,$Body,$TimeoutSeconds)
-    if($Uri -cne 'http://127.0.0.1:1234/v1/embeddings' -or $Body.encoding_format -cne 'base64'){throw 'Unexpected embedding request'}
+    if($Uri -cne 'http://127.0.0.1:1235/v1/embeddings' -or $Body.encoding_format -cne 'base64' -or $Body.dimensions -ne 768){throw 'Unexpected embedding request'}
     if($script:authStatus){return & $script:realApi -Uri $Uri -Headers $Headers -Method $Method -Body $Body -TimeoutSeconds $TimeoutSeconds}
     $vector=@(for($i=0;$i -lt 768;$i++){if($script:badVector){0.0}else{0.25}})
     if($script:base64){
@@ -123,6 +123,8 @@ try{
     Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'zero vector' 'Invalid inference does not report ready'
     $failedTest=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
     Assert-Embedding ($failedTest.Status -ceq 'Deferred' -and $failedTest.SmokeTest -ceq 'Failed' -and $failedTest.Message -match 'zero vector') 'An embedding test failure remains an explicit nonblocking warning'
+    $diagnostic=Get-Content -LiteralPath (Join-Path $root 'runtime/embedding-status.json') -Raw|ConvertFrom-Json
+    Assert-Embedding ($diagnostic.result.Status -ceq 'Deferred' -and $diagnostic.apiBaseUrl -ceq $pool.RouterApiBaseUrl -and $diagnostic.requestedDimensions -eq 768) 'Failed Kilo-compatible preflight remains visible in the local diagnostic report'
     $script:badVector=$false;$script:duplicateIndex=$true
     Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'vector indices' 'Duplicate vector indices are rejected'
     $script:duplicateIndex=$false
@@ -136,10 +138,10 @@ try{
         'coder-fast'=@{id='shadow-coder-fast';context=16384;output=4096}
         review=@{id='shadow-review';context=32768;output=8192}
         fast=@{id='shadow-fast';context=16384;output=4096}
-    }) -ApiBaseUrl $pool.RouterApiBaseUrl -EmbeddingApiBaseUrl $pool.BackendApiBaseUrl -EmbeddingModelId $result.InstanceId
+    }) -ApiBaseUrl $pool.RouterApiBaseUrl -EmbeddingApiBaseUrl $pool.RouterApiBaseUrl -EmbeddingModelId $result.InstanceId
     $envMap=Get-ShadowLocalEnvironment -InstallRoot $root -ConfigJson ($config.Config|ConvertTo-Json -Depth 40 -Compress)
     Assert-Embedding ($config.Config.indexing.provider -ceq 'openai-compatible' -and $config.Config.indexing.vectorStore -ceq 'lancedb' -and
-        $config.Config.indexing.'openai-compatible'.baseUrl -ceq $pool.BackendApiBaseUrl -and
+        $config.Config.indexing.'openai-compatible'.baseUrl -ceq $pool.RouterApiBaseUrl -and
         $config.Config.permission.semantic_search -ceq 'allow' -and $envMap.KILO_LANCEDB_PATH -ceq $entry) 'Local indexing and semantic search are explicitly configured'
     Assert-Embedding ($config.Config.agent.'shadow-chat'.model -ceq 'lmstudio/coder-high' -and
         $config.Config.agent.'shadow-chat-fast'.model -ceq 'lmstudio/coder-fast' -and

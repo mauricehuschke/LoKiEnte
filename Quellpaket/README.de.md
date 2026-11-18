@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.18.24 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.18.25 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den
@@ -38,15 +38,28 @@ Copilot-Erweiterungen und der Startup-Helfer synchronisieren ihren Zustand nicht
 Eigene Editor-Einstellungen bleiben erhalten; geänderte Einstellungen werden
 gesichert. Widersprechende ausdrückliche Sync-Freigaben werden entfernt.
 
-Sync bleibt freiwillig: Melde dich selbst an und wähle Extensions sowie bei Bedarf
-Settings, Keyboard Shortcuts und Snippets. UI State und Profiles vorzugsweise
-abwählen. Bei einem bereits offenen Ersteinrichtungs-Konflikt abbrechen, alle
-LoKiEnte-Fenster schließen, erneut provisionieren und Sync neu einrichten.
-Verbleibende persönliche Konflikte gezielt zusammenführen, nicht die gesamte
-Datei durch lokale oder entfernte Werte ersetzen. Cloud-Daten und interne
-Sync-Datenbanken werden nicht bearbeitet. Nach Updates alle LoKiEnte-Fenster neu starten.
+Sync bleibt freiwillig. Empfohlen ist **nur Extensions**; alle anderen Kategorien,
+insbesondere Settings, UI State und Profiles, bleiben abgewählt. Mit
+**LoKiEnte: Configure Extension Sync** öffnest du die offizielle VS-Code-Auswahlliste.
+Der Startup-Helfer zeigt den Hinweis einmalig nach Installation/Update. Die Auswahl
+musst du selbst übernehmen; die öffentliche Erweiterungs-API kann sie nicht setzen
+oder verifizieren. Einen offenen erstmaligen Einstellungs-Merge vorher abbrechen.
+Lokale Vorlieben und Cloud-Einstellungen werden nicht ersetzt. Erneute Provisionierung
+löst persönliche Konflikte nicht, solange Settings ausgewählt bleibt. Auch die
+Ausnahmelisten werden beim Einstellungs-Sync übertragen; sie können sich nicht selbst
+ausschließen. Nach Updates alle LoKiEnte-Fenster vollständig schließen und neu starten.
 
 ### Lokale semantische Indexierung
+
+Kilo und Embedding-Vorabtest verwenden `/v1/embeddings` am lokalen Router. Dieser
+akzeptiert nur das verwaltete Modell mit 768 Dimensionen, entfernt dieses optionale
+Anfragefeld vor der Weiterleitung an LM Studio und prüft Anzahl, Indizes und endliche,
+von null verschiedene 768-dimensionale Antwortvektoren. Vektoren werden nicht gekürzt
+oder umgerechnet. Authentifizierung und Loopback-Grenzen bleiben aktiv. Begrenzte
+CPU-Embedding-Anfragen können während Coding-Anfragen laufen; das Herunterfahren
+wartet auf laufende Arbeit. `runtime/embedding-status.json` hält das letzte
+Vorprüfungsergebnis ohne Tokens oder Anfragetexte fest; spätere Fehler erzeugen
+bereinigte Router-Ereigniscodes.
 
 Im Dual-Modus richtet die Provisionierung LanceDB 0.26.2 und das lokale
 `nomic-embed-text-v1.5.Q4_K_M.gguf` ein. Die Datei wird mit Größe und SHA-256
@@ -121,7 +134,7 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.18.24` ausführen. Das Skript baut
+`python .\Build-LoKiEnte.py 2026.11.18.25` ausführen. Das Skript baut
 die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält

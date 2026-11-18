@@ -36,7 +36,7 @@ const server=http.createServer((req,res)=>{
   res.setHeader('content-type','application/json');
   if(req.url==='/health'){
     if(state.failed)res.statusCode=503;
-    res.end(JSON.stringify({service:state.service||'shadow-local-model-router',version:'2026.11.17.15',ready:!state.failed&&state.ready!==false,configDigest:digest,pid:process.pid,busy:!!state.busy,queued:state.queued||0}));return;
+    res.end(JSON.stringify({service:state.service||'shadow-local-model-router',version:'2026.11.18.25',ready:!state.failed&&state.ready!==false,configDigest:digest,pid:process.pid,busy:!!state.busy,queued:state.queued||0}));return;
   }
   if(req.url==='/admin/shutdown'&&req.method==='POST'){
     if(req.headers['x-shadow-control']!==process.env.SHADOW_LOCAL_ROUTER_CONTROL){res.writeHead(403);res.end('{}');return;}

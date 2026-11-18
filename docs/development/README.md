@@ -133,6 +133,18 @@ workspace migration and startup/failure behavior using Test-ProvisionSettings.ps
 Test-VsCodeProfile.ps1, Test-WorkspaceGuide.ps1 and Test-VsCodeStartup.mjs. A real
 VS Code/Kilo window and signed-in sync acceptance are separate integration checks.
 
+The startup VSIX also includes `sync-guide.cjs`. Its command
+`lokiente.configureExtensionSync` opens the supported VS Code sync configuration
+UI and explains selecting Extensions only. The one-time marker records guidance,
+not successful configuration. Test it with `node Quellpaket/tests/Test-SyncGuide.mjs`.
+Never set internal sync database keys or claim category selection was applied.
+
+The managed `/v1/embeddings` route has its own bounded CPU request handling and
+shares router authentication and shutdown protection. Run Test-EmbeddingRouter.mjs,
+Test-ModelRouter.mjs, Test-Embedding.ps1 and Test-RouterLifecycle.ps1 after changes.
+Provisioning and launch must send embedding preflight and Kilo through the same
+route. A synthetic API checks compatibility; real target inference remains separate.
+
 ## License and forks
 
 [Apache License 2.0 with Commons Clause 1.0](../../LICENSE.txt) applies to LoKiEnte

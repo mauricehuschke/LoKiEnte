@@ -225,35 +225,46 @@ set `lokiente.startup.openKilo` to `false` in the managed user settings. You can
 still use **LoKiEnte: Open Kilo** from the Command Palette. If Kilo cannot open,
 read the warning and the **LoKiEnte Startup** output channel.
 
-You can use **Backup and Sync Settings** to bring your usual extensions and editor
-preferences into this environment. Provisioning does not sign you in or turn on
-cloud sync. When configuring sync:
+**Recommended: sync extensions only and keep settings local.** This imports your
+usual extensions without merging editor preferences from another environment.
+Provisioning does not sign you in or silently change the account's sync categories.
 
-- Select **Extensions**; optionally add **Settings**, **Keyboard Shortcuts** and
-  **Snippets**. Themes and formatter preferences remain yours.
-- Prefer leaving **UI State** and **Profiles** unchecked for LoKiEnte, so another
-  environment's layout or profiles are not imported. This is a choice in VS Code's
-  sync dialog, not a setting silently changed by the installer.
-- Provisioning extends `settingsSync.ignoredSettings` to keep the managed terminal,
-  Kilo autocomplete controls, telemetry/update policy, startup preference and
-  Copilot visibility local. It excludes the whole Windows terminal-profile map
-  because it contains machine-specific executable paths.
-- `settingsSync.ignoredExtensions` excludes Kilo, the startup helper and both GitHub
-  Copilot extensions. Their installation/enablement state stays separate from your
-  personal environment; other extensions can sync normally. Kilo is updated by
-  provisioning, not by Settings Sync.
+1. Cancel an unfinished initial settings merge, if one is open.
+2. Run **LoKiEnte: Configure Extension Sync** from the Command Palette. The updated
+   startup helper also offers a one-time hint. It opens VS Code's own sync checklist.
+3. Select **Extensions only** and deselect **every other category**, including
+   **Settings**, **UI State** and **Profiles**. Apply the selection. When enabling
+   Backup and Sync for the first time, use the same selection in its setup dialog.
+4. Sign in yourself if needed. Existing local themes, formatter settings and terminal
+   profiles stay local; your cloud settings are not replaced.
 
-Updates preserve personal settings and custom exclusions, back up changed settings
-under `backups/vscode-settings`, and remove explicit sync opt-ins that conflict with
-the managed exclusions. Existing registered workspaces receive the AI policy too.
+The helper cannot read or apply those category choices through VS Code's public
+extension API. Opening the dialog does **not** mean the selection has been applied.
+An existing settings conflict is resolved by excluding Settings from sync, not by
+accepting an entire local or remote file. Reprovisioning alone cannot make that choice.
 
-**If the initial sync already shows a merge conflict:** cancel that setup, close
-LoKiEnte windows, provision again using the same installation root, then reopen and
-configure sync. For extensions alone, leave **Settings** unchecked. If syncing
-settings too, review any remaining personal conflicts individually; do not replace
-the entire file with **Accept Remote Settings** or **Accept Local Settings**.
-Personal conflicts can still occur; provisioning does not resolve or overwrite
-your cloud settings or manipulate VS Code's internal sync database.
+Managed settings and extension exclusions remain as additional protection if you
+later choose to sync settings too. Kilo, the startup helper and both Copilot
+extensions are excluded from extension sync; Kilo is updated by provisioning.
+Personal settings and custom exclusions are preserved and changed settings backed
+up under `backups/vscode-settings`. A later decision to sync personal settings can
+still produce genuine conflicts. VS Code synchronizes its exclusion lists themselves;
+they cannot be reliably isolated by adding them to their own ignore list.
+
+### If local indexing fails to initialize
+
+After updating, close all LoKiEnte windows and reopen the desktop launcher. In Dual
+mode, provisioning and startup test the same local embedding route and 768-dimensional
+request used by Kilo. The router handles LM Studio versions that reject the optional
+`dimensions` field, while validating the actual returned vectors. No cloud fallback
+or automatic project-indexing consent is added.
+
+If Kilo still reports **Failed to initialize**, check `runtime/embedding-status.json`
+inside the installation folder for the last preflight result and the local router
+endpoint. `runtime/router-events.jsonl` records sanitized error codes for subsequent
+requests. Check LM Studio for model readiness or HTTP errors. A passed preflight
+is not a completed project index: enable indexing for the intended project and wait
+for **Complete**. Single mode still does not provision semantic indexing.
 
 ## How code verification works
 

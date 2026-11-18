@@ -6,6 +6,40 @@ This document preserves the validation history and its original limitations.
 Older sections describe the behavior and evidence of their stated release, not
 necessarily the current defaults. Current usage is documented in [README.md](README.md).
 
+## Embedding compatibility and extension-only sync — package 2026.11.18.25
+
+This candidate is isolated from the stable release. The new embedding router and
+sync-guide tests, together with the existing model-router and startup tests, passed
+all 33 Node tests. PowerShell regressions cover embedding readiness and diagnostics,
+router replacement, profile preservation, provisioning settings, launcher commands,
+project selection, workspace migration, model pools and partial GPU offload.
+All 14 selected PowerShell suites passed 334 checks, including the complete
+54-check quality workflow, bootstrap (42), localization (28), entry scripts (4)
+and installation-location migration under Windows PowerShell 5.1 (51). The tests
+use synthetic agent responses and do not install applications or download models.
+The installer contains all 98 source files byte-for-byte with a matching checksum.
+Syntax checks passed for 67 PowerShell files, 14 Node files and the Python builder;
+72 local Markdown links, two JSON files and six JSON examples were validated.
+
+The actual Kilo 7.8.30 indexer reproduced the reported initialization message when
+a synthetic local backend rejected `dimensions`. The same indexer reached Complete
+through the new route, using real LanceDB 0.26.2 and synthetic 768-dimensional
+embeddings. A direct backend accepting the field also completed. This demonstrates
+the compatibility fix; it does not establish the cause on a machine without logs
+or validate semantic retrieval quality with a real model.
+
+The packaged startup helper 0.1.2 was installed and activated in an isolated
+VS Code 1.146.0 profile with Kilo 7.8.30. Both LoKiEnte commands, the supported sync
+configuration command and Kilo focus command were available, Kilo was active and
+the managed AI visibility setting remained enabled. No signed-in account was used.
+The helper opens the official checklist; the user must select Extensions only and
+apply it. Tests verify guidance and failure handling, not a fictitious automatic
+category change. Existing local preferences and remote account data are preserved.
+
+Target-machine installation, real LM Studio embeddings/GPU inference, project-index
+completion and signed-in extension-only synchronization remain acceptance checks.
+Neither a successful preflight nor an opened sync dialog proves those outcomes.
+
 ## English defaults and German documentation — package 2026.11.18.22
 
 40 independent PowerShell/Node suites passed after the language update. The complete

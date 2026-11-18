@@ -99,7 +99,7 @@ function Start-ShadowModelRouter {
     $digest=Get-ShadowRoutingDigest $Pool $NodePath $PowerShellPath
     $health=Get-ShadowRouterHealth -Pool $Pool
     if($health -and (Get-LrProperty $health 'service') -ceq 'shadow-local-model-router' -and
-       (Get-LrProperty $health 'configDigest') -ceq $digest -and (Get-LrProperty $health 'version') -ceq '2026.11.17.15' -and
+       (Get-LrProperty $health 'configDigest') -ceq $digest -and (Get-LrProperty $health 'version') -ceq '2026.11.18.25' -and
        (Get-LrProperty $health 'ready' $false) -eq $true){
         return [pscustomobject]@{Status='Ready';ApiBaseUrl=$Pool.RouterApiBaseUrl;Port=([Uri]$Pool.RouterApiBaseUrl).Port;Pid=$health.pid;ConfigDigest=$digest;Reused=$true}
     }

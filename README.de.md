@@ -240,37 +240,52 @@ du stattdessen das wiederhergestellte Layout behalten, setze
 **LoKiEnte: Open Kilo** bleibt in der Befehlspalette verfügbar. Kann Kilo nicht
 geöffnet werden, beachte die Warnung und den Ausgabekanal **LoKiEnte Startup**.
 
-Über **Backup and Sync Settings** kannst du deine üblichen Erweiterungen und
-Editor-Einstellungen übernehmen. Die Provisionierung meldet dich nicht an und
-aktiviert keine Cloud-Synchronisierung. Wähle beim Einrichten von Sync:
+**Empfohlen: nur Erweiterungen synchronisieren, Einstellungen lokal lassen.** So
+übernimmst du deine üblichen Erweiterungen ohne einen Abgleich der Editor-Einstellungen
+mit einer anderen Umgebung. Die Provisionierung meldet dich nicht an und ändert
+nicht stillschweigend die Sync-Kategorien deines Kontos.
 
-- **Extensions**; bei Bedarf zusätzlich **Settings**, **Keyboard Shortcuts** und
-  **Snippets**. Themes und Formatierer bleiben deine persönliche Auswahl.
-- Lasse **UI State** und **Profiles** für LoKiEnte vorzugsweise abgewählt, damit
-  Layout und Profile einer anderen Umgebung nicht importiert werden. Diese Auswahl
-  erfolgt im Sync-Dialog von VS Code; der Installer ändert sie nicht heimlich.
-- Die Provisionierung erweitert `settingsSync.ignoredSettings`, damit das verwaltete
-  Terminal, Kilo-Autocomplete-Vorgaben, Telemetrie-/Updatevorgaben, Startpräferenz
-  und Copilot-Sichtbarkeit lokal bleiben. Die gesamte Windows-Terminalprofil-Liste
-  wird ausgeschlossen, weil sie maschinenspezifische Programmpfade enthält.
-- `settingsSync.ignoredExtensions` schließt Kilo, den Startup-Helfer und beide
-  GitHub-Copilot-Erweiterungen aus. Installation und Aktivierungszustand bleiben
-  damit von deiner persönlichen Umgebung getrennt; andere Erweiterungen können
-  normal synchronisieren. Kilo aktualisiert die Provisionierung, nicht Settings Sync.
+1. Brich einen noch offenen erstmaligen Einstellungs-Merge ab.
+2. Rufe **LoKiEnte: Configure Extension Sync** über die Befehlspalette auf. Der
+   aktualisierte Startup-Helfer bietet außerdem einmalig einen Hinweis an. Er öffnet
+   die offizielle Sync-Auswahlliste von VS Code.
+3. Wähle **nur Extensions** und wähle **alle anderen Kategorien** ab, insbesondere
+   **Settings**, **UI State** und **Profiles**. Übernimm die Auswahl. Beim erstmaligen
+   Aktivieren von Backup and Sync gilt dieselbe Auswahl im Einrichtungsdialog.
+4. Melde dich bei Bedarf selbst an. Vorhandene lokale Themes, Formatierer und
+   Terminalprofile bleiben lokal; Cloud-Einstellungen werden nicht ersetzt.
 
-Updates erhalten persönliche Einstellungen und eigene Ausnahmen, sichern geänderte
-Einstellungen unter `backups/vscode-settings` und entfernen ausdrückliche
-Sync-Freigaben, die den verwalteten Ausnahmen widersprechen. Auch bestehende
-registrierte Arbeitsbereiche erhalten die KI-Vorgabe.
+Die öffentliche Erweiterungs-API von VS Code erlaubt dem Helfer nicht, diese
+Kategorien auszulesen oder automatisch zu setzen. Das Öffnen des Dialogs bestätigt
+**nicht**, dass die Auswahl übernommen wurde. Ein bestehender Einstellungskonflikt
+wird durch das Abwählen von Settings behoben, nicht durch pauschale Übernahme einer
+Dateiseite. Erneutes Provisionieren allein kann diese Auswahl nicht treffen.
 
-**Falls beim erstmaligen Aktivieren bereits ein Merge-Konflikt angezeigt wird:**
-Brich diese Einrichtung ab, schließe die LoKiEnte-Fenster, provisioniere erneut mit
-demselben Installationsordner und öffne danach LoKiEnte und die Sync-Einrichtung.
-Für Erweiterungen allein lasse **Settings** abgewählt. Synchronisierst du auch
-Einstellungen, löse verbleibende persönliche Konflikte gezielt auf. Ersetze nicht
-die gesamte Datei pauschal über **Accept Remote Settings** oder **Accept Local Settings**.
-Persönliche Konflikte bleiben möglich; die Provisionierung überschreibt keine
-Cloud-Einstellungen und manipuliert nicht die interne Sync-Datenbank von VS Code.
+Die verwalteten Einstellungs- und Erweiterungsausnahmen bleiben als zusätzliche
+Absicherung erhalten, falls du später auch Einstellungen synchronisieren möchtest.
+Kilo, der Startup-Helfer und beide Copilot-Erweiterungen sind vom Erweiterungs-Sync
+ausgeschlossen; Kilo aktualisiert die Provisionierung. Persönliche Einstellungen
+und eigene Ausnahmen bleiben erhalten; Änderungen werden unter
+`backups/vscode-settings` gesichert. Ein späterer Abgleich persönlicher Einstellungen
+kann echte Konflikte erzeugen. VS Code synchronisiert die Ausnahmelisten selbst;
+sie lassen sich nicht zuverlässig durch Einträge in ihrer eigenen Liste isolieren.
+
+### Falls die lokale Indizierung nicht initialisiert
+
+Schließe nach dem Update alle LoKiEnte-Fenster und starte erneut über den
+Desktoplauncher. Im Dual-Modus testen Provisionierung und Start denselben lokalen
+Embedding-Endpunkt und dieselbe 768-dimensionale Anfrage wie Kilo. Der Router
+berücksichtigt LM-Studio-Versionen, die das optionale Feld `dimensions` ablehnen,
+und prüft weiterhin die tatsächlichen Antwortvektoren. Es gibt keinen Cloud-Fallback
+und keine automatische Zustimmung zur Indizierung eines Projekts.
+
+Bei **Failed to initialize** zeigt `runtime/embedding-status.json` im
+Installationsordner das letzte Vorprüfungsergebnis und den lokalen Router-Endpunkt.
+`runtime/router-events.jsonl` enthält bereinigte Fehlercodes späterer Anfragen.
+Prüfe in LM Studio die Modellbereitschaft und mögliche HTTP-Fehler. Ein bestandener
+Vorabtest ist noch kein fertiger Projektindex: Aktiviere die Indizierung für das
+gewünschte Projekt und warte auf **Complete**. Im Single-Modus wird semantische
+Indizierung weiterhin nicht provisioniert.
 
 ## Wie die Codeprüfung funktioniert
 

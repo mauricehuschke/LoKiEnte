@@ -642,8 +642,8 @@ function Start-ShadowEmbeddingModel {
         }
         try {
             $headers=Get-LrApiHeaders -ApiTokenEnvironmentVariable $Pool.ApiTokenEnvironmentVariable
-            $response=Invoke-LrApi -Uri ($Pool.BackendApiBaseUrl+'/embeddings') -Headers $headers -Method POST -Body @{
-                model=$id;input=@('local embedding test','local source search');encoding_format='base64'
+            $response=Invoke-LrApi -Uri ($Pool.RouterApiBaseUrl+'/embeddings') -Headers $headers -Method POST -Body @{
+                model=$id;input=@('local embedding test','local source search');encoding_format='base64';dimensions=768
             } -TimeoutSeconds 60
             $data=@(Get-LrProperty $response 'data' @())
             if($data.Count -ne 2){throw 'Embedding smoke test did not return two vectors.'}
@@ -681,11 +681,17 @@ function Start-ShadowEmbeddingModel {
 function Initialize-ShadowEmbeddingModel {
     param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)]$Pool,[Parameter(Mandatory)]$Definition)
     try {
-        return Start-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $Pool -Definition $Definition -AllowUnfitAttempt:(Get-LrProperty $Pool 'AllowUnfitAttempt' $false)
+        $result=Start-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $Pool -Definition $Definition -AllowUnfitAttempt:(Get-LrProperty $Pool 'AllowUnfitAttempt' $false)
     } catch {
         if(-not $_.Exception.Data['ShadowResourceFitFailure'] -and -not $_.Exception.Data['ShadowEmbeddingVerificationFailure']){throw}
         Write-Warning "Local indexing is not ready yet: $($_.Exception.Message) Model remains downloaded."
         $smoke=if($_.Exception.Data['ShadowEmbeddingVerificationFailure']){'Failed'}else{'NotRun'}
-        return [pscustomobject]@{Status='Deferred';InstanceId=('shadow-'+$Pool.OwnerId+'-embedding');ModelPath=$Definition.ExpectedPath;Dimension=768;Device='CPU';SmokeTest=$smoke;Message=$_.Exception.Message}
+        $result=[pscustomobject]@{Status='Deferred';InstanceId=('shadow-'+$Pool.OwnerId+'-embedding');ModelPath=$Definition.ExpectedPath;Dimension=768;Device='CPU';SmokeTest=$smoke;Message=$_.Exception.Message}
     }
+    # Stable content avoids a new backup on every successful launch. API errors
+    # are already sanitized; no request text or authentication values are stored.
+    Write-SmpJson -Path (Join-Path $InstallRoot 'runtime/embedding-status.json') -InstallRoot $InstallRoot -Value ([ordered]@{
+        schema=1;apiBaseUrl=$Pool.RouterApiBaseUrl;requestedDimensions=768;result=$result
+    })
+    return $result
 }

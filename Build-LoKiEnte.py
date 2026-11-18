@@ -36,6 +36,7 @@ def main():
     required = {
         "assets/lokiente.ico", "Setup.ps1", "Start-LocalAI.ps1", "Invoke-SetupRequest.ps1",
         "VsCodeProfile.ps1", "vscode-startup/package.json", "vscode-startup/extension.cjs",
+        "vscode-startup/sync-guide.cjs",
         "vscode-startup/extension.vsixmanifest", "vscode-startup/[Content_Types].xml",
         "WorkflowPolicy.ps1", "Invoke-ReviewedTask.ps1", "TaskPreparation.ps1",
         "WorkflowProgress.ps1", "KiloWorkflowTools.mjs", "WorkflowJob.mjs",

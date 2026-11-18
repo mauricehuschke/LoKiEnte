@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.18.24 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.18.25 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
@@ -41,14 +41,27 @@ visibility settings stay local. Kilo, both Copilot extensions and the startup
 helper do not sync their state. Personal editor settings are preserved; changed
 settings are backed up. Conflicting explicit sync opt-ins are removed.
 
-Sync remains optional: sign in yourself and select Extensions, optionally Settings,
-Keyboard Shortcuts and Snippets. Prefer leaving UI State and Profiles unchecked.
-If initial sync already has a conflict, cancel it, close all LoKiEnte windows,
-provision again and configure sync anew. Resolve remaining personal conflicts
-individually instead of accepting an entire local or remote file. Cloud data and
-internal sync databases are not edited. Restart all LoKiEnte windows after updates.
+Sync remains optional. The recommended choice is **Extensions only**; leave all
+other categories, including Settings, UI State and Profiles, unchecked. Use
+**LoKiEnte: Configure Extension Sync** to open the official VS Code checklist.
+The startup helper shows this guidance once after installation/update. You must
+apply the checklist selection yourself; the public extension API cannot set or
+verify these choices. Cancel an unfinished initial settings merge before doing so.
+Local preferences and cloud settings are not replaced. Reprovisioning alone does
+not resolve personal conflicts if Settings remains selected. The exclusion lists
+also sync when settings sync is enabled; they cannot exclude themselves.
+After updates, fully close all LoKiEnte windows and restart.
 
 ### Local semantic indexing
+
+Kilo and the embedding preflight use the local router's `/v1/embeddings` route.
+It accepts only the managed model and 768 dimensions, omits that optional request
+field before forwarding to LM Studio, and verifies count, indices and finite,
+nonzero 768-dimensional response vectors. It does not truncate or resize vectors.
+Authentication and loopback boundaries remain active. CPU embedding requests are
+bounded and can proceed during coding requests; shutdown waits until work ends.
+`runtime/embedding-status.json` preserves the last preflight result without tokens
+or request text; later failures produce sanitized router event codes.
 
 Dual mode provisions LanceDB 0.26.2 and local
 `nomic-embed-text-v1.5.Q4_K_M.gguf`. The model file is checked against its size and
@@ -118,7 +131,7 @@ functional acceptance, commit and push remain your responsibility.
 ### Build the installer from source
 
 On the development machine, update the version above and run
-`python .\Build-LoKiEnte.py 2026.11.18.24` from the repository root. The script
+`python .\Build-LoKiEnte.py 2026.11.18.25` from the repository root. The script
 rebuilds the embedded payload and checksum. The target Windows PC still needs
 only the generated PS1. A separate old ZIP is unnecessary for this process. The
 provisioning report records the version and checksum of the installer actually used.

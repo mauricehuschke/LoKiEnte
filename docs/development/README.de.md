@@ -142,6 +142,20 @@ Test-ProvisionSettings.ps1, Test-VsCodeProfile.ps1, Test-WorkspaceGuide.ps1 und
 Test-VsCodeStartup.mjs. Ein echtes VS-Code-/Kilo-Fenster und angemeldeter Settings
 Sync sind separate Integrationsprüfungen.
 
+Der Startup-VSIX enthält außerdem `sync-guide.cjs`. Sein Befehl
+`lokiente.configureExtensionSync` öffnet die unterstützte Sync-Einrichtung von VS Code
+und erklärt die Auswahl ausschließlich von Extensions. Die einmalige Markierung
+belegt den Hinweis, keine erfolgreiche Konfiguration. Prüfen mit
+`node Quellpaket/tests/Test-SyncGuide.mjs`. Keine internen Sync-Datenbankfelder setzen
+und keine ungeprüfte Übernahme der Kategorien behaupten.
+
+Die verwaltete Route `/v1/embeddings` besitzt eine begrenzte CPU-Anfrageverarbeitung
+und nutzt Authentifizierung und Shutdown-Schutz des Routers. Nach Änderungen
+Test-EmbeddingRouter.mjs, Test-ModelRouter.mjs, Test-Embedding.ps1 und
+Test-RouterLifecycle.ps1 ausführen. Vorprüfung und Kilo müssen bei Provisionierung
+und Start denselben Endpunkt nutzen. Eine künstliche API prüft Kompatibilität;
+echte Inferenz auf dem Zielgerät bleibt eine separate Prüfung.
+
 ## Lizenz und Forks
 
 [Apache License 2.0 mit Commons Clause 1.0](../../LICENSE.txt) gilt für LoKiEnte

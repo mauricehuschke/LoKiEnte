@@ -76,6 +76,7 @@ function New-ShadowVsCodeStartupVsix {
                     'extension.vsixmanifest'=(Join-Path $source 'extension.vsixmanifest')
                     'extension/package.json'=(Join-Path $source 'package.json')
                     'extension/extension.cjs'=(Join-Path $source 'extension.cjs')
+                    'extension/sync-guide.cjs'=(Join-Path $source 'sync-guide.cjs')
                     'extension/LICENSE.txt'=(Join-Path $PSScriptRoot 'LICENSE.txt')
                 }
                 foreach($name in $entries.Keys){

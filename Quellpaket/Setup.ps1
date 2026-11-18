@@ -402,7 +402,7 @@ try {
         $pool=Configure-LocalModelPool -InstallRoot $InstallRoot -ContextLength $ContextLength -Port $Port -RouterPort $RouterPort -IncludeFastModel:$IncludeFastModel -AllowPartialGpuOffload:$AllowPartialGpuOffload -AllowUnfitAttempt:$AllowUnfitAttempt -SelectedDefinitions $selectedDefinitions -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable
         $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $node -PowerShellPath $toolchain.powerShellExecutable
         $embedding=Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)
-        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable -EmbeddingModelId $embedding.InstanceId -EmbeddingApiBaseUrl $pool.BackendApiBaseUrl
+        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable -EmbeddingModelId $embedding.InstanceId -EmbeddingApiBaseUrl $router.ApiBaseUrl
         $report.runtime=$pool;$report.router=$router
         $report.embedding=$embedding
         $report.warnings+=@('Local indexing is configured; permission and completion must be checked in Kilo for each project.')
