@@ -4,38 +4,38 @@ function Enter-ShadowProjectRun {
     param([string]$ProjectPath)
     $gitDir=(Get-ShadowGitOutput $ProjectPath @('rev-parse','--absolute-git-dir')).Trim()
     try { return [IO.File]::Open((Join-Path $gitDir 'shadow-local-ai-run.lock'),'OpenOrCreate','ReadWrite','None') }
-    catch [IO.IOException] { throw 'Projekt ist durch einen anderen Local-AI-Lauf gesperrt oder die Git-Sperrdatei ist nicht zugaenglich.' }
+    catch [IO.IOException] { throw 'Project is locked by another Local AI run or the Git lock file is inaccessible.' }
 }
 
 function Get-ShadowWritePaths {
     param([System.Collections.IDictionary]$Policy,[string]$ProjectPath)
     if(-not $Policy.Contains('writePaths') -or $Policy.writePaths -isnot [array] -or -not $Policy.writePaths.Count){
-        throw 'Schreibende Auftraege benoetigen writePaths in checks.json (exakte projektbezogene Dateipfade).'
+        throw 'Write tasks require writePaths in checks.json (exact project-relative file paths).'
     }
     $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach($path in $Policy.writePaths){
         if($path -isnot [string] -or $path -notmatch '^[^/\\:*?"<>|\[\]\x00-\x1f]+(?:/[^/\\:*?"<>|\[\]\x00-\x1f]+)*$'){
-            throw "Ungueltiger Schreibpfad: $path. Exakten projektbezogenen Dateipfad mit / ohne Glob angeben."
+            throw "Invalid write path: $path. Specify an exact project-relative file path with / and no glob."
         }
         $cursor=$ProjectPath
         foreach($part in $path.Split('/')){
             if($part -match '^\s|[ .]$|^(?:\.git|\.kilo|\.kilocode|\.vscode|\.github|node_modules)(?:$)|^\.env|^credentials|^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)'){
-                throw "Geschuetzter oder ungueltiger Schreibpfad: $path"
+                throw "Protected or invalid write path: $path"
             }
             $cursor=Join-Path $cursor $part
             $item=Get-Item -LiteralPath $cursor -Force -ErrorAction SilentlyContinue
             if($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){
-                throw "Schreibpfad enthaelt eine Verknuepfung: $path"
+                throw "Write path contains a link: $path"
             }
         }
-        if(Test-Path -LiteralPath $cursor -PathType Container){throw "Schreibpfad muss eine Datei angeben: $path"}
+        if(Test-Path -LiteralPath $cursor -PathType Container){throw "Write path must identify a file: $path"}
         if([IO.Path]::GetFileName($path) -match '^(?:auth\.json|\.gitignore|\.kilocodeignore|\.gitattributes|\.npmrc|package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|pyproject\.toml|pytest\.ini|tox\.ini|Makefile|Justfile|.*\.config\.[^/]+)$'){
-            throw "Projekt- oder Pruefkonfiguration manuell aendern: $path"
+            throw "Change project or check configuration manually: $path"
         }
         if(Get-ShadowGitOutput $ProjectPath @('check-ignore','--',$path) -AllowedExitCodes @(0,1)){
-            throw "Ignorierter Schreibpfad liegt ausserhalb des Pruefnachweises: $path"
+            throw "Ignored write path is outside verification evidence: $path"
         }
-        if(-not $seen.Add($path)){throw "Doppelter Schreibpfad: $path"}
+        if(-not $seen.Add($path)){throw "Duplicate write path: $path"}
         $path
     }
 }
@@ -49,7 +49,7 @@ function Get-ShadowDirtyFiles {
         $absolute=Join-Path $ProjectPath $path
         $item=Get-Item -LiteralPath $absolute -Force -ErrorAction SilentlyContinue
         if($item -and ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint))){
-            throw "Dateityp fuer Umfangspruefung nicht unterstuetzt: $path"
+            throw "File type not supported for scope verification: $path"
         }
         $files[$path]=if($item){(Get-FileHash -LiteralPath $absolute -Algorithm SHA256).Hash}else{'(deleted)'}
     }
@@ -61,7 +61,7 @@ function Assert-ShadowWriteScope {
     $paths=@($Before.Keys)+@($After.Keys) | Sort-Object -Unique
     foreach($path in $paths){
         if($path -notin $WritePaths -and ($Before.ContainsKey($path) -ne $After.ContainsKey($path) -or $Before[$path] -cne $After[$path])){
-            throw "Datei ausserhalb des erlaubten Schreibumfangs geaendert: $path. Diff manuell pruefen."
+            throw "File changed outside the allowed write scope: $path. Review the diff manually."
         }
     }
 }

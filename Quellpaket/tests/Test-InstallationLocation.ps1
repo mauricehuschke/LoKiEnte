@@ -52,7 +52,7 @@ try{
         Assert-Location ($selected.Root -ceq $expected -and [bool]$selected.CopyFrom -eq ($choice -eq '3')) "Legacy selection $choice chooses the requested action"
     }
     $script:answer='cancel'
-    Assert-LocationThrow {Select-BootstrapInstallation $target $source} 'abgebrochen' 'Invalid selection cancels'
+    Assert-LocationThrow {Select-BootstrapInstallation $target $source} 'cancelled' 'Invalid selection cancels'
     $claimed=Join-Path $root 'claimed'
     Write-Fixture (Join-Path $claimed 'shadow-local-ai-install.json') '{"schema":1,"product":"ShadowLocalAI"}'
     Write-Fixture (Join-Path $claimed 'app\sentinel.txt') 'target work'
@@ -86,7 +86,7 @@ try{
     Assert-BootstrapInstallRoot -Root $target -AllowSharedDirectory
     Assert-Location ([IO.File]::ReadAllText((Join-Path $target 'unrelated.txt')) -ceq 'keep') 'Unrelated script-directory contents are preserved'
     Write-Fixture (Join-Path $target 'toolchain.json') '{}'
-    Assert-LocationThrow {Assert-BootstrapInstallRoot -Root $target -AllowSharedDirectory} 'Namenskonflikt' 'Unowned managed-name collision is rejected'
+    Assert-LocationThrow {Assert-BootstrapInstallRoot -Root $target -AllowSharedDirectory} 'name conflict' 'Unowned managed-name collision is rejected'
     Remove-Item -LiteralPath (Join-Path $target 'toolchain.json')
     Write-Fixture (Join-Path $source 'app\fixture.ps1') '# copied app'
     Write-Fixture (Join-Path $source 'provisioning.lock') ''
@@ -110,11 +110,11 @@ try{
     $before=@{}
     foreach($file in Get-ChildItem -LiteralPath $source -File -Recurse -Force){$before[$file.FullName]=(Get-FileHash -LiteralPath $file.FullName).Hash}
     $script:processes=@([pscustomobject]@{ProcessId=999999;CommandLine='node.exe "'+(Join-Path $source 'app\ModelRouter.mjs')+'"'})
-    Assert-LocationThrow {Copy-BootstrapInstallation $source $target} 'Prozessen' 'Running source applications block the copy'
+    Assert-LocationThrow {Copy-BootstrapInstallation $source $target} 'processes' 'Running source applications block the copy'
     $script:processes=@()
     $held=[IO.File]::Open((Join-Path $source 'provisioning.lock'),[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
-    try{Assert-LocationThrow {Copy-BootstrapInstallation $source $target} 'gesperrt' 'Concurrent source provisioning blocks the copy'}finally{$held.Dispose()}
-    Assert-LocationThrow {Copy-BootstrapInstallation $source (Join-Path $source 'nested')} 'verschachtelt' 'Overlapping roots are rejected'
+    try{Assert-LocationThrow {Copy-BootstrapInstallation $source $target} 'locked' 'Concurrent source provisioning blocks the copy'}finally{$held.Dispose()}
+    Assert-LocationThrow {Copy-BootstrapInstallation $source (Join-Path $source 'nested')} 'nested' 'Overlapping roots are rejected'
     Copy-BootstrapInstallation $source $target
     $chain=Get-Content -LiteralPath (Join-Path $target 'toolchain.json') -Raw|ConvertFrom-Json
     Assert-Location ($chain.kiloArgumentPrefix[0] -ceq (Join-Path $target 'tooling\kilo.js') -and $chain.outside -ceq 'C:\Existing\node.exe' -and $chain.sibling -ceq ($source+'-other\keep.js')) 'Managed paths relocate without rewriting external paths or sibling prefixes'
@@ -130,7 +130,7 @@ try{
     $report=Get-Content -LiteralPath (Join-Path $target 'provisioning-report.json') -Raw|ConvertFrom-Json
     Assert-Location ($report.status -ceq 'INCOMPLETE' -and $report.installRoot -ceq $target -and @(Get-ChildItem -LiteralPath (Join-Path $target 'backups\migration') -File -Recurse).Count -eq 1) 'Copied installation requires provisioning and retains its prior report'
     Assert-Location (-not(Test-Path -LiteralPath (Join-Path $target 'runtime\model-pool.lock')) -and -not(Test-Path -LiteralPath (Join-Path $target 'provisioning.lock'))) 'Source lock files are not copied'
-    Assert-LocationThrow {Copy-BootstrapInstallation $source $target} 'bereits' 'Copy never merges or overwrites an existing destination'
+    Assert-LocationThrow {Copy-BootstrapInstallation $source $target} 'already' 'Copy never merges or overwrites an existing destination'
 
     $failed=Join-Path $root 'rollback target'
     $moveDefinition=$ast.EndBlock.Statements|Where-Object {$_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'Move-BootstrapCopyEntry'}
@@ -143,12 +143,12 @@ try{
     Assert-Location (@(Get-ChildItem -LiteralPath $failed -Force).Count -eq 0) 'Publish failure rolls back only its own copied entries'
     . ([scriptblock]::Create($moveDefinition.Extent.Text))
     Write-Fixture (Join-Path $source 'toolchain.json') 'not JSON'
-    Assert-LocationThrow {Copy-BootstrapInstallation $source $failed} 'nicht migrierbar' 'Malformed managed configuration aborts before publication'
+    Assert-LocationThrow {Copy-BootstrapInstallation $source $failed} 'Cannot migrate' 'Malformed managed configuration aborts before publication'
     Assert-Location (@(Get-ChildItem -LiteralPath $failed -Force).Count -eq 0) 'Failed staging leaves no partial destination'
     $linked=Join-Path $root 'linked source'
     Write-Fixture (Join-Path $linked 'shadow-local-ai-install.json') '{"schema":1,"product":"ShadowLocalAI"}'
     $null=New-Item -ItemType Junction -Path (Join-Path $linked 'junction') -Target $source
-    Assert-LocationThrow {Copy-BootstrapInstallation $linked $failed} 'Verknuepfung' 'Source junctions cannot escape the copy boundary'
+    Assert-LocationThrow {Copy-BootstrapInstallation $linked $failed} 'link' 'Source junctions cannot escape the copy boundary'
     [IO.Directory]::Delete((Join-Path $linked 'junction'))
 
     $hardlinkSource=Join-Path $root 'hardlink source'

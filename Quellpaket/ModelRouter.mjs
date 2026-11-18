@@ -136,7 +136,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
         if(state.Status!=='Ready'||state.Alias!==profile.Alias||state.ModelId!==profile.InstanceId||state.ContextLength!==profile.ContextLength||state.Parallel!==1)
           throw new RouterError(503,'switch_verification_failed','The loaded model does not match the verified pool profile.');
         if(profile.VerificationState==='Deferred'&&state.VerificationState!=='Verified')
-          throw new RouterError(503,'model_unverified','Das lokale Modell wurde noch nicht erfolgreich geprueft.');
+          throw new RouterError(503,'model_unverified','The local model has not passed verification yet.');
         if(state.VerificationState==='Verified'){
           profile.VerificationState='Verified';
           profile.SmokeTests={Chat:'Passed',ToolCall:'Passed',ToolResultRoundTrip:'Passed'};
@@ -215,9 +215,9 @@ export function makePowerShellSwitcher({installRoot,pwsh,switchScript,timeoutMs=
       }
       if(exitCode!==0){
         if(state?.Status==='Error'&&state.Code==='resource_fit')
-          throw new RouterError(503,'model_memory_unavailable','Das lokale Modell ist derzeit nicht ladbar. Speicher freigeben und erneut versuchen; die Modelldatei bleibt erhalten.');
+          throw new RouterError(503,'model_memory_unavailable','The local model cannot currently load. Free memory and retry; the model file is preserved.');
         if(state?.Status==='Error'&&state.Code==='model_unverified')
-          throw new RouterError(503,'model_unverified','Das lokale Modell hat den Chat- oder Werkzeugtest nicht bestanden. Lokale Protokolle pruefen.');
+          throw new RouterError(503,'model_unverified','The local model failed the chat or tool test. Check local logs.');
         throw new RouterError(503,'controller_rejected','The model switch was refused. Inspect local model ownership, memory and busy state.');
       }
       return state;

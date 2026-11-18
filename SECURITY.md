@@ -1,27 +1,26 @@
-# Datenschutz und Zugangsdaten
+# Privacy and credentials
 
-In dieses Repository gehören nur Quellen, Tests, Dokumentation und der
-eingebettete Installer. Provisionierungsberichte, Laufzeitprofile, Modellzustände,
-Sicherungen und Beispielprojekte einer tatsächlichen Installation bleiben lokal.
-Die .gitignore schließt diese Dateien aus. Bereits getrackte Dateien werden
-dadurch nicht automatisch aus älteren Commits entfernt.
+[Deutsch](SECURITY.de.md)
 
-API-Tokens über die vorgesehenen Umgebungsvariablen bzw. lokale
-Zugangsdatenverwaltung bereitstellen. Variablennamen wie LOKIENTE_LM_API_KEY sind
-keine Zugangsdaten. Keine echten Werte in Skripte, Tests, Screenshots oder Issues
-kopieren. Nur synthetische Testdaten und neutrale Beispielpfade verwenden.
+Only sources, tests, documentation, assets and the embedded installer belong in
+this repository. Provisioning reports, runtime profiles, model state, backups and
+example projects from an actual installation stay local. .gitignore excludes them;
+it does not remove files already tracked in earlier commits.
 
-Vor Veröffentlichung Gitleaks auf Dateistand und Historie ausführen. Der Installer
-enthält eine Base64-kodierte ZIP; deshalb müssen auch ihre entpackten Inhalte
-gescannt werden. Archive in Sicherungen dürfen ebenfalls private Daten enthalten.
-SHA-256-Prüfsummen in Manifesten sind keine geheimen Schlüssel.
+Provide API tokens through the designated environment variables or local credential
+management. Names such as LOKIENTE_LM_API_KEY are not credentials. Never copy real
+values into scripts, tests, screenshots or issues. Use synthetic test data and
+neutral example paths only.
 
-Für Git-Commits die GitHub-No-Reply-Adresse und den öffentlichen Benutzernamen
-verwenden. GitHub zeigt die passende No-Reply-Adresse in den E-Mail-Einstellungen.
-Eine Änderung der Git-Konfiguration bereinigt keine bereits vorhandenen Commits.
+Before publishing, run Gitleaks on current files and history. The installer embeds
+a Base64 ZIP, so scan its extracted contents too. Backup archives can also contain
+private data. SHA-256 checksums in manifests are not secret keys.
 
-Falls Zugangsdaten veröffentlicht wurden: zunächst sperren/rotieren und danach
-die Historie bereinigen. Ein Löschcommit allein reicht nicht. Veröffentlichte
-Historie nur koordiniert ersetzen; andere Klone und GitHub-Caches können alte
-Inhalte weiterhin enthalten. Gegebenenfalls GitHub Support zur Entfernung
-zwischengespeicherter sensibler Inhalte kontaktieren.
+Use your public username and GitHub no-reply address for commits. GitHub shows the
+appropriate address in email settings. Changing Git configuration does not clean
+existing commits.
+
+If credentials were published, revoke/rotate them first and then clean history.
+A deletion commit is insufficient. Coordinate replacement of published history;
+other clones and GitHub caches may retain old contents. Contact GitHub Support
+when necessary to remove cached sensitive content.

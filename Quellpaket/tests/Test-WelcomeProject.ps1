@@ -45,7 +45,7 @@ try{
     }finally{$env:GIT_DIR=$oldGitDir}
     $mockApp=Join-Path $fixture 'mock-app'
     [void][IO.Directory]::CreateDirectory($mockApp)
-    foreach($name in @('Common.ps1','Workspace.ps1','WORKFLOW.md','New-WelcomeTestProject.ps1','welcome-example')){
+    foreach($name in @('Common.ps1','Workspace.ps1','WORKFLOW.md','WORKFLOW.de.md','templates','New-WelcomeTestProject.ps1','welcome-example')){
         Copy-Item -LiteralPath (Join-Path $SourceRoot $name) -Destination $mockApp -Recurse
     }
     Add-Content -LiteralPath (Join-Path $mockApp 'Common.ps1') -Value @'

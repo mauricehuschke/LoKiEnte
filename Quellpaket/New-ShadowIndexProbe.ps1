@@ -8,7 +8,7 @@ $project=Join-Path $root "diagnostics/index-probe-$id"
 [void](New-Item -ItemType Directory -Path $project)
 $git=(Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 & $git init --quiet $project
-if($LASTEXITCODE -ne 0){throw "Test-Repository konnte nicht initialisiert werden: $project"}
+if($LASTEXITCODE -ne 0){throw "Could not initialize test repository: $project"}
 $publicMarker="VISIBLE_$id"
 $gitIgnored="IGNORE_GIT_$id"
 $kiloIgnored="IGNORE_KILO_$id"

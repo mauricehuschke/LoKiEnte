@@ -61,9 +61,9 @@ try {
     $catalog=Get-ShadowPoolCatalog -Pool $pool
     Assert-Life ($catalog.coder.reasoning -and $catalog.review.reasoning -and $catalog.coder.interleaved -ceq 'reasoning_content' -and $catalog.review.interleaved -ceq 'reasoning') 'Known model catalog preserves model-specific reasoning metadata for the Kilo SDK'
     $bad=($pool|ConvertTo-Json -Depth 20|ConvertFrom-Json);$bad.RouterApiBaseUrl='https://example.invalid/v1'
-    Throws-Life {Get-ShadowRouterHealth -Pool $bad} 'Router-Endpunkt' 'External router endpoint rejected before credentials or requests'
+    Throws-Life {Get-ShadowRouterHealth -Pool $bad} 'router endpoint' 'External router endpoint rejected before credentials or requests'
     $bad.RouterApiBaseUrl=$pool.BackendApiBaseUrl
-    Throws-Life {Get-ShadowRouterHealth -Pool $bad} 'Router-Endpunkt' 'Backend and router ports must be distinct'
+    Throws-Life {Get-ShadowRouterHealth -Pool $bad} 'router endpoint' 'Backend and router ports must be distinct'
     $first=Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh
     $created.Add($first.Pid)
     Assert-Life ($first.Status -ceq 'Ready' -and -not $first.Reused -and $script:backendStarts -eq 1) 'Initial launch starts backend once and verifies actual child PID and digest'
@@ -76,15 +76,15 @@ try {
     Assert-Life ($same.Reused -and $same.Pid -eq $first.Pid) 'Volatile estimate changes do not invalidate a busy router'
     $pool.Profiles[0].OutputLimit=2048
     [IO.File]::WriteAllText($poolPath,($pool|ConvertTo-Json -Depth 15))
-    Throws-Life {Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh} 'arbeitet noch' 'Changed config does not stop a busy router'
+    Throws-Life {Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh} 'still working' 'Changed config does not stop a busy router'
     Assert-Life ($script:backendStarts -eq 1 -and $null -ne (Get-Process -Id $first.Pid -ErrorAction SilentlyContinue)) 'Busy process and active backend survive refused restart'
     Set-Fixture @{service='foreign-service'}
-    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'nicht zum erwarteten' 'Foreign service is never killed based on its port'
+    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'not.*expected' 'Foreign service is never killed based on its port'
     Set-Fixture @{}
     $controlPath=Join-Path $root 'runtime/router-control.json'
     $controlText=[IO.File]::ReadAllText($controlPath)
     [IO.File]::WriteAllText($controlPath,(@{schema=1;token=('0'*64)}|ConvertTo-Json))
-    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'authentifiziert' 'Wrong control token cannot shut down a router'
+    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'authenticated' 'Wrong control token cannot shut down a router'
     Assert-Life ($null -ne (Get-Process -Id $first.Pid -ErrorAction SilentlyContinue)) 'Authentication failure preserves running process'
     [IO.File]::WriteAllText($controlPath,$controlText)
     $third=Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh
@@ -93,16 +93,16 @@ try {
     Set-Fixture @{failed=$true;busy=$true}
     $failedHealth=Get-ShadowRouterHealth -Pool $pool
     Assert-Life ($null -ne $failedHealth -and -not $failedHealth.ready) 'HTTP 503 preserves the known router identity without claiming readiness'
-    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'arbeitet noch' 'Failed but busy router cannot be shut down'
+    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'still working' 'Failed but busy router cannot be shut down'
     Set-Fixture @{failed=$true}
     Stop-ShadowModelRouter -InstallRoot $root -Pool $pool
     Assert-Life ($null -eq (Get-ShadowRouterHealth -Pool $pool)) 'Authenticated idle shutdown also recovers an HTTP 503 router'
     Set-Fixture @{ready=$false}
-    Throws-Life {Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh} 'Bereitschaftsstatus' 'Unhealthy new child fails startup'
+    Throws-Life {Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh} 'readiness status' 'Unhealthy new child fails startup'
     $failedPid=[int][IO.File]::ReadAllText((Join-Path $root 'fixture-pid.txt'))
     Assert-Life ($null -eq (Get-Process -Id $failedPid -ErrorAction SilentlyContinue)) 'Failed newly spawned router is terminated instead of orphaned'
     $script:occupied=$true
-    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'belegt' 'Unreachable occupied port is preserved without PID kill'
+    Throws-Life {Stop-ShadowModelRouter -InstallRoot $root -Pool $pool} 'occupied' 'Unreachable occupied port is preserved without PID kill'
     [pscustomobject]@{Suite='Router PowerShell lifecycle';Passed=$true;Checks=$results.Count;Limitations='Real Node processes, loopback HTTP, auth and files. Backend startup and Windows listener inventory mocked; retry sleeps shortened.'}|ConvertTo-Json
 } finally {
     [Environment]::SetEnvironmentVariable($pool.ApiTokenEnvironmentVariable,$previous,'Process')

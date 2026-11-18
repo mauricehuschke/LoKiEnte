@@ -71,10 +71,10 @@ try{
         $count++
     }
     foreach($case in @(
-        @{Path='bad-chat';Pattern='Chat-Smoke-Test'},
-        @{Path='bad-tool';Pattern='Kein eindeutiger'},
-        @{Path='bad-receipt';Pattern='Tool-Antwort'},
-        @{Path='prose';Pattern='Tool-Antwort'}
+        @{Path='bad-chat';Pattern='Chat smoke test'},
+        @{Path='bad-tool';Pattern='no unique'},
+        @{Path='bad-receipt';Pattern='tool response'},
+        @{Path='prose';Pattern='tool response'}
     )){
         $failure=$null
         try{$null=Test-LrModelInference -ApiBaseUrl "$base/$($case.Path)/v1" -ModelId 'fixture' -Headers @{}}catch{$failure=$_.Exception.Message}

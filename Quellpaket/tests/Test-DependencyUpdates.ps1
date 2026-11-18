@@ -50,7 +50,7 @@ try{
     $script:installed=[version]'2.50.0.0'
     $script:applyChange=$false
     $rejected=$false
-    try{$null=Install-ShadowPackage @arguments -AcceptedVersion $versions.git}catch{$rejected=$_.Exception.Message -match 'erreicht die freigegebene Version'}
+    try{$null=Install-ShadowPackage @arguments -AcceptedVersion $versions.git}catch{$rejected=$_.Exception.Message -match 'does not meet approved version'}
     if(-not $rejected){throw 'Upgrade was accepted despite the executable still being old'}
 
     $tokens=$null;$parse=$null

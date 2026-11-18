@@ -35,33 +35,33 @@ $token=$null
 # Reuse the actual provisioning profile thresholds and exact model definitions.
 $tokens=$null;$parseErrors=$null
 $runtimeAst=[Management.Automation.Language.Parser]::ParseInput($PackageFiles['Runtime.ps1'],[ref]$tokens,[ref]$parseErrors)
-if($parseErrors.Count){throw 'Runtime-Modul im Paket enthaelt Syntaxfehler.'}
+if($parseErrors.Count){throw 'Runtime module in the package contains syntax errors.'}
 foreach($name in @('Get-LrProperty','ConvertFrom-LrModelList','Get-LrMissingLoadOptions','Select-LrProfile','Add-LrVariantMetadata','Find-LrModel')){
     $definition=$runtimeAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$false)
-    if($null -eq $definition){throw "Audit-Helfer fehlt im Paket: $name"}
+    if($null -eq $definition){throw "Audit helper missing from package: $name"}
     . ([scriptblock]::Create($definition.Extent.Text))
     $commonAst=[Management.Automation.Language.Parser]::ParseInput($PackageFiles['Common.ps1'],[ref]$tokens,[ref]$parseErrors)
-    if($parseErrors.Count){throw 'Gemeinsames Modul im Paket enthaelt Syntaxfehler.'}
+    if($parseErrors.Count){throw 'Common module in the package contains syntax errors.'}
     $definition=$commonAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Resolve-ShadowCodeCli'},$false)
-    if($null -eq $definition){throw 'VS-Code-CLI-Pfadpruefung fehlt im Paket.'}
+    if($null -eq $definition){throw 'VS Code CLI path verification missing from package.'}
     . ([scriptblock]::Create($definition.Extent.Text))
 }
 $poolAst=[Management.Automation.Language.Parser]::ParseInput($PackageFiles['ModelPool.ps1'],[ref]$tokens,[ref]$parseErrors)
-if($parseErrors.Count){throw 'Modellpool-Modul im Paket enthaelt Syntaxfehler.'}
+if($parseErrors.Count){throw 'Model pool module in package contains syntax errors.'}
 $definition=$poolAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Get-SmpModelDefinitions'},$false)
-if($null -eq $definition){throw 'Modellkatalog fehlt im Paket.'}
+if($null -eq $definition){throw 'Model catalog missing from package.'}
 . ([scriptblock]::Create($definition.Extent.Text))
 $selectionAst=[Management.Automation.Language.Parser]::ParseInput($PackageFiles['ModelSelection.ps1'],[ref]$tokens,[ref]$parseErrors)
-if($parseErrors.Count){throw 'Modellauswahl im Paket enthaelt Syntaxfehler.'}
+if($parseErrors.Count){throw 'Model selection module in package contains syntax errors.'}
 foreach($name in @('Get-ShadowModelCatalog','Get-ShadowModelRanking','Get-ShadowRecommendedModel')){
     $definition=$selectionAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$false)
-    if($null -eq $definition){throw "Audit-Modellkatalog fehlt: $name"}
+    if($null -eq $definition){throw "Audit model catalog missing: $name"}
     . ([scriptblock]::Create($definition.Extent.Text))
 }
 $ripgrepAst=[Management.Automation.Language.Parser]::ParseInput($PackageFiles['Ripgrep.ps1'],[ref]$tokens,[ref]$parseErrors)
-if($parseErrors.Count){throw 'Ripgrep-Modul im Paket enthaelt Syntaxfehler.'}
+if($parseErrors.Count){throw 'Ripgrep module in the package contains syntax errors.'}
 $definition=$ripgrepAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Get-ShadowRipgrepInfo'},$false)
-if($null -eq $definition){throw 'Ripgrep-Auditdaten fehlen.'}
+if($null -eq $definition){throw 'Ripgrep audit data missing.'}
 . ([scriptblock]::Create($definition.Extent.Text))
 
 function Add-AuditCheck {
@@ -71,7 +71,7 @@ function Add-AuditCheck {
 
 function Invoke-AuditNative {
     param([string]$FilePath,[string[]]$Arguments,[int]$TimeoutSeconds=20,[switch]$AllowFailure)
-    if([IO.Path]::GetExtension($FilePath) -in @('.cmd','.bat','.ps1')){throw 'Audit erwartet einen nativen Programmeinstieg, keinen Shell-Shim.'}
+    if([IO.Path]::GetExtension($FilePath) -in @('.cmd','.bat','.ps1')){throw 'Audit requires a native program entry point, not a shell shim.'}
     $start=New-Object Diagnostics.ProcessStartInfo
     $start.FileName=$FilePath
     $start.Arguments=(@(foreach($argument in $Arguments){ConvertTo-WindowsArgument $argument}) -join ' ')
@@ -86,12 +86,12 @@ function Invoke-AuditNative {
         $stderr=$process.StandardError.ReadToEndAsync()
         if(-not $process.WaitForExit($TimeoutSeconds*1000)){
             $process.Kill()
-            throw "Zeitlimit ($TimeoutSeconds s) bei $([IO.Path]::GetFileName($FilePath)). Nur der Audit-CLI-Prozess wurde beendet; ein gestarteter Hintergrunddienst kann weiterlaufen."
+            throw "Timeout ($TimeoutSeconds s) for $([IO.Path]::GetFileName($FilePath)). Only the audit CLI process was terminated; a background service it started may still be running."
         }
         $text=$stdout.GetAwaiter().GetResult()
         $errorText=$stderr.GetAwaiter().GetResult()
         if($AllowFailure){return [pscustomobject]@{ExitCode=$process.ExitCode;Stdout=$text;Stderr=$errorText}}
-        if($process.ExitCode -ne 0){throw "$([IO.Path]::GetFileName($FilePath)) meldet Exitcode $($process.ExitCode). Programm separat pruefen."}
+        if($process.ExitCode -ne 0){throw "$([IO.Path]::GetFileName($FilePath)) returned exit code $($process.ExitCode). Check the program separately."}
         return $text.Trim()
     }finally{$process.Dispose()}
 }
@@ -107,17 +107,17 @@ function Invoke-AuditJson {
     $response=$null
     try{
         if($BearerToken){
-            if(-not $Uri.IsLoopback){throw 'Audit sendet API-Token nur an Loopback.'}
-            if($BearerToken -match '[\r\n]'){throw 'API-Token enthaelt ungueltige Headerzeichen; sein Wert wird nicht ausgegeben.'}
+            if(-not $Uri.IsLoopback){throw 'Audit sends API tokens only to loopback addresses.'}
+            if($BearerToken -match '[\r\n]'){throw 'API token contains invalid header characters; its value is not displayed.'}
             try{$client.DefaultRequestHeaders.Authorization=New-Object Net.Http.Headers.AuthenticationHeaderValue('Bearer',$BearerToken)}
-            catch{throw 'API-Token kann nicht als Authorization-Header verwendet werden; sein Wert wird nicht ausgegeben.'}
+            catch{throw 'API token cannot be used as an Authorization header; its value is not displayed.'}
         }
         try{$response=$client.GetAsync($Uri).GetAwaiter().GetResult()}
-        catch{throw "Verbindung zu $($Uri.Host):$($Uri.Port) fehlgeschlagen oder Zeitlimit erreicht."}
-        if(-not $response.IsSuccessStatusCode){throw "HTTP $([int]$response.StatusCode) von $($Uri.Host):$($Uri.Port). Keine Weiterleitung und kein Fallback ausgefuehrt."}
+        catch{throw "Connection to $($Uri.Host):$($Uri.Port) failed or timed out."}
+        if(-not $response.IsSuccessStatusCode){throw "HTTP $([int]$response.StatusCode) from $($Uri.Host):$($Uri.Port). No redirect or fallback performed."}
         $text=$response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
         try{return ConvertFrom-Json -InputObject $text -ErrorAction Stop}
-        catch{throw "Antwort von $($Uri.Host) ist kein gueltiges JSON."}
+        catch{throw "Response from $($Uri.Host) is not valid JSON."}
     }finally{if($response){$response.Dispose()};$client.Dispose();$handler.Dispose()}
 }
 
@@ -127,17 +127,17 @@ function ConvertFrom-AuditJson {
         if($ModelList){ConvertFrom-LrModelList -Json $Json;return}
         return ConvertFrom-Json -InputObject $Json -ErrorAction Stop
     }
-    catch{throw "Ungueltiges JSON oder unerwartete Struktur aus $Source. Rohdaten werden nicht in den Auditbericht uebernommen."}
+    catch{throw "Invalid JSON or unexpected structure from $Source. Raw data is not included in the audit report."}
 }
 
-Add-AuditCheck 'bundle' PASS 'Eingebettetes ZIP vor der Auswertung per SHA256 verifiziert.' @{version=$BundleVersion;sha256=$PayloadHash}
-if($AllowPartialGpuOffload){Add-AuditCheck 'model.offload' WARN 'Teilweise CPU-Auslagerung ist ausgewaehlt; Speicherfit und Leistung werden erst im Setup geprueft.'}
-try{Assert-BootstrapOptions;Add-AuditCheck 'parameters' PASS 'Parameterkombination und Projektpfade sind gueltig.'}
+Add-AuditCheck 'bundle' PASS 'Embedded ZIP verified using SHA256 before evaluation.' @{version=$BundleVersion;sha256=$PayloadHash}
+if($AllowPartialGpuOffload){Add-AuditCheck 'model.offload' WARN 'Partial CPU offload selected; memory fit and performance will be checked during setup.'}
+try{Assert-BootstrapOptions;Add-AuditCheck 'parameters' PASS 'Parameter combination and project paths are valid.'}
 catch{Add-AuditCheck 'parameters' FAIL $_.Exception.Message}
 try{
     if($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem -or
        -not [Environment]::Is64BitProcess -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64'){
-        throw 'Windows x64 und ein 64-Bit-PowerShell-Prozess sind erforderlich.'
+        throw 'Windows x64 and a 64-bit PowerShell process are required.'
     }
     $system=Get-CimInstance Win32_OperatingSystem
     $cpu=Get-CimInstance Win32_Processor|Select-Object -First 1
@@ -145,7 +145,7 @@ try{
         Gpu=$null;TotalRamBytes=([long]$system.TotalVisibleMemorySize*1KB)
         FreeRamBytes=([long]$system.FreePhysicalMemory*1KB)
     }
-    Add-AuditCheck 'windows' PASS 'Windows-x64-Umgebung erkannt.' @{
+    Add-AuditCheck 'windows' PASS 'Windows x64 environment detected.' @{
         name=$system.Caption;build=$system.BuildNumber;cpu=$cpu.Name
         ramGiB=[math]::Round($hardware.TotalRamBytes/1GB,1);freeRamGiB=[math]::Round($hardware.FreeRamBytes/1GB,1)
         auditPowerShell=$PSVersionTable.PSVersion.ToString()
@@ -153,14 +153,14 @@ try{
 }catch{Add-AuditCheck 'windows' FAIL $_.Exception.Message}
 try{
     Assert-BootstrapInstallRoot -AllowSharedDirectory
-    Add-AuditCheck 'installRoot' PASS 'Installationspfad und Paketkennung sind nutzbar; kein Schreibtest ausgefuehrt.' @{path=$InstallRoot;exists=(Test-Path -LiteralPath $InstallRoot)}
+    Add-AuditCheck 'installRoot' PASS 'Installation path and package identity are usable; no write test performed.' @{path=$InstallRoot;exists=(Test-Path -LiteralPath $InstallRoot)}
 }catch{Add-AuditCheck 'installRoot' FAIL $_.Exception.Message}
 try{
     $legacyRoot=Join-Path $env:LOCALAPPDATA 'ShadowLocalAI'
     if([IO.Path]::GetFullPath($InstallRoot).TrimEnd('\','/') -ine $legacyRoot.TrimEnd('\','/') -and (Test-Path -LiteralPath $legacyRoot)){
-        Add-AuditCheck 'installRoot.legacy' WARN 'Bisheriges Verzeichnis vorhanden. Audit prueft nur installRoot und kopiert nichts. Altes Verzeichnis mit -InstallRoot gezielt pruefen; der normale Lauf bietet Auswahl/Kopie an.' @{path=$legacyRoot}
+        Add-AuditCheck 'installRoot.legacy' WARN 'Legacy directory exists. Audit checks only installRoot and copies nothing. Use -InstallRoot to inspect the old directory explicitly; normal provisioning offers selection/copying.' @{path=$legacyRoot}
     }
-}catch{Add-AuditCheck 'installRoot.legacy' FAIL 'Bisheriges Installationsverzeichnis konnte nicht geprueft werden.'}
+}catch{Add-AuditCheck 'installRoot.legacy' FAIL 'Could not check the previous installation directory.'}
 try{
     $lockPaths=@((Join-Path $InstallRoot 'provisioning.lock'),(Join-Path $InstallRoot 'setup-active.lock'))
     $foundLock=$false
@@ -170,14 +170,14 @@ try{
         $lock.Dispose();$foundLock=$true
     }
     if($foundLock){
-        Add-AuditCheck 'setup.lock' PASS 'Kein exklusiver Provisionierungslauf an der vorhandenen Sperrdatei erkannt.'
-    }else{Add-AuditCheck 'setup.lock' SKIP 'Noch keine Provisionierungssperre vorhanden.'}
-}catch{Add-AuditCheck 'setup.lock' FAIL 'Provisionierungssperre belegt oder nicht lesbar. Laufende Einrichtung abschliessen bzw. Zugriffsrechte pruefen.'}
+        Add-AuditCheck 'setup.lock' PASS 'No exclusive provisioning run detected on the existing lock file.'
+    }else{Add-AuditCheck 'setup.lock' SKIP 'No provisioning lock exists yet.'}
+}catch{Add-AuditCheck 'setup.lock' FAIL 'Provisioning lock is occupied or unreadable. Complete active setup or check permissions.'}
 try{
     $disks=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType = 3'|ForEach-Object {
         @{drive=$_.DeviceID;totalGiB=[math]::Round($_.Size/1GB,1);freeGiB=[math]::Round($_.FreeSpace/1GB,1)}
     })
-    Add-AuditCheck 'storage' WARN 'Freier Platz ist eine Bestandsaufnahme. Das konfigurierte LM-Studio-Modelllaufwerk und Platz fuer Downloads muessen separat passen; fuer eine Neuinstallation etwa 60 GB Reserve einplanen.' $disks
+    Add-AuditCheck 'storage' WARN 'Free space is a snapshot. The configured LM Studio model drive and download space must be checked separately; allow about 60 GB of reserve for a new installation.' $disks
 }catch{Add-AuditCheck 'storage' WARN $_.Exception.Message}
 
 $candidates=[ordered]@{
@@ -201,39 +201,39 @@ foreach($name in $candidates.Keys){
         $tools[$name]=$path
         if(-not $path){
             $status=if($name -in @('winget','nvidia-smi')){'FAIL'}else{'MISSING'}
-            Add-AuditCheck "tool.$name" $status $(if($status -eq 'FAIL'){'Voraussetzung fehlt; muss vor der Provisionierung bereitgestellt werden.'}else{'Fehlt; kann beim normalen Setup installiert werden.'})
+            Add-AuditCheck "tool.$name" $status $(if($status -eq 'FAIL'){'Prerequisite missing; provide it before provisioning.'}else{'Missing; can be installed during normal setup.'})
             continue
         }
         $version=if($name -in @('code','lmstudio')){
             (Get-Item -LiteralPath $path).VersionInfo.ProductVersion
         }elseif($name -eq 'pwsh'){
             Invoke-AuditNative $path @('-NoLogo','-NoProfile','-NonInteractive','-Command','$PSVersionTable.PSVersion.ToString()')
-        }elseif($name -eq 'nvidia-smi'){'siehe gpu-Pruefung'}else{Invoke-AuditNative $path @('--version')}
-        if($name -eq 'pwsh' -and [version]$version -lt [version]'7.4'){throw 'Vorhandene PowerShell ist aelter als 7.4; sie wird nicht automatisch ersetzt.'}
-        if($name -eq 'node' -and ($version -notmatch '^v(\d+)\.' -or [int]$Matches[1] -lt 20)){throw 'Vorhandenes Node ist nicht als Version >=20 nachweisbar.'}
+        }elseif($name -eq 'nvidia-smi'){'see GPU check'}else{Invoke-AuditNative $path @('--version')}
+        if($name -eq 'pwsh' -and [version]$version -lt [version]'7.4'){throw 'Existing PowerShell is older than 7.4; it will not be replaced automatically.'}
+        if($name -eq 'node' -and ($version -notmatch '^v(\d+)\.' -or [int]$Matches[1] -lt 20)){throw 'Existing Node cannot be verified as version >=20.'}
         if($name -eq 'curl'){$version=($version -split '\r?\n')[0]}
-        Add-AuditCheck "tool.$name" PASS 'Programm gefunden.' @{path=$path;version=$version}
+        Add-AuditCheck "tool.$name" PASS 'Program found.' @{path=$path;version=$version}
     }catch{Add-AuditCheck "tool.$name" FAIL $_.Exception.Message}
 }
 try{
     $ripgrep=Get-ShadowRipgrepInfo -InstallRoot $InstallRoot
     Assert-BootstrapNoReparsePoint -Path $ripgrep.Path
     if(-not(Test-Path -LiteralPath $ripgrep.Path -PathType Leaf)){
-        Add-AuditCheck 'tool.ripgrep' MISSING 'Ripgrep fehlt im isolierten Kilo-Cache; das normale Setup stellt es bereit.' @{path=$ripgrep.Path}
+        Add-AuditCheck 'tool.ripgrep' MISSING 'Ripgrep is missing from the isolated Kilo cache; normal setup will provide it.' @{path=$ripgrep.Path}
     }else{
         $hash=(Get-FileHash -LiteralPath $ripgrep.Path -Algorithm SHA256 -ErrorAction Stop).Hash
-        if($hash -ine $ripgrep.ExecutableSha256){throw 'Vorhandenes ripgrep hat eine unbekannte Pruefsumme und bleibt unveraendert.'}
+        if($hash -ine $ripgrep.ExecutableSha256){throw 'Existing ripgrep has an unknown checksum and remains unchanged.'}
         $version=Invoke-AuditNative $ripgrep.Path @('--version')
-        if($version -notmatch '(?m)^ripgrep 15\.1\.0(?:\s|$)'){throw 'Ripgrep meldet eine unerwartete Version.'}
-        Add-AuditCheck 'tool.ripgrep' PASS 'Geprueftes ripgrep im isolierten Kilo-Cache gefunden; Kilo-Dateisuche wird im Setup getestet.' @{path=$ripgrep.Path;version=$ripgrep.Version}
+        if($version -notmatch '(?m)^ripgrep 15\.1\.0(?:\s|$)'){throw 'Ripgrep reports an unexpected version.'}
+        Add-AuditCheck 'tool.ripgrep' PASS 'Verified ripgrep found in the isolated Kilo cache; Kilo file search will be tested during setup.' @{path=$ripgrep.Path;version=$ripgrep.Version}
     }
 }catch{Add-AuditCheck 'tool.ripgrep' FAIL $_.Exception.Message}
 try{
     if($tools['code']){
         $cli=Resolve-ShadowCodeCli -CodePath $tools['code']
-        Add-AuditCheck 'vscode.cli' PASS 'Der vom installierten VS Code angegebene CLI-Einstieg ist vorhanden; keine Erweiterungen installiert.' @{path=$cli}
+        Add-AuditCheck 'vscode.cli' PASS 'The CLI entry point declared by installed VS Code exists; no extensions installed.' @{path=$cli}
     }else{
-        Add-AuditCheck 'vscode.cli' SKIP 'VS Code fehlt; CLI-Pfad kann noch nicht geprueft werden.'
+        Add-AuditCheck 'vscode.cli' SKIP 'VS Code is missing; cannot check its CLI path yet.'
     }
 }catch{Add-AuditCheck 'vscode.cli' FAIL $_.Exception.Message}
 try{
@@ -245,42 +245,42 @@ try{
     }
     if($tools['node'] -and $npm -and (Test-Path -LiteralPath $npm -PathType Leaf)){
         $tools['npm']=$npm
-        Add-AuditCheck 'tool.npm' PASS 'npm ueber den nativen Node-Einstieg aufrufbar.' @{version=(Invoke-AuditNative $tools['node'] @($npm,'--version'))}
-    }else{Add-AuditCheck 'tool.npm' $(if($tools['node']){'FAIL'}else{'MISSING'}) 'npm-cli.js fehlt oder Node ist nicht vorhanden.'}
+        Add-AuditCheck 'tool.npm' PASS 'npm callable through the native Node entry point.' @{version=(Invoke-AuditNative $tools['node'] @($npm,'--version'))}
+    }else{Add-AuditCheck 'tool.npm' $(if($tools['node']){'FAIL'}else{'MISSING'}) 'npm-cli.js or Node is missing.'}
 }catch{Add-AuditCheck 'tool.npm' FAIL $_.Exception.Message}
 try{
     $packageRoot=Join-Path $InstallRoot 'tooling\node_modules\@kilocode\cli'
     $manifestPath=Join-Path $packageRoot 'package.json'
     if(Test-Path -LiteralPath $manifestPath -PathType Leaf){
-        $manifest=ConvertFrom-AuditJson -Json (Get-Content -LiteralPath $manifestPath -Raw) -Source 'Kilo-Manifest'
-        if((Get-LrProperty $manifest 'name') -cne '@kilocode/cli' -or -not(Get-LrProperty $manifest 'version')){throw 'Installiertes Kilo-Manifest ist unvollstaendig.'}
+        $manifest=ConvertFrom-AuditJson -Json (Get-Content -LiteralPath $manifestPath -Raw) -Source 'Kilo manifest'
+        if((Get-LrProperty $manifest 'name') -cne '@kilocode/cli' -or -not(Get-LrProperty $manifest 'version')){throw 'Installed Kilo manifest is incomplete.'}
         $bin=Get-LrProperty $manifest 'bin'
         $relative=if($bin -is [string]){$bin}else{Get-LrProperty $bin 'kilo'}
-        if($relative -isnot [string] -or -not $relative){throw 'Installiertes Kilo-Manifest enthaelt keinen CLI-Einstieg.'}
+        if($relative -isnot [string] -or -not $relative){throw 'Installed Kilo manifest has no CLI entry point.'}
         $entry=[IO.Path]::GetFullPath((Join-Path $packageRoot $relative))
         $prefix=[IO.Path]::GetFullPath($packageRoot)+[IO.Path]::DirectorySeparatorChar
         if(-not $entry.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase) -or -not(Test-Path -LiteralPath $entry -PathType Leaf)){
-            throw 'Kilo-CLI-Einstieg fehlt oder liegt ausserhalb des verwalteten Pakets.'
+            throw 'Kilo CLI entry point is missing or outside the managed package.'
         }
-        Add-AuditCheck 'tool.kilo' PASS 'Verwaltetes Kilo-Manifest und Einstieg vorhanden; effektive Konfiguration nicht ausgefuehrt.' @{version=$manifest.version}
-    }else{Add-AuditCheck 'tool.kilo' MISSING 'Keine private Kilo-Installation gefunden. Eine globale kompatible CLI kann das Setup gegebenenfalls wiederverwenden.'}
+        Add-AuditCheck 'tool.kilo' PASS 'Managed Kilo manifest and entry point exist; effective configuration was not executed.' @{version=$manifest.version}
+    }else{Add-AuditCheck 'tool.kilo' MISSING 'No private Kilo installation found. Setup may reuse a compatible global CLI.'}
 }catch{Add-AuditCheck 'tool.kilo' FAIL $_.Exception.Message}
 try{
-    if(-not $tools['nvidia-smi']){throw 'GPU-Speicher kann ohne nvidia-smi nicht verifiziert werden.'}
+    if(-not $tools['nvidia-smi']){throw 'GPU memory cannot be verified without nvidia-smi.'}
     $text=Invoke-AuditNative $tools['nvidia-smi'] @('--query-gpu=name,memory.total,memory.free,driver_version','--format=csv,noheader,nounits')
     $gpus=@(foreach($line in ($text -split '\r?\n')){
         if(-not $line.Trim()){continue}
         $parts=$line -split ',',4
-        if($parts.Count -ne 4){throw 'Unerwartete nvidia-smi-Ausgabe.'}
+        if($parts.Count -ne 4){throw 'Unexpected nvidia-smi output.'}
         $total=[double]::Parse($parts[1].Trim(),[Globalization.CultureInfo]::InvariantCulture)*1MB
         $free=[double]::Parse($parts[2].Trim(),[Globalization.CultureInfo]::InvariantCulture)*1MB
-        if($total -le 0 -or $free -lt 0 -or $free -gt $total){throw 'Ungueltige GPU-Speicherangaben.'}
+        if($total -le 0 -or $free -lt 0 -or $free -gt $total){throw 'Invalid GPU memory values.'}
         [pscustomobject]@{Name=$parts[0].Trim();TotalBytes=[long]$total;FreeBytes=[long]$free;Driver=$parts[3].Trim()}
     })
-    if($gpus.Count -ne 1){throw "Erkannt: $($gpus.Count) NVIDIA-GPUs; das Setup setzt genau eine voraus."}
-    if($null -eq $hardware){throw 'RAM-Bestandsaufnahme fehlt.'}
+    if($gpus.Count -ne 1){throw "Detected $($gpus.Count) NVIDIA GPUs; setup requires exactly one."}
+    if($null -eq $hardware){throw 'RAM inventory unavailable.'}
     $hardware.Gpu=$gpus[0]
-    Add-AuditCheck 'gpu' PASS 'NVIDIA-GPU und freier Speicher ausgelesen.' $gpus[0]
+    Add-AuditCheck 'gpu' PASS 'NVIDIA GPU and free memory detected.' $gpus[0]
     $noFitRoles=[Collections.Generic.List[string]]::new()
     if($ModelMode -eq 'Dual'){
         $catalog=@(Get-ShadowModelCatalog)
@@ -296,9 +296,9 @@ try{
         if(-not $suggestion){$noFitRoles.Add('coder');$definitions=@()}else{$definitions=@($suggestion)}
     }else{$definitions=@(Select-LrProfile -PreferredModel $PreferredModel -Hardware $hardware -ModelKey $ModelKey)}
     if($noFitRoles.Count){
-        Add-AuditCheck 'model.hardware' WARN 'Keine grobe Speicherempfehlung fuer mindestens eine Rolle. Im Setup bewusst auswaehlen; Downloads bleiben moeglich.' @{profiles=@($definitions|ForEach-Object {$_.Name});rolesWithoutFit=@($noFitRoles);requestedContext=$ContextLength}
+        Add-AuditCheck 'model.hardware' WARN 'No approximate memory recommendation for at least one role. Select explicitly during setup; downloads remain available.' @{profiles=@($definitions|ForEach-Object {$_.Name});rolesWithoutFit=@($noFitRoles);requestedContext=$ContextLength}
     }else{
-        Add-AuditCheck 'model.hardware' PASS 'Unverbindliche hardwarebasierte Vorschlaege; die Modellauswahl erfolgt im Setup. Kein Nachweis fuer den tatsaechlichen Modell-/Kontextfit.' @{profiles=@($definitions|ForEach-Object {$_.Name});requestedContext=$ContextLength}
+        Add-AuditCheck 'model.hardware' PASS 'Non-binding hardware-based suggestions; model selection takes place during setup. This does not prove actual model/context fit.' @{profiles=@($definitions|ForEach-Object {$_.Name});requestedContext=$ContextLength}
     }
 }catch{Add-AuditCheck 'model.hardware' FAIL $_.Exception.Message}
 
@@ -312,9 +312,9 @@ foreach($item in @(
 )){
     try{
         $path=Join-Path $InstallRoot $item.path
-        if(-not(Test-Path -LiteralPath $path -PathType Leaf)){Add-AuditCheck "state.$($item.name)" MISSING 'Noch kein gespeicherter Zustand vorhanden.';continue}
+        if(-not(Test-Path -LiteralPath $path -PathType Leaf)){Add-AuditCheck "state.$($item.name)" MISSING 'No saved state exists yet.';continue}
         $state=ConvertFrom-AuditJson -Json (Get-Content -LiteralPath $path -Raw) -Source $item.name
-        if((Get-LrProperty $state $item.schema) -ne $item.version){throw 'Unbekanntes Zustandsschema; keine automatische Reparatur im Audit.'}
+        if((Get-LrProperty $state $item.schema) -ne $item.version){throw 'Unknown state schema; audit does not repair it automatically.'}
         $required=switch($item.name){
             'toolchain'{@('nodeExecutable','kiloExecutable','powerShellExecutable','codeExecutable')}
             'pool'{@('OwnerId','BackendApiBaseUrl','RouterApiBaseUrl','Profiles','Status')}
@@ -323,9 +323,9 @@ foreach($item in @(
             'selection'{@('roles')}
             'provisioning'{@('status')}
         }
-        foreach($field in $required){if(-not(Get-LrProperty $state $field)){throw "Pflichtfeld fehlt im gespeicherten Zustand: $field"}}
+        foreach($field in $required){if(-not(Get-LrProperty $state $field)){throw "Required field missing from saved state: $field"}}
         if($item.name -eq 'ownership' -and ($null -eq $state.PSObject.Properties['Entries'] -or $state.Entries -isnot [array])){
-            throw 'Eigentumsnachweis enthaelt keine Eintragsliste.'
+            throw 'Ownership record has no entries list.'
         }
         foreach($field in @('ApiBaseUrl','BackendApiBaseUrl','RouterApiBaseUrl')){
             $value=Get-LrProperty $state $field
@@ -333,14 +333,14 @@ foreach($item in @(
                 $uri=[Uri]$value
                 if(-not $uri.IsAbsoluteUri -or -not $uri.IsLoopback -or $uri.Scheme -ne 'http' -or
                    $uri.UserInfo -or $uri.Query -or $uri.Fragment -or $uri.AbsolutePath.TrimEnd('/') -cne '/v1'){
-                    throw 'Gespeicherter Modellendpunkt ist kein eindeutiger lokaler HTTP-/v1-Endpunkt.'
+                    throw 'Saved model endpoint is not an unambiguous local HTTP /v1 endpoint.'
                 }
             }
         }
         $states[$item.name]=$state
         $status=Get-LrProperty $state 'Status' (Get-LrProperty $state 'status')
         $valid=$null -eq $status -or $status -cin @('Ready','PROVISIONED')
-        Add-AuditCheck "state.$($item.name)" $(if($valid){'PASS'}else{'WARN'}) 'Gespeicherter Zustand gelesen; ersetzt keine aktuelle Funktionspruefung.' @{status=$status}
+        Add-AuditCheck "state.$($item.name)" $(if($valid){'PASS'}else{'WARN'}) 'Saved state read; this does not replace a current functional check.' @{status=$status}
     }catch{Add-AuditCheck "state.$($item.name)" FAIL $_.Exception.Message}
 }
 if(-not $ModelKey -and ($states.ContainsKey('selection') -or ($ModelMode -eq 'Dual' -and $states.ContainsKey('pool')))){
@@ -369,9 +369,9 @@ if(-not $ModelKey -and ($states.ContainsKey('selection') -or ($ModelMode -eq 'Du
     }
     if(-not $unmatched -and $savedDefinitions.Count -eq $minimum -and $rolesPresent){
         $definitions=$savedDefinitions.ToArray()
-        Add-AuditCheck 'model.selection' PASS 'Gespeicherte Modellauswahl wird auf vorhandene Dateien geprueft; neue Empfehlungen erscheinen beim Setup.'
+        Add-AuditCheck 'model.selection' PASS 'Checking saved model selection against existing files; new recommendations appear during setup.'
     }else{
-        Add-AuditCheck 'model.selection' WARN 'Gespeicherte Modellauswahl ist nicht vollstaendig im Katalog; Audit zeigt aktuelle Vorschlaege statt einer behaupteten bestaetigten Auswahl.'
+        Add-AuditCheck 'model.selection' WARN 'Saved model selection is not fully represented in the catalog; audit shows current suggestions rather than claiming a confirmed selection.'
     }
 }
 try{
@@ -379,18 +379,18 @@ try{
         $token=[Environment]::GetEnvironmentVariable($ApiTokenEnvironmentVariable,'Process')
         if(-not $token){$token=[Environment]::GetEnvironmentVariable($ApiTokenEnvironmentVariable,'User')}
     }
-    Add-AuditCheck 'authentication' PASS 'Nur Token-Verfuegbarkeit erfasst; kein Tokenwert im Bericht.' @{variable=$ApiTokenEnvironmentVariable;present=(-not [string]::IsNullOrWhiteSpace($token))}
+    Add-AuditCheck 'authentication' PASS 'Only token availability recorded; no token value in the report.' @{variable=$ApiTokenEnvironmentVariable;present=(-not [string]::IsNullOrWhiteSpace($token))}
     $lmHome=Join-Path $env:USERPROFILE '.lmstudio'
     $pointer=Join-Path $env:USERPROFILE '.lmstudio-home-pointer'
     if(Test-Path -LiteralPath $pointer -PathType Leaf){
         $lmHome=(Get-Content -LiteralPath $pointer -Raw).Trim()
-        if($lmHome -notmatch '^(?:[A-Za-z]:[\\/]|\\\\[^\\]+\\[^\\]+)' -or -not(Test-Path -LiteralPath $lmHome -PathType Container)){throw 'Ungueltiger LM-Studio-Home-Verweis.'}
+        if($lmHome -notmatch '^(?:[A-Za-z]:[\\/]|\\\\[^\\]+\\[^\\]+)' -or -not(Test-Path -LiteralPath $lmHome -PathType Container)){throw 'Invalid LM Studio home reference.'}
     }elseif(Test-Path -LiteralPath (Join-Path $env:USERPROFILE '.cache\lm-studio') -PathType Container){$lmHome=Join-Path $env:USERPROFILE '.cache\lm-studio'}
     $lms=Find-BootstrapExecutable 'lms.exe' @((Join-Path $lmHome 'bin\lms.exe'))
     $tools['lms']=$lms
-    if(-not $lms){Add-AuditCheck 'tool.lms' MISSING 'LM-Studio-CLI fehlt; App installieren bzw. Erststart abschliessen.'}
+    if(-not $lms){Add-AuditCheck 'tool.lms' MISSING 'LM Studio CLI missing; install the app or complete first-run setup.'}
     else{
-        Add-AuditCheck 'tool.lms' PASS 'LM-Studio-CLI gefunden.' @{path=$lms;version=(Invoke-AuditNative $lms @('--version'))}
+        Add-AuditCheck 'tool.lms' PASS 'LM Studio CLI found.' @{path=$lms;version=(Invoke-AuditNative $lms @('--version'))}
         $help=Invoke-AuditNative $lms @('load','--help')
         $missing=@(Get-LrMissingLoadOptions -Help $help)
         $probe=$null
@@ -398,14 +398,14 @@ try{
             $probe=Invoke-AuditNative $lms @('load','--exact','--local','--estimate-only','--yes') -AllowFailure
             $missing=@(Get-LrMissingLoadOptions -Help $help -ExactLocalProbe $probe)
         }
-        Add-AuditCheck 'lms.capabilities' $(if($missing.Count){'FAIL'}else{'PASS'}) 'Ladeoptionen per Hilfe und gegebenenfalls kontrolliertem Aufruf ohne Modellpfad mit --estimate-only geprueft; kein Modell geladen. Versteckte Optionen werden nicht allein wegen fehlender Hilfe abgelehnt.' @{missing=$missing;hiddenOptionsProbed=($null -ne $probe)}
+        Add-AuditCheck 'lms.capabilities' $(if($missing.Count){'FAIL'}else{'PASS'}) 'Load options checked through help and, where necessary, a controlled --estimate-only invocation without a model path; no model loaded. Hidden options are not rejected merely because help omits them.' @{missing=$missing;hiddenOptionsProbed=($null -ne $probe)}
         $server=ConvertFrom-AuditJson -Json (Invoke-AuditNative $lms @('server','status','--json')) -Source 'lms server status'
-        if((Get-LrProperty $server 'running') -isnot [bool]){throw 'Serverstatus enthaelt kein running-Boolean.'}
+        if((Get-LrProperty $server 'running') -isnot [bool]){throw 'Server status has no running boolean.'}
         if($server.running){
             $backendPort=[int](Get-LrProperty $server 'port' 0)
-            if($backendPort -lt 1 -or $backendPort -gt 65535){throw 'Laufender Server meldet keinen gueltigen Port.'}
+            if($backendPort -lt 1 -or $backendPort -gt 65535){throw 'Running server reports no valid port.'}
         }
-        Add-AuditCheck 'lms.server' $(if($server.running){'PASS'}else{'MISSING'}) 'Serverstatus gelesen; kein API-Serverstart angefordert.' @{running=$server.running;effectivePort=$backendPort}
+        Add-AuditCheck 'lms.server' $(if($server.running){'PASS'}else{'MISSING'}) 'Server status read; no API server start requested.' @{running=$server.running;effectivePort=$backendPort}
         $downloaded=@(ConvertFrom-AuditJson -Json (Invoke-AuditNative $lms @('ls','--json')) -Source 'lms ls' -ModelList|Where-Object {
             (Get-LrProperty $_ 'type') -eq 'llm' -and $null -eq (Get-LrProperty $_ 'deviceIdentifier' '__unknown__')
         })
@@ -414,7 +414,7 @@ try{
             Add-LrVariantMetadata -Models $downloaded -Groups $groups
         }
         $loaded=@(ConvertFrom-AuditJson -Json (Invoke-AuditNative $lms @('ps','--json')) -Source 'lms ps' -ModelList)
-        Add-AuditCheck 'lms.models' PASS 'Lokale Modelldateien und geladene Instanzen gelesen.' @{downloadedCount=$downloaded.Count;loadedCount=$loaded.Count}
+        Add-AuditCheck 'lms.models' PASS 'Local model files and loaded instances read.' @{downloadedCount=$downloaded.Count;loadedCount=$loaded.Count}
         foreach($instance in $loaded){
             $owned=@()
             if($states.ContainsKey('ownership')){
@@ -427,7 +427,7 @@ try{
             $idle=(Get-LrProperty $instance 'status') -ceq 'idle' -and [int](Get-LrProperty $instance 'queued' 0) -eq 0
             $recognized=$local -and $owned.Count -eq 1
             $verifiedOwnership=$recognized -and (Get-LrProperty $owned[0] 'Verified') -eq $true
-            Add-AuditCheck 'model.loaded' $(if($verifiedOwnership -and $idle){'PASS'}else{'WARN'}) 'Instanz wird weder entladen noch uebernommen. Unbekannte, ausstehende oder beschaeftigte Instanzen erfordern weitere Setup-Pruefungen.' @{
+            Add-AuditCheck 'model.loaded' $(if($verifiedOwnership -and $idle){'PASS'}else{'WARN'}) 'Instance will neither be unloaded nor adopted. Unknown, pending or busy instances require further setup checks.' @{
                 id=(Get-LrProperty $instance 'identifier');local=$local;idle=$idle;recordedOwner=$recognized
                 ownershipVerified=$verifiedOwnership
             }
@@ -437,9 +437,9 @@ try{
 foreach($definition in $definitions){
     try{
         $model=Find-LrModel -Models $downloaded -Profile $definition -ModelKey $ModelKey
-        if($model){Add-AuditCheck 'model.file' PASS 'Exakte lokale Modelldatei gefunden.' @{profile=$definition.Name};continue}
+        if($model){Add-AuditCheck 'model.file' PASS 'Exact local model file found.' @{profile=$definition.Name};continue}
         $status=if($ModelKey -or $SkipModelDownload){'FAIL'}else{'MISSING'}
-        $message=if($ModelKey){'Explizites Modell nicht lokal nachgewiesen.'}elseif($SkipModelDownload){'Modelldatei fehlt und der Download ist deaktiviert.'}else{'Modelldatei nicht lokal nachgewiesen; das Setup bietet Auswahl und ggf. Download an.'}
+        $message=if($ModelKey){'Explicit model not verified locally.'}elseif($SkipModelDownload){'Model file missing and downloads disabled.'}else{'Model file not verified locally; setup offers selection and download where applicable.'}
         Add-AuditCheck 'model.file' $status $message @{profile=$definition.Name;path=$definition.ExpectedPath;downloadUrl=$definition.DownloadUrl}
     }catch{Add-AuditCheck 'model.file' FAIL $_.Exception.Message}
 }
@@ -450,33 +450,33 @@ try{
         if($number -eq $RouterPort -and $ModelMode -ne 'Dual' -and $number -ne $backendPort){continue}
         $atPort=@($listeners|Where-Object {$_.LocalPort -eq $number})
         $public=@($atPort|Where-Object {$_.LocalAddress -notin @('127.0.0.1','::1')})
-        Add-AuditCheck "port.$number" $(if($public.Count){'FAIL'}elseif($atPort.Count){'WARN'}else{'PASS'}) 'Portbelegung gelesen; kein Dienst beendet.' @{
+        Add-AuditCheck "port.$number" $(if($public.Count){'FAIL'}elseif($atPort.Count){'WARN'}else{'PASS'}) 'Port usage read; no service stopped.' @{
             listening=($atPort.Count -gt 0);loopbackOnly=($atPort.Count -gt 0 -and $public.Count -eq 0)
             addresses=@($atPort|ForEach-Object {$_.LocalAddress})
         }
     }
-    if($ModelMode -eq 'Dual' -and $backendPort -eq $RouterPort){Add-AuditCheck 'ports.distinct' FAIL 'Der tatsaechliche Backendport kollidiert mit dem Routerport.'}
+    if($ModelMode -eq 'Dual' -and $backendPort -eq $RouterPort){Add-AuditCheck 'ports.distinct' FAIL 'The actual backend port conflicts with the router port.'}
 }catch{Add-AuditCheck 'ports' WARN $_.Exception.Message}
 if($listenersKnown -and @($listeners|Where-Object {$_.LocalPort -eq $backendPort -and $_.LocalAddress -eq '127.0.0.1'}).Count){
     try{
         $catalog=Invoke-AuditJson -Uri "http://127.0.0.1:$backendPort/api/v1/models" -BearerToken $token
-        if($null -eq $catalog -or $null -eq $catalog.PSObject.Properties['models'] -or $catalog.models -isnot [array]){throw 'Keine LM-Studio-REST-v1-Modelldaten am Backendport.'}
-        Add-AuditCheck 'api.backend' PASS 'LM-Studio-REST-v1 erreichbar und Authentifizierung akzeptiert; keine Inferenz angefordert.'
+        if($null -eq $catalog -or $null -eq $catalog.PSObject.Properties['models'] -or $catalog.models -isnot [array]){throw 'No LM Studio REST v1 model data at the backend port.'}
+        Add-AuditCheck 'api.backend' PASS 'LM Studio REST v1 reachable and authentication accepted; no inference requested.'
     }catch{Add-AuditCheck 'api.backend' FAIL $_.Exception.Message}
-}else{Add-AuditCheck 'api.backend' SKIP 'Kein nachgewiesener IPv4-Loopback-Listener; keine API-Anfrage gesendet.'}
+}else{Add-AuditCheck 'api.backend' SKIP 'No verified IPv4 loopback listener; no API request sent.'}
 if($ModelMode -eq 'Dual' -and $listenersKnown -and @($listeners|Where-Object {$_.LocalPort -eq $RouterPort -and $_.LocalAddress -eq '127.0.0.1'}).Count){
     try{
         $health=Invoke-AuditJson -Uri "http://127.0.0.1:$RouterPort/health" -BearerToken $token
-        if((Get-LrProperty $health 'service') -cne 'shadow-local-model-router'){throw 'Port gehoert nicht zum erwarteten Modellrouter.'}
-        Add-AuditCheck 'api.router' $(if((Get-LrProperty $health 'ready') -eq $true){'PASS'}else{'WARN'}) 'Routerstatus gelesen; kein Neustart angefordert.' @{
+        if((Get-LrProperty $health 'service') -cne 'shadow-local-model-router'){throw 'Port does not belong to the expected model router.'}
+        Add-AuditCheck 'api.router' $(if((Get-LrProperty $health 'ready') -eq $true){'PASS'}else{'WARN'}) 'Router status read; no restart requested.' @{
             ready=(Get-LrProperty $health 'ready');busy=(Get-LrProperty $health 'busy');queued=(Get-LrProperty $health 'queued')
         }
     }catch{Add-AuditCheck 'api.router' WARN $_.Exception.Message}
 }
 try{
     $manifest=Invoke-AuditJson -Uri 'https://registry.npmjs.org/@kilocode%2fcli/latest'
-    if((Get-LrProperty $manifest 'name') -cne '@kilocode/cli' -or -not(Get-LrProperty $manifest 'version')){throw 'Oeffentliche npm-Registry liefert kein passendes Kilo-Manifest.'}
-    Add-AuditCheck 'online.kilo' PASS 'Oeffentliche npm-Registry erreichbar. Fehlendes engines-Feld ist erlaubt; eine abweichend konfigurierte npm-Registry wird hier nicht geprueft.' @{
+    if((Get-LrProperty $manifest 'name') -cne '@kilocode/cli' -or -not(Get-LrProperty $manifest 'version')){throw 'Public npm registry returned no matching Kilo manifest.'}
+    Add-AuditCheck 'online.kilo' PASS 'Public npm registry reachable. A missing engines field is allowed; a differently configured npm registry is not checked here.' @{
         version=$manifest.version;engines=(Get-LrProperty $manifest 'engines');bin=(Get-LrProperty $manifest 'bin')
     }
 }catch{Add-AuditCheck 'online.kilo' WARN $_.Exception.Message}
@@ -487,11 +487,11 @@ foreach($definition in $definitions){
         $repository=$parts[0]+'/'+$parts[1]
         $model=Invoke-AuditJson -Uri ("https://huggingface.co/api/models/"+$repository)
         $files=@((Get-LrProperty $model 'siblings' @())|Where-Object {(Get-LrProperty $_ 'rfilename') -ceq $parts[2]})
-        if($files.Count -ne 1){throw 'Exakte GGUF-Datei wird von der Modellquelle nicht bestaetigt.'}
-        Add-AuditCheck 'online.model' PASS 'Exakte GGUF-Datei im oeffentlichen Katalog gefunden; keine Modelldaten heruntergeladen.' @{profile=$definition.Name;repository=$repository}
+        if($files.Count -ne 1){throw 'The model source does not confirm the exact GGUF file.'}
+        Add-AuditCheck 'online.model' PASS 'Exact GGUF file found in the public catalog; no model data downloaded.' @{profile=$definition.Name;repository=$repository}
     }catch{Add-AuditCheck 'online.model' WARN $_.Exception.Message @{profile=$definition.Name}}
 }
-Add-AuditCheck 'inference' SKIP 'Speicherschaetzung, Modellladen, Chat-/Tool-Smoke-Tests und wirksame Kilo-Konfiguration bleiben dem normalen Setup vorbehalten.'
+Add-AuditCheck 'inference' SKIP 'Memory estimation, model loading, chat/tool smoke tests and effective Kilo configuration are reserved for normal setup.'
 $failed=@($checks|Where-Object {$_.status -eq 'FAIL'}).Count
 $warnings=@($checks|Where-Object {$_.status -eq 'WARN'}).Count
 $missing=@($checks|Where-Object {$_.status -eq 'MISSING'}).Count
@@ -500,7 +500,7 @@ $missing=@($checks|Where-Object {$_.status -eq 'MISSING'}).Count
     status=$(if($failed){'BLOCKED'}elseif($warnings -or $missing){'ATTENTION_REQUIRED'}else{'PRECHECK_PASSED'})
     exitCode=$(if($failed){2}else{0})
     provisioningPerformed=$false;inferenceVerified=$false;installRoot=$InstallRoot
-    sideEffects='Das Audit schreibt keine Paketdateien und fordert keine Installation, Inferenz oder Modellwechsel an. Vorhandene CLI-Werkzeuge koennen Cache/Logs schreiben oder ihren Hintergrunddienst initialisieren. Oeffentliche Metadaten werden online abgefragt.'
+    sideEffects='Audit writes no package files and requests no installation, inference or model switches. Existing CLI tools may write caches/logs or initialize their background service. Public metadata is queried online.'
     summary=@{failed=$failed;warnings=$warnings;missing=$missing;checks=$checks.Count}
     tools=$tools;checks=$checks.ToArray()
 }

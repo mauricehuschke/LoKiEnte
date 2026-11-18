@@ -45,7 +45,7 @@ function Invoke-ShadowNative {
                 throw "Timeout after $TimeoutSeconds seconds: $([IO.Path]::GetFileName($FilePath))"
             }
             if (-not $Quiet -and ([int]$clock.Elapsed.TotalSeconds % 30 -eq 0)) {
-                Write-Host ('  ... {0} laeuft seit {1}s' -f [IO.Path]::GetFileName($FilePath), [int]$clock.Elapsed.TotalSeconds)
+                Write-Host ('  ... {0} has been running for {1}s' -f [IO.Path]::GetFileName($FilePath), [int]$clock.Elapsed.TotalSeconds)
             }
         }
         $stdout=$outTask.GetAwaiter().GetResult()
@@ -117,7 +117,7 @@ function Resolve-ShadowNpm {
     foreach ($candidate in $candidates) {
         if (Test-Path -LiteralPath $candidate -PathType Leaf) { return (Resolve-Path -LiteralPath $candidate).Path }
     }
-    throw 'npm-cli.js wurde nicht gefunden. Die vorhandene Node/npm-Installation bleibt unveraendert; bitte deren Installation reparieren.'
+    throw 'npm-cli.js was not found. The existing Node/npm installation remains unchanged; repair that installation.'
 }
 
 function Install-ShadowPackage {
@@ -126,33 +126,33 @@ function Install-ShadowPackage {
     $accepted=if($AcceptedVersion){Get-ShadowComparableVersion $AcceptedVersion}else{$null}
     if($existing -and $accepted){
         $current=Get-ShadowInstalledVersion -Tool $Tool -Path $existing
-        if(-not $current){throw "Installierte Version von $Tool nicht ermittelbar. Upgrade auf $AcceptedVersion wurde nicht gestartet."}
+        if(-not $current){throw "Cannot determine installed version of $Tool. Upgrade to $AcceptedVersion was not started."}
         if($current -ge $accepted){
-            Write-ShadowMessage "$Tool $current bereits auf oder ueber dem freigegebenen Stand $AcceptedVersion."
+            Write-ShadowMessage "$Tool $current is already at or above the approved version $AcceptedVersion."
             return $existing
         }
     }elseif ($existing) {
-        Write-ShadowMessage "Vorhanden: $Tool ($existing)"
+        Write-ShadowMessage "Available: $Tool ($existing)"
         return $existing
     }
     $action=if($existing){'upgrade'}else{'install'}
     $arguments=@($action,'--id',$PackageId,'--exact','--source','winget','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
     if($action -ceq 'install'){$arguments+=@('--no-upgrade')}
     if($accepted){$arguments+=@('--version',$AcceptedVersion)}
-    Write-ShadowMessage "WinGet $action fuer $PackageId $AcceptedVersion ..."
+    Write-ShadowMessage "WinGet $action for $PackageId $AcceptedVersion ..."
     $result=Invoke-ShadowNative -FilePath $WingetPath -ArgumentList $arguments -AllowFailure
     Update-ShadowProcessPath
     $resolved=Resolve-ShadowTool -Name $Tool
     if (-not $resolved) {
-        throw "Paket $PackageId wurde nicht nutzbar gefunden (WinGet exit $($result.ExitCode)). Falls ein Neustart verlangt wurde, danach dasselbe Skript erneut ausfuehren."
+        throw "Package $PackageId was not found in a usable state (WinGet exit $($result.ExitCode)). If a restart was requested, rerun this script afterwards."
     }
     if ($result.ExitCode -notin @(0,3010,1641)) {
         # A tool discovered after a non-success installer exit is reported, not
         # silently accepted. Re-running reuses it after the operator has seen it.
-        throw "WinGet meldete $($result.ExitCode) fuer $PackageId. Programm wurde gefunden, Installationsstatus aber nicht bestaetigt. Bitte Ausgabe pruefen und erneut ausfuehren."
+        throw "WinGet returned $($result.ExitCode) for $PackageId. Program found, but installation status is unconfirmed. Check the output and retry."
     }
     if($accepted -and (Get-ShadowInstalledVersion -Tool $Tool -Path $resolved) -lt $accepted){
-        throw "$Tool erreicht die freigegebene Version $AcceptedVersion nach WinGet nicht. Neustart oder Programmpfad pruefen."
+        throw "$Tool does not meet approved version $AcceptedVersion after WinGet. Check restart requirements or executable path."
     }
     return $resolved
 }
@@ -171,10 +171,10 @@ function Write-ShadowManagedFile {
     param([Parameter(Mandatory)][string]$Path,[Parameter(Mandatory)][AllowEmptyString()][string]$Content,[string]$BackupRoot)
     $newBytes=[Text.UTF8Encoding]::new($false).GetBytes($Content)
     if (Test-Path -LiteralPath $Path) {
-        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Dateikonflikt: $Path" }
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "File conflict: $Path" }
         $oldBytes=[IO.File]::ReadAllBytes($Path)
         if ([Convert]::ToBase64String($oldBytes) -eq [Convert]::ToBase64String($newBytes)) { return $false }
-        if (-not $BackupRoot) { throw "Vorhandene Datei wuerde ueberschrieben: $Path" }
+        if (-not $BackupRoot) { throw "Existing file would be overwritten: $Path" }
         [IO.Directory]::CreateDirectory($BackupRoot) | Out-Null
         $tag=[DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')
         $backup=Join-Path $BackupRoot ($tag+'-'+[IO.Path]::GetFileName($Path))
@@ -221,19 +221,19 @@ function Resolve-ShadowCodeCli {
         $pattern='^\s*"%~dp0\.\.\\'+$exe+'"\s+"%~dp0\.\.\\(?:(?<version>[A-Za-z0-9][A-Za-z0-9._-]*)\\)?resources\\app\\out\\cli\.js"\s+%\*\s*$'
         $matches=@(Get-Content -LiteralPath $wrapper -ErrorAction Stop|Where-Object {$_ -match $pattern})
         if($matches.Count -ne 1){
-            throw "VS-Code-CLI-Pfad in $wrapper ist nicht eindeutig im erwarteten Format. Die bestehende Installation wird nicht veraendert."
+            throw "VS Code CLI path in $wrapper is not unambiguous in the expected format. Existing installation remains unchanged."
         }
         $match=[regex]::Match($matches[0],$pattern,[Text.RegularExpressions.RegexOptions]::IgnoreCase)
         $relative=if($match.Groups['version'].Success){
             Join-Path $match.Groups['version'].Value 'resources/app/out/cli.js'
         }else{'resources/app/out/cli.js'}
         $cli=Join-Path $root $relative
-        if(-not(Test-Path -LiteralPath $cli -PathType Leaf)){throw "Der von VS Code angegebene CLI-Einstieg fehlt: $cli. Bestehende Installation pruefen."}
+        if(-not(Test-Path -LiteralPath $cli -PathType Leaf)){throw "The CLI entry point declared by VS Code is missing: $cli. Check the existing installation."}
         return $cli
     }
     $legacy=Join-Path $root 'resources/app/out/cli.js'
     if(Test-Path -LiteralPath $legacy -PathType Leaf){return $legacy}
-    throw "VS-Code-CLI nicht gefunden: $wrapper und $legacy. Bestehende Installation pruefen."
+    throw "VS Code CLI not found: $wrapper and $legacy. Check the existing installation."
 }
 
 function Invoke-ShadowCodeCli {
@@ -252,27 +252,27 @@ function Get-ShadowBundledKilo {
     $extensionsRoot=Join-Path $InstallRoot 'vscode-extensions'
     $result=Invoke-ShadowCodeCli -CodePath $CodePath -Arguments @('--user-data-dir',(Join-Path $InstallRoot 'vscode-data'),'--extensions-dir',$extensionsRoot,'--telemetry-level','off','--list-extensions','--show-versions')
     $versions=@($result.StdOut -split '\r?\n'|Where-Object {$_ -match '^kilocode\.kilo-code@[^@\s]+$'}|ForEach-Object {$_.Substring($_.IndexOf('@')+1)})
-    if($versions.Count -ne 1){throw 'VS Code meldete keine eindeutige installierte Kilo-Erweiterung mit Version im verwalteten Profil.'}
-    if(-not(Test-Path -LiteralPath $extensionsRoot -PathType Container)){throw 'Verwaltetes VS-Code-Erweiterungsverzeichnis fehlt.'}
+    if($versions.Count -ne 1){throw 'VS Code did not report a unique installed Kilo extension with a version in the managed profile.'}
+    if(-not(Test-Path -LiteralPath $extensionsRoot -PathType Container)){throw 'Managed VS Code extension directory missing.'}
     $candidates=[Collections.Generic.List[string]]::new()
     foreach($directory in Get-ChildItem -LiteralPath $extensionsRoot -Directory -Force -ErrorAction Stop|Where-Object {$_.Name -like 'kilocode.kilo-code-*'}){
-        if($directory.Attributes -band [IO.FileAttributes]::ReparsePoint){throw "Verknuepfung im verwalteten Kilo-Erweiterungsverzeichnis: $($directory.FullName)."}
+        if($directory.Attributes -band [IO.FileAttributes]::ReparsePoint){throw "Link in the managed Kilo extension directory: $($directory.FullName)."}
         $manifest=Join-Path $directory.FullName 'package.json'
-        if(-not(Test-Path -LiteralPath $manifest -PathType Leaf)){throw "Paketmanifest der Kilo-Erweiterung fehlt: $manifest"}
+        if(-not(Test-Path -LiteralPath $manifest -PathType Leaf)){throw "Kilo extension package manifest missing: $manifest"}
         try{$package=Get-Content -LiteralPath $manifest -Raw -ErrorAction Stop|ConvertFrom-Json -AsHashtable -ErrorAction Stop}
-        catch{throw "Paketmanifest der Kilo-Erweiterung nicht lesbar: $manifest"}
+        catch{throw "Kilo extension package manifest unreadable: $manifest"}
         if($package -isnot [Collections.IDictionary] -or -not $package.Contains('publisher') -or
            -not $package.Contains('name') -or -not $package.Contains('version')){
-            throw "Paketmanifest der Kilo-Erweiterung unvollstaendig: $manifest"
+            throw "Kilo extension package manifest incomplete: $manifest"
         }
         if($package['publisher'] -ieq 'kilocode' -and $package['name'] -ieq 'kilo-code' -and $package['version'] -ceq $versions[0]){
             $candidates.Add($directory.FullName)
         }
     }
-    if($candidates.Count -ne 1){throw "Kilo-Erweiterung Version $($versions[0]) ist im verwalteten Erweiterungsverzeichnis nicht eindeutig ($($candidates.Count) Treffer)."}
+    if($candidates.Count -ne 1){throw "Kilo extension version $($versions[0]) is not unique in the managed extension directory ($($candidates.Count) matches)."}
     $extensionPath=$candidates[0]
     $binary=Join-Path $extensionPath 'bin/kilo.exe'
-    if(-not(Test-Path -LiteralPath $binary -PathType Leaf)){throw 'Die installierte Kilo-Erweiterung enthaelt nicht die erwartete aktuelle CLI-Runtime. Pre-Release-Kanal pruefen.'}
+    if(-not(Test-Path -LiteralPath $binary -PathType Leaf)){throw 'The installed Kilo extension does not contain the expected current CLI runtime. Check the pre-release channel.'}
     return $binary
 }
 

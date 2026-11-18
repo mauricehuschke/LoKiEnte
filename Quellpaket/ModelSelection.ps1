@@ -53,7 +53,7 @@ function Get-ShadowModelRanking {
         'coder-fast' {@('qwen35-9b','qwen3-14b','qwen35-4b','gpt-oss-20b','qwen38-27b')}
         'review' {@('gpt-oss-20b','qwen3-14b','qwen35-9b','qwen35-4b','qwen38-27b')}
         'fast' {@('qwen35-9b','qwen35-4b','qwen3-14b','gpt-oss-20b','qwen38-27b')}
-        default {throw "Unbekannte Modellrolle: $Role"}
+        default {throw "Unknown model role: $Role"}
     }
 }
 
@@ -62,7 +62,7 @@ function Get-ShadowRecommendedModel {
     $ranking=@(Get-ShadowModelRanking -Role $Role)
     foreach($id in $ranking){
         $candidate=@($Catalog|Where-Object {$_.Id -ceq $id})
-        if($candidate.Count -ne 1){throw "Modellkatalog ist unvollstaendig: $id"}
+        if($candidate.Count -ne 1){throw "Model catalog is incomplete: $id"}
         $gpuBytes=if($AllowPartialGpuOffload){$candidate[0].Bytes*0.8}else{$candidate[0].Bytes}
         if($candidate[0].Bytes+6GB -le $Hardware.FreeRamBytes -and $gpuBytes+4GB -le $Hardware.Gpu.FreeBytes){
             return $candidate[0]
@@ -77,68 +77,68 @@ function Select-ShadowModels {
         $roles=if($Single){@('coder')}else{@('coder-high','coder-fast','review')}
         if(-not $Single -and $IncludeFastModel){$roles+=@('fast')}
         $chosen=[Collections.Generic.List[object]]::new()
-        Write-Host "`nMODELLAUSWAHL - geschaetzte Empfehlung, keine Leistungs- oder Speicherfit-Garantie"
-        Write-Host ("Frei: VRAM {0:N1} GiB; RAM {1:N1} GiB. Nur ein Coding-/Reviewmodell wird gleichzeitig geladen." -f ($Hardware.Gpu.FreeBytes/1GB),($Hardware.FreeRamBytes/1GB))
-        if(-not $Single){Write-Host 'Fuer die lokale Indexierung wird zusaetzlich ein kleines CPU-Embeddingmodell geladen.'}
-        Write-Host 'Vorhandene Modelle bleiben erhalten. Modelle werden niemals automatisch geloescht.'
+        Write-Host "`nMODEL SELECTION - estimated recommendation, no performance or memory-fit guarantee"
+        Write-Host ("Available: VRAM {0:N1} GiB; RAM {1:N1} GiB. Only one coding/review model is loaded at a time." -f ($Hardware.Gpu.FreeBytes/1GB),($Hardware.FreeRamBytes/1GB))
+        if(-not $Single){Write-Host 'Local indexing additionally loads a small CPU embedding model.'}
+        Write-Host 'Existing models are preserved. Models are never deleted automatically.'
         foreach($role in $roles){
             $ranking=@(Get-ShadowModelRanking -Role $role)
             $ordered=@(foreach($id in $ranking){$catalog|Where-Object {$_.Id -ceq $id}})
             $recommendation=Get-ShadowRecommendedModel -Role $role -Catalog $catalog -Hardware $Hardware -AllowPartialGpuOffload:$AllowPartialGpuOffload
             if($Single -and $PreferredId){
                 $requested=@($catalog|Where-Object {$_.Id -ceq $PreferredId})
-                if($requested.Count -ne 1){throw "Unbekanntes ausdruecklich gewaehltes Modell: $PreferredId"}
+                if($requested.Count -ne 1){throw "Unknown explicitly selected model: $PreferredId"}
                 $recommendation=$requested[0]
             }
             $roleDescription=switch($role){
-                'coder-high' {'CODER HIGH - anspruchsvolle Entwicklung und Architektur'}
-                'coder-fast' {'CODER FAST - schnellere Entwicklung und gezielte Recherche'}
-                'review' {'REVIEW - unabhaengige Gegenpruefung und Sicherheit'}
-                'fast' {'FAST - optionales kleines Modell fuer einfache Aufgaben'}
-                default {'CODER - Einzelmodell'}
+                'coder-high' {'CODER HIGH - demanding development and architecture'}
+                'coder-fast' {'CODER FAST - faster development and targeted research'}
+                'review' {'REVIEW - independent cross-checks and security'}
+                'fast' {'FAST - optional small model for simple tasks'}
+                default {'CODER - Single model'}
             }
-            Write-Host "`nRolle: $roleDescription [$role]"
+            Write-Host "`nRole: $roleDescription [$role]"
             $previous=@($PreviousProfiles|Where-Object {(Get-LrProperty $_ 'Alias') -ceq $role})
             if(-not $previous.Count -and $role -eq 'coder-high'){
                 $previous=@($PreviousProfiles|Where-Object {(Get-LrProperty $_ 'Alias') -ceq 'coder'})
-                if($previous.Count){Write-Host '  Uebernahmevorschlag aus dem bisherigen coder-Profil.'}
+                if($previous.Count){Write-Host '  Suggested selection from the previous coder profile.'}
             }
             if(-not $previous.Count -and $role -eq 'coder-fast'){
                 $previous=@($PreviousProfiles|Where-Object {(Get-LrProperty $_ 'Alias') -ceq 'fast'})
-                if($previous.Count){Write-Host '  Ausgangsvorschlag aus dem bisherigen fast-Profil; getrennt anpassbar.'}
+                if($previous.Count){Write-Host '  Initial suggestion from the previous fast profile; adjustable separately.'}
             }
             if(-not $previous.Count -and $Single){
                 $previous=@($PreviousProfiles|Where-Object {(Get-LrProperty $_ 'Alias') -ceq 'coder-high'})
             }
-            if($previous.Count -gt 1){throw "Bisherige Rolle $role ist mehrdeutig. Keine automatische Aenderung."}
-            if($previous.Count -eq 1){Write-Host "  Bisheriges Profil: $([string](Get-LrProperty $previous[0] 'Name'))"}
+            if($previous.Count -gt 1){throw "Previous role $role is ambiguous. No automatic change."}
+            if($previous.Count -eq 1){Write-Host "  Previous profile: $([string](Get-LrProperty $previous[0] 'Name'))"}
             $previousCandidate=$null
             if($previous.Count -eq 1){
                 $previousId=[string](Get-LrProperty $previous[0] 'Id')
                 $previousPath=[string](Get-LrProperty $previous[0] 'ExpectedPath')
                 $previousMatch=@($ordered|Where-Object {($previousId -and $_.Id -ceq $previousId) -or ($previousPath -and $_.ExpectedPath -ieq $previousPath)})
-                if($previousMatch.Count -gt 1){throw "Bisheriges Modell fuer $role ist mehrdeutig."}
+                if($previousMatch.Count -gt 1){throw "Previous model for $role is ambiguous."}
                 if($previousMatch.Count -eq 1){$previousCandidate=$previousMatch[0]}
             }
             for($i=0;$i -lt $ordered.Count;$i++){
                 $candidate=$ordered[$i]
-                $existing=if(Find-LrModel -Models $Downloaded -Profile $candidate){'vorhanden'}else{'Download ggf. erforderlich'}
-                $label=if($recommendation -and $candidate.Id -ceq $recommendation.Id){' EMPFEHLUNG'}else{''}
-                if($previousCandidate -and $candidate.Id -ceq $previousCandidate.Id){$label+=' BISHER'}
-                Write-Host ("  {0}. {1} ({2:N2} GiB Dateien; {3}){4}" -f ($i+1),$candidate.Name,($candidate.Bytes/1GB),$existing,$label)
+                $existing=if(Find-LrModel -Models $Downloaded -Profile $candidate){'available'}else{'Download may be required'}
+                $label=if($recommendation -and $candidate.Id -ceq $recommendation.Id){' RECOMMENDED'}else{''}
+                if($previousCandidate -and $candidate.Id -ceq $previousCandidate.Id){$label+=' PREVIOUS'}
+                Write-Host ("  {0}. {1} ({2:N2} GiB files; {3}){4}" -f ($i+1),$candidate.Name,($candidate.Bytes/1GB),$existing,$label)
             }
             $defaultModel=if($Single -and $PreferredId){$recommendation}elseif($previousCandidate){$previousCandidate}else{$recommendation}
             $default=if($defaultModel){1+([array]::IndexOf($ordered,$defaultModel))}else{0}
-            if(-not $default){Write-Host 'Keine Vorauswahl passt zur groben Speicherreserve. Eine bewusste Auswahl ist erforderlich; der echte Fit wird weiterhin geprueft.'}
+            if(-not $default){Write-Host 'No default selection meets the approximate memory reserve. Explicit selection is required; actual fit will still be checked.'}
             $index=0
             while($true){
-                $prompt=if($default){"Nummer waehlen oder Enter fuer $default; q bricht ab"}else{'Nummer waehlen; q bricht ab'}
+                $prompt=if($default){"Select a number or press Enter for $default; q cancels"}else{'Select a number; q cancels'}
                 $choice=Read-Host $prompt
-                if($choice -ceq 'q'){throw 'Modellauswahl abgebrochen. Keine Modelldatei geloescht oder heruntergeladen.'}
+                if($choice -ceq 'q'){throw 'Model selection cancelled. No model files deleted or downloaded.'}
                 if([string]::IsNullOrWhiteSpace($choice)){$index=$default}
-                elseif(-not [int]::TryParse($choice,[ref]$index)){Write-Host 'Ungueltige Auswahl.';continue}
+                elseif(-not [int]::TryParse($choice,[ref]$index)){Write-Host 'Invalid selection.';continue}
                 if($index -ge 1 -and $index -le $ordered.Count){break}
-                Write-Host 'Ungueltige Auswahl.'
+                Write-Host 'Invalid selection.'
             }
 
             
@@ -155,10 +155,10 @@ function Select-ShadowModels {
             $item=$ordered[$index-1]
             $chosen.Add(@{Alias=$role;Name=$item.Name;Definition=$item})
         }
-        Write-Host "`nGewaehlte Rollen:"
+        Write-Host "`nSelected roles:"
         foreach($item in $chosen){Write-Host "  $($item.Alias): $($item.Name)"}
-        Write-Host 'Die Modellauswahl wird spaeter erneut anhand der aktuellen Hardware angeboten.'
-        if((Read-Host 'Diese Modellauswahl mit y bestaetigen') -cne 'y'){throw 'Modellauswahl abgebrochen. Keine Modelldatei geloescht oder heruntergeladen.'}
+        Write-Host 'Model selection will be offered again later based on current hardware.'
+        if((Read-Host 'Confirm this model selection with y') -cne 'y'){throw 'Model selection cancelled. No model files deleted or downloaded.'}
         return $chosen.ToArray()
     }
 
@@ -170,7 +170,7 @@ function Assert-ShadowDirectPath {
                     catch [IO.FileNotFoundException]{$attributes=$null}
                     catch [IO.DirectoryNotFoundException]{$attributes=$null}
                     if($null -ne $attributes -and ($attributes -band [IO.FileAttributes]::ReparsePoint)){
-                        throw "Verknuepfung im Modellpfad: $current. Keine Modelldatei wird ueberschrieben."
+                        throw "Link in model path: $current. No model file will be overwritten."
                     }
                     $parent=[IO.Directory]::GetParent($current)
                     $current=if($parent){$parent.FullName}else{$null}
@@ -183,7 +183,7 @@ function Resolve-ShadowModelDirectory {
                 if(Test-Path -LiteralPath $pointer -PathType Leaf){
                     $homePath=(Get-Content -LiteralPath $pointer -Raw -ErrorAction Stop).Trim()
                     if(-not [IO.Path]::IsPathFullyQualified($homePath) -or -not(Test-Path -LiteralPath $homePath -PathType Container)){
-                        throw 'LM-Studio-Home-Verweis ungueltig. Modellverzeichnis bleibt unveraendert.'
+                        throw 'Invalid LM Studio home reference. Model directory remains unchanged.'
                     }
                 }elseif(Test-Path -LiteralPath (Join-Path $user '.cache/lm-studio') -PathType Container){
                     $homePath=Join-Path $user '.cache/lm-studio'
@@ -191,14 +191,14 @@ function Resolve-ShadowModelDirectory {
                 $settings=Join-Path $homePath 'settings.json'
                 if(Test-Path -LiteralPath $settings -PathType Leaf){
                     try{$data=Get-Content -LiteralPath $settings -Raw -ErrorAction Stop|ConvertFrom-Json -AsHashtable -ErrorAction Stop}
-                    catch{throw "LM-Studio-Einstellungen nicht lesbar: $settings. Kein Modell wird abgelegt."}
+                    catch{throw "LM Studio settings unreadable: $settings. No model will be placed."}
                     if($data -isnot [Collections.IDictionary] -or -not $data.Contains('downloadsFolder') -or
                        $data.downloadsFolder -isnot [string] -or -not [IO.Path]::IsPathFullyQualified($data.downloadsFolder)){
-                        throw 'LM-Studio-Modellverzeichnis ist nicht eindeutig in settings.json hinterlegt. Kein Modell wird abgelegt.'
+                        throw 'LM Studio model directory is not unambiguously specified in settings.json. No model will be placed.'
                     }
                     $root=[IO.Path]::GetFullPath($data.downloadsFolder)
                 }else{$root=Join-Path $homePath 'models'}
-                if(-not(Test-Path -LiteralPath $root -PathType Container)){throw "LM-Studio-Modellverzeichnis nicht vorhanden: $root"}
+                if(-not(Test-Path -LiteralPath $root -PathType Container)){throw "LM Studio model directory does not exist: $root"}
                 Assert-ShadowDirectPath $root
                 return $root
             }
@@ -226,7 +226,7 @@ function Test-ShadowModelFile {
                         $handle.Dispose()
                         return
                     }catch [IO.IOException]{
-                        Write-Host "Eine Teildatei ist noch in Verwendung: $Path. Warte vor dem Wiederanlauf; Strg+C bricht ab."
+                        Write-Host "A partial file is still in use: $Path. Wait before resuming; Ctrl+C cancels."
                         Start-Sleep -Seconds 10
                     }
                 }
@@ -244,44 +244,44 @@ function Invoke-ShadowModelDownload {
                 Wait-ShadowDownloadFile -Path $partial
                 if(Test-Path -LiteralPath $complete){
                     if(Test-ShadowModelFile -Path $complete -Size $File.Size -Sha256 $File.Sha256){return $complete}
-                    throw "Vorhandene Download-Datei stimmt nicht mit dem Katalog ueberein: $complete. Sie bleibt unveraendert."
+                    throw "Existing download file does not match the catalog: $complete. It remains unchanged."
                 }
                 if((Test-Path -LiteralPath $partial -PathType Leaf) -and (Get-Item -LiteralPath $partial).Length -gt $File.Size){
-                    throw "Teildatei ist groesser als erwartet: $partial. Sie bleibt zur Untersuchung erhalten."
+                    throw "Partial file is larger than expected: $partial. It is retained for investigation."
                 }
                 if((Test-Path -LiteralPath $partial -PathType Leaf) -and (Get-Item -LiteralPath $partial).Length -eq $File.Size){
                     if(Test-ShadowModelFile -Path $partial -Size $File.Size -Sha256 $File.Sha256){
                         [IO.File]::Move($partial,$complete)
                         return $complete
                     }
-                    throw "Vollstaendige Teildatei hat einen falschen Hash: $partial. Sie bleibt erhalten; bitte vor einem erneuten Download pruefen."
+                    throw "Completed partial file has an incorrect hash: $partial. It is preserved; inspect it before downloading again."
                 }
                 $curl=Resolve-ShadowTool -Name curl
-                if(-not $curl){throw 'curl.exe fehlt. Windows-curl bereitstellen; keine Modelldatei wurde geloescht.'}
+                if(-not $curl){throw 'curl.exe missing. Provide Windows curl; no model file was deleted.'}
                 $url='https://huggingface.co/'+$Model.Repository+'/resolve/'+$Model.Revision+'/'+[Uri]::EscapeDataString($File.Name)
                 $attempt=0
                 while($true){
                     Wait-ShadowDownloadFile -Path $partial
                     $attempt++
-                    Write-Host "`nDownload: $($File.Name) - Versuch $attempt (Abbruch mit Strg+C)"
-                    Write-Host 'Quelle: Hugging Face; Fortschritt und Geschwindigkeit folgen. Kein Gesamtzeitlimit.'
+                    Write-Host "`nDownload: $($File.Name) - attempt $attempt (Ctrl+C to cancel)"
+                    Write-Host 'Source: Hugging Face; progress and speed follow. No overall timeout.'
                     $args=@('--disable','--fail','--location','--proto','=https','--proto-redir','=https','--max-redirs','10',
                         '--connect-timeout','60','--speed-limit','1','--speed-time','300',
                         '--continue-at','-','--output',$partial,'--url',$url)
                     $exitCode=Invoke-ShadowCurl -FilePath $curl -Arguments $args
                     if($exitCode -eq 0){
-                        Write-Host "Pruefe Groesse und SHA-256: $($File.Name) ..."
+                        Write-Host "Checking size and SHA-256: $($File.Name) ..."
                         if(Test-ShadowModelFile -Path $partial -Size $File.Size -Sha256 $File.Sha256){
                             [IO.File]::Move($partial,$complete)
                             return $complete
                         }
-                        throw "Downloadpruefung fehlgeschlagen. Datei bleibt zur Untersuchung erhalten: $partial"
+                        throw "Download verification failed. File retained for investigation: $partial"
                     }elseif($exitCode -eq 33 -and (Test-Path -LiteralPath $partial)){
                         $preserved=$partial+'.range-'+[guid]::NewGuid().ToString('N')
                         [IO.File]::Move($partial,$preserved)
-                        Write-Warning "Fortsetzung vom Server abgelehnt. Teildatei aufbewahrt: $preserved"
-                    }else{Write-Warning "Download fehlgeschlagen (curl Exitcode $exitCode); Teildatei bleibt fuer den Wiederanlauf erhalten."}
-                    Write-Host 'Neuer Versuch in 30 Sekunden. Strg+C beendet die Provisionierung.'
+                        Write-Warning "Server rejected resumption. Partial file retained: $preserved"
+                    }else{Write-Warning "Download failed (curl exit code $exitCode); partial file retained for resumption."}
+                    Write-Host 'Retrying in 30 seconds. Ctrl+C stops provisioning.'
                     Start-Sleep -Seconds 30
                 }
             }
@@ -295,13 +295,13 @@ function Copy-ShadowModelFile {
                 Assert-ShadowDirectPath $target
                 if(Test-Path -LiteralPath $target){
                     if(Test-ShadowModelFile -Path $target -Size $File.Size -Sha256 $File.Sha256){return}
-                    throw "Zieldatei existiert und stimmt nicht ueberein: $target. Sie bleibt unveraendert."
+                    throw "Destination file exists and does not match: $target. It remains unchanged."
                 }
                 $temporary=Join-Path $folder ('.shadow-copy-'+[guid]::NewGuid().ToString('N')+'.partial')
-                Write-Host "Kopiere gepruefte Datei nach LM Studio: $($File.Name) ..."
+                Write-Host "Copying verified file to LM Studio: $($File.Name) ..."
                 [IO.File]::Copy($Source,$temporary,$false)
                 if(-not(Test-ShadowModelFile -Path $temporary -Size $File.Size -Sha256 $File.Sha256)){
-                    throw "Kopie stimmt nicht ueberein und bleibt zur Untersuchung erhalten: $temporary"
+                    throw "Copy does not match and is retained for investigation: $temporary"
                 }
                 [IO.File]::Move($temporary,$target)
             }
@@ -313,8 +313,8 @@ function Install-ShadowSelectedModels {
                 $logs=Join-Path $InstallRoot 'runtime/model-precheck-logs'
                 $catalog=@{}
                 foreach($item in $Definitions){$catalog[$item.Definition.Id]=$item.Definition}
-                Write-Host "`nLM-Studio-Modellverzeichnis: $modelsRoot"
-                Write-Host "Downloadkopien bleiben erhalten: $downloadRoot"
+                Write-Host "`nLM Studio model directory: $modelsRoot"
+                Write-Host "Download copies are retained: $downloadRoot"
                 $neededDownload=[long]0;$neededCopy=[long]0
                 foreach($model in $catalog.Values){
                     foreach($file in $model.Files){
@@ -333,11 +333,11 @@ function Install-ShadowSelectedModels {
                     $downloadDrive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($downloadRoot)))
                     $modelDrive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($modelsRoot)))
                     if($downloadDrive.Name -ieq $modelDrive.Name){
-                        if($downloadDrive.AvailableFreeSpace -lt ($neededDownload+$neededCopy)){throw 'Nicht genug Speicherplatz fuer Downloads und erhaltene Kopien. Keine Modelldatei geloescht.'}
+                        if($downloadDrive.AvailableFreeSpace -lt ($neededDownload+$neededCopy)){throw 'Insufficient space for downloads and retained copies. No model file deleted.'}
                     }elseif($downloadDrive.AvailableFreeSpace -lt $neededDownload -or $modelDrive.AvailableFreeSpace -lt $neededCopy){
-                        throw 'Nicht genug Speicherplatz auf dem Download- oder LM-Studio-Modelllaufwerk. Keine Modelldatei geloescht.'
+                        throw 'Insufficient space on the download or LM Studio model drive. No model file deleted.'
                     }
-                    Write-Host ("Zusaetzlicher Platzbedarf etwa: Download {0:N2} GiB; Modellkopien {1:N2} GiB." -f ($neededDownload/1GB),($neededCopy/1GB))
+                    Write-Host ("Approximate additional space: download {0:N2} GiB; model copies {1:N2} GiB." -f ($neededDownload/1GB),($neededCopy/1GB))
                 }
                 foreach($model in $catalog.Values){
                     foreach($file in $model.Files){
@@ -345,12 +345,12 @@ function Install-ShadowSelectedModels {
                         Assert-ShadowDirectPath $destination
                         if(Test-Path -LiteralPath $destination){
                             if(-not(Test-ShadowModelFile -Path $destination -Size $file.Size -Sha256 $file.Sha256)){
-                                throw "Vorhandene Modelldatei ist nicht identisch: $destination. Sie bleibt unveraendert."
+                                throw "Existing model file is not identical: $destination. It remains unchanged."
                             }
-                            Write-Host "Bereits vorhanden und geprueft: $($file.Name)"
+                            Write-Host "Already available and verified: $($file.Name)"
                             continue
                         }
-                        if($SkipModelDownload){throw "Modelldatei fehlt und -SkipModelDownload ist gesetzt: $($model.Repository)/$($file.Name)."}
+                        if($SkipModelDownload){throw "Model file missing and -SkipModelDownload is set: $($model.Repository)/$($file.Name)."}
                         $source=Invoke-ShadowModelDownload -Model $model -File $file -DownloadRoot $downloadRoot
                         Copy-ShadowModelFile -Source $source -ModelRoot $modelsRoot -Repository $model.Repository -File $file
                     }
@@ -363,8 +363,8 @@ function Install-ShadowSelectedModels {
                         }else{@(Get-LrDownloadedModels -LmsPath $LmsPath -LogDirectory $logs)}
                         if(Find-LrModel -Models $models -Profile $item.Definition){break}
                         $attempt++
-                        Write-Host "Warte auf LM-Studio-Erkennung: $($item.Definition.ExpectedPath) (Versuch $attempt; Abbruch mit Strg+C)."
-                        Write-Host 'Falls eine andere Variante ausgewaehlt ist, die gewaehlte Datei in LM Studio aktivieren.'
+                        Write-Host "Waiting for LM Studio discovery: $($item.Definition.ExpectedPath) (attempt $attempt; Ctrl+C to cancel)."
+                        Write-Host 'If a different variant is selected, activate the chosen file in LM Studio.'
                         Start-Sleep -Seconds 10
                     }
                 }

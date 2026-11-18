@@ -8,10 +8,10 @@ function Resolve-ShadowProjectDirectory {
         ($candidate.StartsWith("'") -and $candidate.EndsWith("'")))){
         $candidate=$candidate.Substring(1,$candidate.Length-2)
     }
-    if([string]::IsNullOrWhiteSpace($candidate)){throw 'Bitte einen vorhandenen Projektordner angeben.'}
+    if([string]::IsNullOrWhiteSpace($candidate)){throw 'Please specify an existing project directory.'}
     $resolved=Resolve-Path -LiteralPath $candidate -ErrorAction Stop
     if($resolved.Provider.Name -cne 'FileSystem' -or -not(Test-Path -LiteralPath $resolved.ProviderPath -PathType Container)){
-        throw 'Das Projekt muss ein vorhandener Dateisystemordner sein.'
+        throw 'The project must be an existing filesystem directory.'
     }
     return $resolved.ProviderPath
 }
@@ -27,42 +27,42 @@ function Select-ShadowProject {
     if(Test-Path -LiteralPath $index){
         try {
             $entries=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($index)) -AsHashtable -NoEnumerate -ErrorAction Stop
-            if($entries -isnot [array]){throw 'Erwartet wird eine Liste von Projekten.'}
+            if($entries -isnot [array]){throw 'Expected a list of projects.'}
             foreach($entry in $entries){
                 if($entry -isnot [Collections.IDictionary] -or -not $entry.Contains('project') -or
                    $entry.project -isnot [string] -or [string]::IsNullOrWhiteSpace($entry.project)){
-                    throw 'Ein Projekteintrag hat keinen gueltigen Projektpfad.'
+                    throw 'A project entry has no valid project path.'
                 }
                 if($seen.Add($entry.project)){$projects.Add($entry.project)}
             }
         } catch {
-            throw "Projektliste nicht lesbar: $index. Die Datei bleibt unveraendert. $($_.Exception.Message)"
+            throw "Project list unreadable: $index. File remains unchanged. $($_.Exception.Message)"
         }
     }
     while($true){
         Write-Host ''
-        Write-Host 'LoKiEnte - Projekt auswaehlen'
+        Write-Host 'LoKiEnte - select a project'
         for($i=0;$i -lt $projects.Count;$i++){
-            $missing=if(Test-Path -LiteralPath $projects[$i] -PathType Container){''}else{' [nicht erreichbar]'}
+            $missing=if(Test-Path -LiteralPath $projects[$i] -PathType Container){''}else{' [unavailable]'}
             Write-Host "$($i+1): $($projects[$i])$missing"
         }
-        if(-not $projects.Count){Write-Host 'Noch keine Projekte registriert.'}
-        Write-Host 'N: Weiteren Projektordner oeffnen (Pfad eingeben)'
-        Write-Host '0: Abbrechen'
-        $choice=(Read-Host 'Auswahl').Trim()
+        if(-not $projects.Count){Write-Host 'No projects registered yet.'}
+        Write-Host 'N: Open another project directory (enter path)'
+        Write-Host '0: Cancel'
+        $choice=(Read-Host 'Selection').Trim()
         if($choice -eq '0'){return $null}
         if($choice -ieq 'N'){
-            $candidate=Read-Host 'Vorhandener Projektordner (leere Eingabe zurueck)'
+            $candidate=Read-Host 'Existing project directory (empty input to go back)'
             if([string]::IsNullOrWhiteSpace($candidate)){continue}
         }else{
             $number=0
             if(-not [int]::TryParse($choice,[ref]$number) -or $number -lt 1 -or $number -gt $projects.Count){
-                Write-Host 'Bitte eine angezeigte Nummer, N oder 0 eingeben.'
+                Write-Host 'Enter a displayed number, N or 0.'
                 continue
             }
             $candidate=$projects[$number-1]
         }
         try { return Resolve-ShadowProjectDirectory -Path $candidate }
-        catch { Write-Host "Ordner kann nicht geoeffnet werden: $($_.Exception.Message)" }
+        catch { Write-Host "Cannot open directory: $($_.Exception.Message)" }
     }
 }

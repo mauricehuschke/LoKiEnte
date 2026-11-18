@@ -15,8 +15,8 @@ function createEventReader(file, root) {
   return async function readEvents() {
   try {
     const info = await fs.lstat(file);
-    if (!info.isFile() || info.isSymbolicLink()) throw new Error('Ungueltiges Fortschrittsprotokoll.');
-    if (info.size < position) throw new Error('Fortschrittsprotokoll wurde unerwartet gekuerzt.');
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error('Invalid progress log.');
+    if (info.size < position) throw new Error('Progress log was unexpectedly truncated.');
     const handle = await fs.open(file, 'r');
     let tail;
     try {
@@ -27,7 +27,7 @@ function createEventReader(file, root) {
     } finally { await handle.close(); }
     const lines = tail.split(/\r?\n/);
     carry = lines.pop();
-    if (carry.length > 16384) throw new Error('Fortschrittsereignis ist zu gross.');
+    if (carry.length > 16384) throw new Error('Progress event is too large.');
     const result = [];
     for (const line of lines) {
       if (!line.trim()) continue;
@@ -58,7 +58,7 @@ async function stopOwnedChild(child) {
     let diagnostic = '';
     killer.stderr.on('data', chunk => { diagnostic = (diagnostic + chunk.toString('utf8')).slice(-1000); });
     await new Promise((resolve, reject) => {
-      killer.once('close', code => { if (code === 0 || child.exitCode !== null || child.signalCode !== null) resolve(); else reject(new Error(`Eigener Prozessbaum konnte nicht beendet werden (taskkill ${code}): ${diagnostic.trim()}`)); });
+      killer.once('close', code => { if (code === 0 || child.exitCode !== null || child.signalCode !== null) resolve(); else reject(new Error(`Could not terminate owned process tree (taskkill ${code}): ${diagnostic.trim()}`)); });
       killer.once('error', reject);
     });
   } else { child.kill('SIGTERM'); }
@@ -69,13 +69,13 @@ export async function runJob(root, runId) {
   const paths = await jobPaths(root, runId);
   const request = await readJson(paths.request);
   const entry = await registeredProject(root, request.project);
-  if (request.schemaVersion !== 1 || request.runId !== runId || !samePath(request.project, entry.project) || !samePath(request.checksFile, entry.checksFile) || !samePath(request.stateDirectory, entry.stateDirectory)) throw new Error('Auftragsbindung ist ungueltig.');
+  if (request.schemaVersion !== 1 || request.runId !== runId || !samePath(request.project, entry.project) || !samePath(request.checksFile, entry.checksFile) || !samePath(request.stateDirectory, entry.stateDirectory)) throw new Error('Task binding is invalid.');
   const projectLock = await readJson(await managedPath(root, path.join(root, 'workflow-jobs', 'locks', lockName(entry.project))));
-  if (projectLock.runId !== runId || !samePath(projectLock.project, entry.project)) throw new Error('Auftrag besitzt die Projektsperre nicht.');
+  if (projectLock.runId !== runId || !samePath(projectLock.project, entry.project)) throw new Error('Task does not own the project lock.');
   const claim = await managedPath(root, path.join(paths.job, 'worker.claim.json'), { missing: true });
   try { await fs.writeFile(claim, JSON.stringify({ runId, workerPid: process.pid, createdUtc: new Date().toISOString() }), { flag: 'wx' }); }
-  catch (error) { if (error.code === 'EEXIST') throw new Error('Dieser Auftrag besitzt bereits einen Worker. Status und Projektsperre bleiben unveraendert.'); throw error; }
-  let state = { schemaVersion: 1, runId, status: 'RUNNING', workerPid: process.pid, updatedUtc: new Date().toISOString(), heartbeatUtc: new Date().toISOString(), events: [], phaseSummary: [], summary: 'Automatische Auftragsvorbereitung laeuft.' };
+  catch (error) { if (error.code === 'EEXIST') throw new Error('This task already has a worker. Status and project lock remain unchanged.'); throw error; }
+  let state = { schemaVersion: 1, runId, status: 'RUNNING', workerPid: process.pid, updatedUtc: new Date().toISOString(), heartbeatUtc: new Date().toISOString(), events: [], phaseSummary: [], summary: 'Automatic task preparation is running.' };
   let child, finished = false, cancelled = false, exitCode = null, receiptPath = '', stdoutTail = '', stdoutBytes = 0, stderrBytes = 0;
   let cancelAttemptAt = 0, cancelError = '';
   let outHandle, errHandle, closed, processError, streamError;
@@ -116,7 +116,7 @@ export async function runJob(root, runId) {
   try {
     await publish();
     const chain = await readJson(await managedPath(root, path.join(root, 'toolchain.json')));
-    if (typeof chain.powerShellExecutable !== 'string' || !path.isAbsolute(chain.powerShellExecutable) || !/^pwsh(?:\.exe)?$/i.test(path.basename(chain.powerShellExecutable))) throw new Error('Provisionierte PowerShell fehlt.');
+    if (typeof chain.powerShellExecutable !== 'string' || !path.isAbsolute(chain.powerShellExecutable) || !/^pwsh(?:\.exe)?$/i.test(path.basename(chain.powerShellExecutable))) throw new Error('Provisioned PowerShell missing.');
     const runner = await managedPath(root, path.join(root, 'app', 'Invoke-ReviewedTask.ps1'));
     const taskFile = await managedPath(root, path.join(paths.job, 'task.md'));
     outHandle = await fs.open(output, 'wx'); errHandle = await fs.open(errors, 'wx');
@@ -128,7 +128,7 @@ export async function runJob(root, runId) {
       stdoutBytes += chunk.length;
       if (stdoutBytes <= maxLogBytes) streamWrites = streamWrites.then(() => outHandle.write(chunk)).catch(error => { streamError = error; });
       stdoutTail = (stdoutTail + chunk.toString('utf8')).slice(-65536);
-      for (const match of stdoutTail.matchAll(/(?:^|\r?\n)Pruefbericht: ([^\r\n]+)/g)) receiptPath = match[1].trim();
+      for (const match of stdoutTail.matchAll(/(?:^|\r?\n)Verification report: ([^\r\n]+)/g)) receiptPath = match[1].trim();
     });
     child.stderr.on('data', chunk => {
       stderrBytes += chunk.length;
@@ -150,12 +150,12 @@ export async function runJob(root, runId) {
       }
       if ((!cancelled || cancelError) && Date.now() >= cancelAttemptAt && await fs.lstat(path.join(paths.job, 'cancel')).then(info => !info.isSymbolicLink() && info.isFile(), () => false)) {
         cancelled = true;
-        state.status = 'CANCELLING'; state.summary = 'Abbruch angefordert; eigener Prozessbaum wird beendet.';
+        state.status = 'CANCELLING'; state.summary = 'Cancellation requested; terminating owned process tree.';
         await publish();
         try { await stopOwnedChild(child); cancelError = ''; }
         catch (error) {
           cancelError = error.message;
-          state.summary = `Abbruch noch nicht bestaetigt. ${cancelError} Der Auftrag kann weiterlaufen; die Projektsperre bleibt aktiv.`;
+          state.summary = `Cancellation not yet confirmed. ${cancelError} The task may still be running; the project lock remains active.`;
           await publish();
         }
         cancelAttemptAt = Date.now() + 5000;
@@ -169,20 +169,20 @@ export async function runJob(root, runId) {
     state.exitCode = exitCode;
     if (cancelled) {
       state.status = 'CANCELLED';
-      state.summary = cancelError ? 'Abbruch wurde angefordert; der Prozess ist nun beendet. Der automatische Abbruch war blockiert, daher kann der Auftrag bis dahin weitergelaufen sein. Aenderungen manuell pruefen.' : 'Auftrag abgebrochen. Bereits geschriebene Dateien bleiben fuer die manuelle Diff-Pruefung erhalten.';
+      state.summary = cancelError ? 'Cancellation was requested; the process has now exited. Automatic cancellation was blocked, so the task may have continued until now. Review changes manually.' : 'Task cancelled. Written files are preserved for manual diff review.';
     }
     else {
-      if (!receiptPath) throw new Error('Runner lieferte keinen Pruefbericht; keine Verifikation moeglich.');
+      if (!receiptPath) throw new Error('Runner returned no verification report; verification is impossible.');
       const receiptFile = await managedPath(root, receiptPath);
-      if (!inside(path.join(root, 'runs'), receiptFile) || path.basename(receiptFile) !== 'receipt.json') throw new Error('Runner lieferte einen ungueltigen Berichtspfad.');
+      if (!inside(path.join(root, 'runs'), receiptFile) || path.basename(receiptFile) !== 'receipt.json') throw new Error('Runner returned an invalid report path.');
       const receipt = await readJson(receiptFile, maxLogBytes);
-      if (receipt.request_id !== runId || !samePath(receipt.project, request.project)) throw new Error('Pruefbericht ist nicht an diesen Auftrag gebunden.');
+      if (receipt.request_id !== runId || !samePath(receipt.project, request.project)) throw new Error('Verification report is not bound to this task.');
       state.receiptPath = receiptFile;
       if (exitCode === 0 && receipt.status === 'VERIFIED' && /^[a-f0-9]{64}$/.test(receipt.final_fingerprint ?? '') && receipt.rounds?.at(-1)?.status === 'VERIFIED') state.status = 'VERIFIED';
       else if (exitCode === 2 && receipt.status === 'REVIEWED_UNVALIDATED') state.status = 'REVIEWED_UNVALIDATED';
       else if (receipt.status === 'NEEDS_INPUT' || String(receipt.error ?? '').startsWith('NEEDS_INPUT:')) state.status = 'NEEDS_INPUT';
       else state.status = 'NOT_VERIFIED';
-      state.summary = receipt.error || (state.status === 'VERIFIED' ? 'Alle vorgeschriebenen Pruefungen bestanden. Git-Diff und fachliches Verhalten vor dem Commit pruefen.' : (receipt.rounds?.at(-1)?.reasons ?? []).join('\n') || 'Der Auftrag wurde nicht verifiziert. Details im Pruefbericht lesen.');
+      state.summary = receipt.error || (state.status === 'VERIFIED' ? 'All required checks passed. Review the Git diff and functional behavior before committing.' : (receipt.rounds?.at(-1)?.reasons ?? []).join('\n') || 'The task was not verified. Read details in the verification report.');
     }
   } catch (error) {
     if (child && !finished) {
@@ -191,12 +191,12 @@ export async function runJob(root, runId) {
       try { await stopOwnedChild(child); }
       catch (stopError) {
         state.status = 'CANCELLING';
-        state.summary = `Workflow-Fehler: ${error.message} Abbruch noch nicht bestaetigt: ${stopError.message} Die Projektsperre bleibt aktiv.`;
+        state.summary = `Workflow error: ${error.message} Cancellation not yet confirmed: ${stopError.message} The project lock remains active.`;
         await publish();
       }
       await closed?.catch(() => {});
     }
-    state.status = cancelled ? 'CANCELLED' : 'FAILED'; state.summary = `Workflow nicht verifiziert: ${error.message}`;
+    state.status = cancelled ? 'CANCELLED' : 'FAILED'; state.summary = `Workflow not verified: ${error.message}`;
   } finally {
     await streamWrites;
     await outHandle?.close().catch(() => {}); await errHandle?.close().catch(() => {});
@@ -212,7 +212,7 @@ if (process.argv[1] && samePath(process.argv[1], fileURLToPath(import.meta.url))
     // A worker that never acquired ownership must not overwrite the status or
     // release a lock owned by another instance. A stale job is exposed by the
     // status tool's heartbeat check and requires explicit local recovery.
-    process.stderr.write(`Workflow-Start fehlgeschlagen: ${error.message}\n`);
+    process.stderr.write(`Workflow startup failed: ${error.message}\n`);
     process.exitCode = 1;
   });
 }

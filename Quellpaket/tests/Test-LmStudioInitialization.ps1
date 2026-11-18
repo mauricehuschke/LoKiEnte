@@ -23,9 +23,9 @@ foreach($case in @('missing','empty','broken-home')){
     }
     $failure=$null
     try{$null=Resolve-ShadowSetupLms -StudioPath 'C:\LM Studio\LM Studio.exe'}catch{$failure=$_.Exception.Message}
-    if(-not $failure -or $failure -notmatch 'MANUELLE AKTION ERFORDERLICH' -or
-       $failure -notmatch 'Erststartdialoge' -or $failure -notmatch 'denselben Parametern erneut starten' -or
-       $failure -notmatch 'nicht automatisch fortgesetzt'){throw "Missing restart instructions for $case"}
+    if(-not $failure -or $failure -notmatch 'MANUAL ACTION REQUIRED' -or
+       $failure -notmatch 'first-run dialogs' -or $failure -notmatch 'same parameters' -or
+       $failure -notmatch 'will not resume automatically'){throw "Missing restart instructions for $case"}
     if($case -ne 'empty' -and $failure -notmatch [regex]::Escape("Synthetic $case")){throw 'Underlying resolution error was hidden'}
     $count++
 }
@@ -60,8 +60,8 @@ function Write-ShadowManagedFile {param($Path,$Content,$BackupRoot) [IO.File]::W
     $result=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root) -AllowFailure -Quiet -TimeoutSeconds 30
     if($result.ExitCode -ne 1){throw 'Setup did not exit with incomplete status'}
     $report=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw|ConvertFrom-Json
-    if($report.status -cne 'INCOMPLETE' -or $report.error -notmatch 'MANUELLE AKTION ERFORDERLICH'){throw 'Manual action was not persisted in the actual setup failure report'}
-    if($result.StdOut -notmatch 'MANUELLE AKTION ERFORDERLICH' -or -not [string]::IsNullOrWhiteSpace($result.StdErr) -or
+    if($report.status -cne 'INCOMPLETE' -or $report.error -notmatch 'MANUAL ACTION REQUIRED'){throw 'Manual action was not persisted in the actual setup failure report'}
+    if($result.StdOut -notmatch 'MANUAL ACTION REQUIRED' -or -not [string]::IsNullOrWhiteSpace($result.StdErr) -or
        $report.manualAction -cne 'LM_STUDIO_INITIALIZATION'){throw 'Manual action instructions were not displayed clearly on stdout'}
     if(Test-Path -LiteralPath (Join-Path $root 'unexpected')){throw 'Setup continued after the manual action guard'}
     $count+=4

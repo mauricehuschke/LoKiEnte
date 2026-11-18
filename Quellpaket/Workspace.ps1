@@ -4,11 +4,11 @@ function Get-ShadowWorkspaceIndex {
     $index=Join-Path $Root 'workspaces.json'
     if(-not(Test-Path -LiteralPath $index)){return}
     $entries=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($index)) -AsHashtable -NoEnumerate
-    if($entries -isnot [array]){throw "Arbeitsbereichsindex ist keine Liste: $index"}
+    if($entries -isnot [array]){throw "Workspace index is not a list: $index"}
     foreach($entry in $entries){
         if($entry -isnot [Collections.IDictionary] -or -not $entry.Contains('project') -or
            $entry.project -isnot [string] -or -not [IO.Path]::IsPathFullyQualified($entry.project)){
-            throw "Arbeitsbereichsindex enthaelt keinen gueltigen absoluten Projektpfad: $index"
+            throw "Workspace index contains no valid absolute project path: $index"
         }
         $entry
     }
@@ -22,7 +22,7 @@ function Update-ShadowWorkspaces {
     $known=@(Get-ShadowWorkspaceIndex -Root $Root)
     foreach($path in (@($known | ForEach-Object {$_.project})+@($ProjectPath))){
         if(-not(Test-Path -LiteralPath $path -PathType Container)){
-            $warnings.Add("Registriertes Projekt voruebergehend nicht erreichbar: $path")
+            $warnings.Add("Registered project temporarily unavailable: $path")
             continue
         }
         $full=(Resolve-Path -LiteralPath $path).ProviderPath
@@ -43,9 +43,9 @@ function New-ShadowWorkspace {
     [IO.Directory]::CreateDirectory($projectState) | Out-Null
     $taskPath=Join-Path $projectState 'task.md'
     $checksPath=Join-Path $projectState 'checks.json'
-    $checksDescription='Auftrag direkt in Kilo shadow-chat eingeben. Kriterien, Dateiumfang und lokale Testchecks werden pro Auftrag automatisch vorbereitet und unabhaengig geprueft. Eigene Checks und Grenzen bleiben erhalten; siehe LOKI-WORKFLOW.md.'
-    $guidePath=Join-Path $projectState 'ANLEITUNG.md'
-    $guideText=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'WORKFLOW.md'))
+    $checksDescription='Enter tasks directly in Kilo shadow-chat. Criteria, file scope and local test checks are prepared automatically for each task and independently reviewed. Custom checks and boundaries are preserved; see LOKI-WORKFLOW.md.'
+    $guidePath=Join-Path $projectState 'GUIDE.md'
+    $guideText=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'WORKFLOW.md')).Replace('(WORKFLOW.de.md)','(LOKI-WORKFLOW.de.md)')
     if(-not(Test-Path -LiteralPath $guidePath)){
         $temporary=$guidePath+'.'+[guid]::NewGuid().ToString('N')+'.tmp'
         try{
@@ -58,26 +58,16 @@ function New-ShadowWorkspace {
         }finally{if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Force}}
     }
     $null=Write-ShadowManagedFile -Path (Join-Path $projectState 'LOKI-WORKFLOW.md') -Content $guideText -BackupRoot (Join-Path $Root 'backups/workspaces')
+    $germanGuide=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'WORKFLOW.de.md')).Replace('(WORKFLOW.md)','(LOKI-WORKFLOW.md)')
+    $null=Write-ShadowManagedFile -Path (Join-Path $projectState 'LOKI-WORKFLOW.de.md') -Content $germanGuide -BackupRoot (Join-Path $Root 'backups/workspaces')
+    if(-not(Test-Path -LiteralPath (Join-Path $projectState 'GUIDE.de.md'))){
+        [IO.File]::WriteAllText((Join-Path $projectState 'GUIDE.de.md'),$germanGuide,[Text.UTF8Encoding]::new($false))
+    }
+    if(-not(Test-Path -LiteralPath (Join-Path $projectState 'task.de.md'))){
+        [IO.File]::WriteAllText((Join-Path $projectState 'task.de.md'),[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'templates/task.de.md')),[Text.UTF8Encoding]::new($false))
+    }
     if (-not (Test-Path -LiteralPath $taskPath)) {
-        $template=@'
-# Auftrag
-
-Optionaler Dateiauftrag: Beschreibe eine kleine, klar abgegrenzte Aenderung.
-Alternativ den Auftrag direkt im Kilo-Agenten shadow-chat eingeben.
-
-## Anforderungen
-- ...
-
-## Erwartetes Ergebnis
-- ... (Akzeptanzkriterien und passende Checks werden automatisch abgeleitet und geprueft)
-
-## Grenzen und betroffene Bereiche
-- Bestehende AGENTS.md, SSOT und Architekturentscheidungen beruecksichtigen.
-- Keine Datenbankmigration anwenden, kein Deployment, kein Push.
-
-## Hinweise fuer Reviewer
-- ...
-'@
+        $template=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'templates/task.md'))
         $null=Write-ShadowManagedFile -Path $taskPath -Content $template
     }
     if (-not (Test-Path -LiteralPath $checksPath)) {
@@ -94,9 +84,13 @@ Alternativ den Auftrag direkt im Kilo-Agenten shadow-chat eingeben.
         $null=Write-ShadowManagedFile -Path $checksPath -Content ($checks|ConvertTo-Json -Depth 10)
     }else{
         $checks=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($checksPath)) -NoEnumerate -AsHashtable
-        if($checks -isnot [Collections.IDictionary]){throw "Projektpruefungen sind kein JSON-Objekt: $checksPath"}
+        if($checks -isnot [Collections.IDictionary]){throw "Project checks are not a JSON object: $checksPath"}
         $migrated=$false
-        if($checks.Contains('description') -and $checks.description -ceq 'WORKFLOW.md lesen: Produktions-/Testdateien, feste Kriterien, Kategorien und bestaetigte Checks mit Berichten eintragen.'){
+        if($checks.Contains('description') -and $checks.description -cin @(
+            'Read WORKFLOW.md: specify production/test files, fixed criteria, categories and confirmed checks with reports.',
+            'Auftrag direkt in Kilo shadow-chat eingeben. Kriterien, Dateiumfang und lokale Testchecks werden pro Auftrag automatisch vorbereitet und unabhaengig geprueft. Eigene Checks und Grenzen bleiben erhalten; siehe LOKI-WORKFLOW.md.',
+            'WORKFLOW.md lesen: Produktions-/Testdateien, feste Kriterien, Kategorien und bestaetigte Checks mit Berichten eintragen.'
+        )){
             $checks.description=$checksDescription;$migrated=$true
         }
         foreach($key in @('checks','writePaths','regressionCheck')){
@@ -123,8 +117,8 @@ Alternativ den Auftrag direkt im Kilo-Agenten shadow-chat eingeben.
     $tasks=[Collections.Generic.List[object]]::new()
     foreach ($workflow in @('Auto','Feature','Bugfix','Refactor','Review','Architecture')) {
         $tasks.Add([ordered]@{
-            label=$(if($workflow -ceq 'Auto'){'Local AI: Auftrag automatisch mit Pruefung'}else{"Local AI: $workflow mit Pruefung"});type='process';command=$PwshPath
-            detail='Optionalen Auftrag aus task.md vorbereiten, checks.json unabhaengig pruefen und Qualitaetsworkflow ausfuehren.'
+            label=$(if($workflow -ceq 'Auto'){'Local AI: Automatic task with verification'}else{"Local AI: $workflow with verification"});type='process';command=$PwshPath
+            detail='Prepare an optional task from task.md, independently review checks.json and run the quality workflow.'
             args=@($baseArgs)+@('-Workflow',$workflow)
             options=@{cwd=$projectFull};problemMatcher=@()
             presentation=@{reveal='always';panel='dedicated';clear=$false}
@@ -132,7 +126,7 @@ Alternativ den Auftrag direkt im Kilo-Agenten shadow-chat eingeben.
         })
         if($workflow -in @('Feature','Bugfix','Refactor')){
             $tasks.Add([ordered]@{
-                label="Local AI: $workflow (Coder Fast) mit Pruefung";type='process';command=$PwshPath
+                label="Local AI: $workflow (Coder Fast) with verification";type='process';command=$PwshPath
                 args=@($baseArgs)+@('-Workflow',$workflow,'-CoderProfile','Fast')
                 options=@{cwd=$projectFull};problemMatcher=@()
                 presentation=@{reveal='always';panel='dedicated';clear=$false}
@@ -141,7 +135,7 @@ Alternativ den Auftrag direkt im Kilo-Agenten shadow-chat eingeben.
         }
     }
     $workspace=[ordered]@{
-        folders=@(@{name=$safeName;path=$projectFull},@{name='Local AI - Auftrag und Checks';path=$projectState})
+        folders=@(@{name=$safeName;path=$projectFull},@{name='Local AI - Task and checks';path=$projectState})
         settings=[ordered]@{
             'kilo-code.new.autocomplete.enableAutoTrigger'=$false
             'kilo-code.new.autocomplete.enableSmartInlineTaskKeybinding'=$false
@@ -151,21 +145,28 @@ Alternativ den Auftrag direkt im Kilo-Agenten shadow-chat eingeben.
     }
     if(Test-Path -LiteralPath $workspaceFile -PathType Leaf){
         $existing=ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($workspaceFile)) -NoEnumerate -AsHashtable
-        if($existing -isnot [Collections.IDictionary]){throw "Workspace ist kein JSON-Objekt: $workspaceFile"}
+        if($existing -isnot [Collections.IDictionary]){throw "Workspace is not a JSON object: $workspaceFile"}
         if($existing.Contains('settings')){
-            if($existing.settings -isnot [Collections.IDictionary]){throw "Workspace-Settings sind kein JSON-Objekt: $workspaceFile"}
+            if($existing.settings -isnot [Collections.IDictionary]){throw "Workspace settings are not a JSON object: $workspaceFile"}
             foreach($key in $workspace.settings.Keys){$existing.settings[$key]=$workspace.settings[$key]}
         }else{$existing.settings=$workspace.settings}
         if(-not $existing.Contains('tasks')){$existing.tasks=@{}}
-        if($existing.tasks -isnot [Collections.IDictionary]){throw "Workspace-Tasks sind kein JSON-Objekt: $workspaceFile"}
+        if($existing.tasks -isnot [Collections.IDictionary]){throw "Workspace tasks are not a JSON object: $workspaceFile"}
         $labels=@($workspace.tasks.tasks | ForEach-Object {$_.label})
+        # Recognize legacy managed labels without removing unrelated user tasks.
+        $legacyLabels=@('Local AI: Auftrag automatisch mit Pruefung')
+        foreach($legacyWorkflow in @('Feature','Bugfix','Refactor','Review','Architecture')){
+            $legacyLabels+="Local AI: $legacyWorkflow mit Pruefung"
+            if($legacyWorkflow -in @('Feature','Bugfix','Refactor')){$legacyLabels+="Local AI: $legacyWorkflow (Coder Fast) mit Pruefung"}
+        }
         $custom=@($existing.tasks['tasks'] | Where-Object {
-            $_ -is [Collections.IDictionary] -and $_['label'] -notin $labels
+            $_ -is [Collections.IDictionary] -and $_['label'] -notin $labels -and
+            -not($_['label'] -in $legacyLabels -and $_['type'] -ceq 'process' -and @($_['args']) -contains $runner)
         })
         $existing.tasks.version='2.0.0'
         $existing.tasks.tasks=@($workspace.tasks.tasks)+$custom
         $extraFolders=@($existing['folders'] | Where-Object {
-            $_ -is [Collections.IDictionary] -and $_['name'] -ne 'Local AI - Auftrag und Checks' -and $_['path'] -ne $projectFull
+            $_ -is [Collections.IDictionary] -and $_['path'] -ne $projectState -and $_['path'] -ne $projectFull
         })
         $existing.folders=@($workspace.folders)+$extraFolders
         $workspace=$existing

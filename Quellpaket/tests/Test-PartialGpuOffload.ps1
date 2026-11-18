@@ -39,10 +39,10 @@ $null=Set-SmpActiveProfile -InstallRoot 'fixture' -Pool $pool -Owner $owner -Ali
 Assert-Offload ($script:estimates.Count -eq 4 -and ($script:estimates -join ',') -ceq 'max/32768,max/16384,max/8192,0.8/32768') 'Tries max contexts before 80 percent'
 Assert-Offload ($script:loads.Count -eq 1 -and $script:loads[0] -ceq '0.8/32768' -and $pool.Profiles[0].Estimate.GpuOffload -ceq '0.8') 'Loads exactly the GPU setting and context that passed estimation'
 $script:estimates=@();$script:loads=@();$pool=New-Fixture $false
-$failed=$false;try{$null=Set-SmpActiveProfile -InstallRoot fixture -Pool $pool -Owner $owner -Alias coder -LogDirectory fixture -AllowContextFallback}catch{$failed=$_.Exception.Message -match 'Kein gepruefter Speicherfit'}
+$failed=$false;try{$null=Set-SmpActiveProfile -InstallRoot fixture -Pool $pool -Owner $owner -Alias coder -LogDirectory fixture -AllowContextFallback}catch{$failed=$_.Exception.Message -match 'No verified memory fit'}
 Assert-Offload ($failed -and ($script:estimates -join ',') -ceq 'max/32768,max/16384' -and $script:loads.Count -eq 0) 'Default retains only max GPU and original context fallback'
 $script:estimates=@();$script:loads=@();$script:freeRam=21.94GB;$pool=New-Fixture $true
-$failed=$false;try{$null=Set-SmpActiveProfile -InstallRoot fixture -Pool $pool -Owner $owner -Alias coder -LogDirectory fixture -AllowContextFallback}catch{$failed=$_.Exception.Message -match 'Reserven: 1 GiB VRAM und 3 GiB RAM'}
+$failed=$false;try{$null=Set-SmpActiveProfile -InstallRoot fixture -Pool $pool -Owner $owner -Alias coder -LogDirectory fixture -AllowContextFallback}catch{$failed=$_.Exception.Message -match 'reserves: 1 GiB VRAM and 3 GiB RAM'}
 Assert-Offload ($failed -and $script:estimates.Count -eq 9 -and $script:loads.Count -eq 0) 'Actual reported RAM shortage blocks every combination without loading'
 foreach($mode in @('guardrail','low')){
     $script:mode=$mode;$script:freeRam=24GB;$script:estimates=@();$script:loads=@();$pool=New-Fixture $true

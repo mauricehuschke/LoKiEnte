@@ -1,692 +1,610 @@
-# LoKiEnte – Provisionierung und geprüfte Agentenabläufe
+# LoKiEnte — provisioning and verified agent workflows
 
-Version: 2026.11.18.21 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Sprache der Arbeitsanweisungen: Deutsch
+[Deutsch](README.de.md)
 
-Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
-registriert. Die [Beispielanleitung](welcome-example/README.md) enthält den
-fertigen Kilo-Testauftrag. Bestehender Beispielcode bleibt beim Update erhalten;
-New-WelcomeTestProject.ps1 -NewExample erzeugt einen frischen Versuch.
+Version: 2026.11.18.22 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
-Dieses Paket richtet LM Studio, einen Pool lokaler Modelle, Kilo CLI und eine eigene VS-Code-Umgebung ein. Standard sind Coding und Review als getrennte Rollen; eine dritte Rolle ist optional. Für jede Rolle kann ein Modell ausgewählt werden, auch dasselbe Modell für mehrere Rollen. Es liefert vordefinierte Rollen und wiederverwendbare Arbeitsabläufe für Feature-Entwicklung, Bugfixes, Refactoring, Review und Architektur. Bestehende Software wird erkannt und möglichst weiterverwendet. Bestehende Repository-Dateien werden bei der Einrichtung nicht verändert.
+Every provisioning run registers the bundled example at `welcome/workflow-test`.
+The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
+request. Updates preserve existing example code; `New-WelcomeTestProject.ps1
+-NewExample` creates a fresh attempt.
 
-LoKiEnte-Starts öffnen ein neues Fenster mit isolierten Daten und Erweiterungen und
-übergeben zusätzlich die VS-Code-Option `--disable-extension` für
-`GitHub.copilot` und `GitHub.copilot-chat`. Die Option gilt nur für das so
-gestartete Fenster; bestehende Fenster und persönliche Profile bleiben unverändert.
-Auch bereits registrierte Projekte erhalten sie beim nächsten LoKiEnte-Start.
+This package sets up LM Studio, a pool of local models, Kilo CLI and a dedicated
+VS Code environment. Coding and review use separate roles by default; an additional
+small-model role is optional. Each role can use a selected model, including the
+same model for several roles. Predefined agents and reusable workflows cover
+features, bug fixes, refactoring, review and architecture. Existing software is
+detected and reused where suitable. Setup does not change existing repository files.
 
-### Lokale semantische Indexierung
+LoKiEnte opens a new window with isolated data and extensions. Its VS Code command
+also passes `--disable-extension` for `GitHub.copilot` and `GitHub.copilot-chat`.
+This affects only that window, preserving personal profiles and existing windows.
+Previously registered projects receive these options on their next LoKiEnte launch.
 
-Im Dual-Modus richtet die Provisionierung LanceDB 0.26.2 und das lokale
-`nomic-embed-text-v1.5.Q4_K_M.gguf` ein. Die Datei wird mit Größe und SHA-256
-geprüft, bei Bedarf heruntergeladen und ohne Überschreiben abgelegt. Das
-Embeddingmodell wird zusätzlich zum jeweils aktiven Codingmodell mit `--gpu off`
-gestartet und sein RAM-Bedarf geschätzt. Ein echter
-lokaler Embedding-Aufruf mit zwei Vektoren ist Teil des Setups und Launcherstarts.
-Die Berechnung und der Vektorspeicher bleiben lokal; es gibt keinen Cloud-Fallback.
-Ist der Speicherfit nicht nachweisbar, bleibt das Modell standardmäßig
-ungeprüft. Nur `-AllowUnfitAttempt` erlaubt einen Versuch ohne die Reserven des
-Pakets. LM Studios Schutzregeln bleiben aktiv. Wird das Embeddingmodell nicht geladen
-oder besteht es den Test nicht, bleibt die Einrichtung mit einer Warnung
-benutzbar, aber die Indexierung ist noch nicht betriebsbereit. Beim nächsten
-LoKiEnte-Start wird sie erneut versucht. Beschädigte Modelldateien, unklare
-Eigentumsverhältnisse und Authentifizierungsfehler bleiben ausdrücklich Fehler.
-Im Single-Modus wird diese Indexierung derzeit nicht eingerichtet.
-Die Integration ist für die VS-Code-Erweiterungen Kilo 7.8.28 und 7.8.30
-geprüft. 7.8.30 ist der freigegebene Standard für Neuinstallationen und Updates.
-Eine bereits neuere Version wird bei der Provisionierung auf die benötigten
-Schnittstellen und Einstellungen geprüft. Die separat installierte Kilo CLI
-hat eine eigene Versionsnummer.
+Documentation is available in English and German as adjacent `.md` / `.de.md`
+files. Provisioning, menus, errors and workflow status use English. Generated
+agent instructions default to English; there is no runtime language switch.
+Technical identifiers and saved installation paths remain compatible with updates.
 
-Nach vollständigem Schließen der LoKiEnte-Fenster und erneutem Start des Projekts
-in Kilo **Einstellungen > Indexing** öffnen und für das jeweilige Projekt
-freigeben. Diese Freigabe verwaltet Kilo pro Projekt; das Paket verändert nicht
-dessen interne VS-Code-Datenbank. Erst der Status **Complete** und eine
-tatsächliche semantische Suche belegen die fertige Indexierung des Projekts.
-Die erfolgreiche Provisionierung allein beweist das nicht.
+### Local semantic indexing
 
-Kilo berücksichtigt `.gitignore` und `.kilocodeignore`, doch die
-Werkzeug-Leserechte sind kein allgemeiner Filter für den Index. Vor der
-Freigabe sensible Dateien und Zugangsdaten gezielt ausschließen. Der lokale
-Index und seine Codeausschnitte sind nicht automatisch verschlüsselt.
-Die installierte Kilo-Version unterscheidet beim OpenAI-kompatiblen
-Embedding-Aufruf nicht zwischen Such- und Dokumentpräfixen, die Nomic empfiehlt.
-Die Suchqualität ist daher nicht als optimal garantiert; Dateisuche und gezielte
-Lektüre bleiben wichtige Ergänzungen.
+Dual mode provisions LanceDB 0.26.2 and local
+`nomic-embed-text-v1.5.Q4_K_M.gguf`. The model file is checked against its size and
+SHA-256, downloaded if needed and stored without overwriting an existing file.
+The embedding model runs with `--gpu off` alongside the active coding model; its
+RAM requirement is estimated. Setup and launcher startup perform a real local
+embedding request producing two vectors. Computation and vector storage remain
+local, with no cloud fallback.
 
-Führe nach der Provisionierung einmal den Suchtest in [VALIDATION.md](VALIDATION.md)
-aus. Er nutzt einen kleinen Ordner mit künstlichen Daten und prüft einen
-erwarteten Treffer sowie Ausschlüsse über beide Ignore-Dateien.
+If memory fit cannot be established, the model remains unverified by default.
+Only `-AllowUnfitAttempt` permits an attempt without the package's memory reserves;
+LM Studio's guardrails remain active. Failure to load or pass the embedding test
+leaves the installation usable with a warning, but indexing is not ready. The next
+LoKiEnte launch retries it. Corrupt model files, ambiguous ownership and authentication
+errors remain explicit failures. Single mode does not currently provision indexing.
 
-### Geprüfte Entwicklung ab dieser Version
+This integration was checked with Kilo VS Code extensions 7.8.28 and 7.8.30.
+Version 7.8.30 is approved for new installations and updates. An already newer
+version is checked for the required interfaces and settings during provisioning.
+The separately installed Kilo CLI has its own version number.
 
-Die [Anwenderanleitung](WORKFLOW.md) führt durch den ersten Auftrag und enthält
-ein vollständiges `checks.json`-Beispiel. Die wichtigsten Änderungen:
+Close all LoKiEnte windows, reopen the project, then open **Settings > Indexing**
+in Kilo and enable indexing for that project. Kilo manages this permission per
+project; the package does not edit its internal VS Code database. Only **Complete**
+status and a successful semantic search establish that project indexing is ready.
+Successful provisioning alone does not establish this.
 
-- Aufträge direkt in Kilo `shadow-chat` eingeben. `loki_start` startet den
-  kontrollierten Ablauf; `loki_status`, `loki_details` und `loki_cancel` machen
-  Fortschritt, Agentenrollen, Rollenmodelle, Ergebnisse und Abbruch zugänglich.
-- `shadow-preparer` leitet Kriterien, Änderungsarten, exakte Dateien und passende
-  lokale Testkandidaten ab. `shadow-preparation-reviewer` prüft sie unabhängig,
-  bevor `checks.json` gesichert und aktualisiert wird. Kein JSON-Pflegen pro Prompt.
-- `writePaths` gibt Produktionsdateien frei, `testWritePaths` ausschließlich Tests.
-- Ein eigenständiger Testautor und unabhängiger Testreview arbeiten vor der Umsetzung.
-  Danach bleiben die geprüften Tests während der Implementierung unverändert.
-- Feste `acceptanceCriteria` mit IDs werden konkreten Testfällen aus frisch
-  erzeugten JUnit-/JSON-Berichten zugeordnet. Reine Exitcodes genügen nicht.
-- `changeTypes` bestimmt zusätzliche Pflichtprüfungen: `security` verlangt
-  Security-Review, `ui`/`api` Integrationstests und Integrationsreview.
-  Planung, Reviewer und Pfadhinweise können diese Einstufung erweitern.
-- Die Provisionierung aktualisiert auch registrierte Projekte. Bestehende
-  Befehle bleiben erhalten; auftragsspezifische Felder werden mit Herkunft und
-  Prüfsummen erneuert. Alte Exitcode-Checks benötigen einen geprüften strukturierten
-  Ersatz. Manuelle Änderungen an automatisch verwalteten Feldern und fehlende
-  Voraussetzungen werden als konkreter `NEEDS_INPUT`-Konflikt gemeldet.
+Kilo observes `.gitignore` and `.kilocodeignore`; tool read permissions are not a
+general index filter. Explicitly exclude sensitive files and credentials before
+enabling indexing. The local index and its code excerpts are not automatically
+encrypted. The installed Kilo version's OpenAI-compatible embedding request does
+not distinguish the search/document prefixes recommended by Nomic. Optimal search
+quality is therefore not guaranteed; file search and targeted reading remain useful.
 
-Alle Rollen laufen sequenziell im vorhandenen Checkout. Testprozesse verwenden
-dein Windows-Konto; die bereinigte Umgebung ist keine Betriebssystem-Sandbox.
-Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
+After provisioning, run the search probe in [VALIDATION.md](VALIDATION.md). It uses
+a small synthetic directory and checks an expected match plus exclusions through
+both ignore files.
 
-### Installer aus dem Quellpaket bauen
+### Verified development
 
-Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.18.21` ausführen. Das Skript baut
-die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
-für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
-ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält
-Paketversion und Prüfsumme des tatsächlich verwendeten Installers.
+The [user guide](WORKFLOW.md) explains the first task and provides a complete
+`checks.json` example. Key behavior:
 
-**Wichtig für die Einordnung:** Das Paket ist entwickelt und mit ausführbaren Parser-, Verhaltens- und Fehlertests geprüft. Es wurde hier nicht auf einem echten Windows-PC mit GPU installiert. Der Installationslauf prüft die tatsächliche Hardware, die wirksame CLI-Konfiguration und, soweit das Laden gelingt, echte Chat-/Tool-Antworten. Nicht geprüfte Modelle werden ausdrücklich gekennzeichnet und ergeben `PROVISIONED_WITH_WARNINGS`, nicht den Nachweis vollständiger Modellbereitschaft.
+- Enter requests directly in Kilo `shadow-chat`. `loki_start` starts the controlled
+  workflow; `loki_status`, `loki_details` and `loki_cancel` expose progress, agent
+  roles, requested role models, results and cancellation.
+- `shadow-preparer` derives criteria, change types, exact files and suitable local
+  test candidates. `shadow-preparation-reviewer` checks them independently before
+  `checks.json` is backed up and updated. No JSON editing is required for each prompt.
+- `writePaths` authorizes production files; `testWritePaths` authorizes tests only.
+- A separate test author and independent test review precede implementation.
+  Reviewed tests remain frozen during implementation.
+- Fixed `acceptanceCriteria` IDs map to actual cases from newly generated JUnit/JSON
+  reports. Process exit codes alone are insufficient.
+- `changeTypes` requires additional checks: `security` requires security review;
+  `ui`/`api` require integration tests and integration review. Planning, reviewers
+  and path hints may expand this classification.
+- Provisioning also updates registered projects. Existing commands remain;
+  task-specific fields are renewed with provenance and hashes. Old exit-code-only
+  checks need a reviewed structured replacement. Manual edits to automatic fields
+  and missing prerequisites produce a specific `NEEDS_INPUT` conflict.
 
-## 1. Start in wenigen Schritten
+All roles run sequentially in the existing checkout. Test processes run under your
+Windows account; their filtered environment is not an OS sandbox. Diff review,
+functional acceptance, commit and push remain your responsibility.
 
-Lade die aktualisierte `Provision-LoKiEnte.ps1` auf den Windows-PC. Die einzelne Datei enthält das vollständige Paket einschließlich dieser Anleitung und der Regressionstests für die Reparaturen. Ein separates ZIP einer älteren Version wird durch diese Aktualisierung nicht verändert und darf nicht als identische Ausgabe dieser Version angesehen werden.
+### Build the installer from source
 
-Öffne **Windows PowerShell 64 Bit** im Downloadordner. Verwende zunächst dein normales Windows-Benutzerkonto. Ein Installationsprogramm kann bei Bedarf einen Windows-UAC-Dialog anzeigen.
+On the development machine, update the version above and run
+`python .\Build-LoKiEnte.py 2026.11.18.22` from the repository root. The script
+rebuilds the embedded payload and checksum. The target Windows PC still needs
+only the generated PS1. A separate old ZIP is unnecessary for this process. The
+provisioning report records the version and checksum of the installer actually used.
 
-### Erweitertes Audit ohne Provisionierung
+**Validation boundary:** executable parser, behavior and failure tests validate
+the package. They do not establish a real installation on the target GPU machine.
+Provisioning checks actual hardware, effective CLI configuration and, where loading
+succeeds, real chat/tool responses. Untested models are explicitly marked and yield
+`PROVISIONED_WITH_WARNINGS`, rather than a claim of complete model readiness.
+
+## 1. Getting started
+
+Download the current `Provision-LoKiEnte.ps1` to the Windows PC. This single file
+contains the complete package, documentation and regression tests. An older separate
+ZIP is not updated by this process and must not be treated as the same release.
+
+Open **Windows PowerShell 64-bit** in the download directory using your normal
+Windows account. An installer may display a Windows UAC prompt when needed.
+
+### Read-only preflight
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -AuditOnly
 ```
 
-Dieser Modus benötigt kein installiertes PowerShell 7. Er prüft die Integrität des eingebetteten Pakets und führt das Audit direkt im Speicher unter Windows PowerShell 5.1 oder neuer aus. Er installiert nichts, schreibt keine Paketdateien und fordert weder Modellladen/-entladen noch einen API-Serverstart oder eine Inferenz an.
+The single PS1 supports this audit in Windows PowerShell 5.1 without first
+installing PowerShell 7. It validates the embedded payload and runs the audit in
+memory. It does not extract the package into an installation directory, install
+software, start the local API, perform inference, or load/unload models.
 
-Ohne `-InstallRoot` prüft das Audit den Ordner der PS1-Datei. Es fragt weder nach
-einer Verzeichnisauswahl noch nach `y`. Eine vorhandene ältere Einrichtung unter
-`%LOCALAPPDATA%\ShadowLocalAI` wird als Hinweis gemeldet, aber nicht automatisch
-stattdessen geprüft. Für diese Einrichtung ausdrücklich
-`-AuditOnly -InstallRoot "$env:LOCALAPPDATA\ShadowLocalAI"` verwenden.
+The default installation root is the directory containing the PS1, not the shell's
+working directory. Audit mode does not ask for a location or accept `y` as a location
+choice. A legacy installation under `%LOCALAPPDATA%\ShadowLocalAI` is reported only
+as a hint; specify its path explicitly to audit it. CLI operations may create their
+own caches or background effects; the package does not promise otherwise. Public
+package/model metadata requests need Internet access. API secrets are sent only to
+the checked loopback endpoint, without following redirects.
 
-**Mögliche Nebeneffekte:** Aufgerufene CLI-Werkzeuge können selbst Cache-/Logdateien schreiben oder ihren Hintergrunddienst initialisieren. Das Audit fragt außerdem öffentliche Paket- und Modellmetadaten online ab. Es ist daher kein strikt offline ausgeführter, nebenwirkungsfreier Dateileser. API-Token werden ausschließlich an den lokalen Endpunkt gesendet und nicht im Bericht ausgegeben; HTTP-Weiterleitungen werden nicht verfolgt.
+The audit checks compatibility of `lms load --exact --local --estimate-only --yes`
+without supplying a model. Only the expected missing-local-path error establishes
+support; an unknown-option error does not. It performs no real estimate or load.
+Empty `lms ls` / `lms ps` JSON arrays mean zero models in both PowerShell 5.1 and 7;
+invalid JSON is an error rather than an empty result.
 
-**Versteckte CLI-Optionen:** `--exact` und `--local` sind im
-[LM-Studio-CLI-Commit 43d4b26](https://github.com/lmstudio-ai/lms/blob/43d4b26/src/subcommands/load.ts)
-absichtlich aus `load --help` ausgeblendet. Fehlen sie dort, prüfen Audit und Setup
-sie mit `lms load --exact --local --estimate-only --yes` **ohne Modellpfad**.
-Nur der erwartete Abbruch wegen des fehlenden Modellpfads bestätigt die Optionen;
-unbekannte Optionen, Verbindungsfehler oder unerwarteter Erfolg tun dies nicht.
-Der Aufruf lädt kein Modell und schätzt ohne Modellpfad auch keinen Speicherbedarf.
-Die Schutzoptionen bleiben beim tatsächlichen Schätzen und Laden erhalten.
+The audit covers:
 
-Eine Antwort `[]` von `lms ls --json` oder `lms ps --json` zählt unter PowerShell
-5.1 und 7 als **null Modelle**, nicht als unbekannte Modellinstanz. Unerwartete
-JSON-Strukturen werden als Fehler gemeldet, nicht als leere Liste ausgegeben.
+- OS, CPU, RAM/VRAM and tool versions, npm metadata and required Kilo/LM Studio flags.
+- VS Code's active CLI entry resolved from `bin/code.cmd`, without executing that
+  batch file; curl and ripgrep availability.
+- Parameters, project paths, installation identity and provisioning lock.
+- Actual drives and hardware; saved runtime state and model instance ownership.
+- Loopback listeners, REST authentication and router state.
+- Exact model files and public npm/Hugging Face metadata. The model drive may
+  differ from the installation drive; custom npm registries are not audited.
 
-Geprüft werden:
+Audit JSON uses schema 2 with `checks`, `summary`, `status` and `exitCode`. Individual
+checks report `PASS`, `WARN`, `FAIL`, `MISSING` or `SKIP`; failures are isolated so
+other checks can finish, with bounded process timeouts.
 
-- Windows x64, PowerShell-Version, CPU, Gesamt-/freier RAM und NVIDIA-VRAM;
-- Werkzeugpfade und Versionen, npm-Einstieg, privates Kilo-Manifest und benötigte LM-Studio-CLI-Optionen;
-- der aktive CLI-Einstieg der vorhandenen VS-Code-Installation anhand ihres `code.cmd`, ohne das Batch-Skript auszuführen;
-- `curl` sowie das geprüfte `ripgrep` im isolierten Kilo-Cache;
-- Parameterkombinationen, Projektpfade, Installationskennung und aktive Provisionierungssperre;
-- freie lokale Laufwerke sowie die tatsächlichen Hardware-Mindestwerte der gewählten Modellprofile;
-- gespeicherte Zustände, lokale Modelldateien, aktive Instanzen und aufgezeichnete Eigentumsnachweise;
-- belegte Ports, Loopback-Bindung, REST-v1-Erreichbarkeit, Authentifizierung und Routerstatus;
-- öffentliche npm-Metadaten und die exakten GGUF-Dateinamen im Hugging-Face-Katalog.
+| Result | Exit code | Meaning |
+|---|---:|---|
+| `BLOCKED` | 2 | An evidenced blocker was found. |
+| `ATTENTION_REQUIRED` | 0 | Installable missing components or warnings remain. |
+| `PRECHECK_PASSED` | 0 | No gaps were reported by these checks; this is not a completed installation. |
 
-Das Modelllaufwerk kann von den Programmpfaden abweichen. Die Speicherübersicht ersetzt deshalb keine Prüfung des tatsächlich konfigurierten LM-Studio-Modellordners. Die öffentliche npm-Prüfung bestätigt auch nicht die Erreichbarkeit einer individuell konfigurierten anderen Registry.
-
-Die Ausgabe ist JSON, Schema 2, mit `checks`, `summary`, `status` und `exitCode`. Jede Prüfung meldet `PASS`, `WARN`, `FAIL`, `MISSING` oder `SKIP`. Nach einzelnen Fehlern werden die übrigen Prüfungen fortgesetzt; externe Aufrufe haben Zeitlimits.
-
-| Ergebnis | Bedeutung |
-|---|---|
-| `BLOCKED`, Exitcode 2 | Mindestens ein nachgewiesener Fehler, etwa ungeeignete Hardware, ungültiger Zustand oder eine defekte vorhandene CLI. |
-| `ATTENTION_REQUIRED`, Exitcode 0 | Fehlende installierbare Komponenten oder Warnungen, etwa nicht erreichbare Onlinequellen. Hinweise vor dem Setup prüfen. |
-| `PRECHECK_PASSED`, Exitcode 0 | Keine Fehler/Warnungen/fehlenden Komponenten in den ausgeführten Vorprüfungen. **Kein** Nachweis einer vollständigen Einrichtung. |
-
-`inferenceVerified` bleibt im Audit immer `false`. Die tatsächliche Speicherschätzung für den angeforderten Kontext, Modell-/Tool-Smoke-Tests und wirksame Kilo-Konfiguration prüft erst das normale Setup. Ein Audit-Erfolg ist keine GPU- oder Agenten-Abnahme.
-
-Optional den Bericht selbst speichern:
+`inferenceVerified` is always false in audit mode. To retain the report:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -AuditOnly > .\ShadowLocalAI-Audit.json
-$LASTEXITCODE
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -AuditOnly > .\LoKiEnte-Audit.json
 ```
 
-Die Dateiumleitung schreibt den Bericht ausdrücklich auf deinen Wunsch, nicht durch das Audit selbst.
-
-### Installation
+### Provision or update
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1
 ```
 
-`ExecutionPolicy Bypass` gilt nur für den gestarteten Prozess. Das Paket ändert keine globale Ausführungsrichtlinie und umgeht keine durch Gruppenrichtlinien erzwungene Vorgabe.
-
-### Zielverzeichnis und Bestätigung
-
-Standard ist **der Ordner, in dem die PS1-Datei liegt**, nicht das Arbeitsverzeichnis
-des Terminals. Mit `-InstallRoot "D:\LocalAI"` lässt sich ein anderes Ziel wählen.
-Liegt unter `%LOCALAPPDATA%\ShadowLocalAI` bereits ein Verzeichnis, bietet der Lauf:
-
-1. das gewählte Ziel verwenden (vorhandene Einrichtung weiterverwenden oder neu einrichten);
-2. das bisherige Verzeichnis weiterverwenden;
-3. die bisherige Einrichtung ins Ziel kopieren und dort fortsetzen.
-
-Ist im Ziel bereits eine gültige Paketkennung vorhanden, weist das Menü darauf
-hin und empfiehlt **Option 1** zum Fortsetzen im Ziel. Die Kennung belegt nicht,
-dass eine frühere Kopie oder die Provisionierung vollständig war. Bei Option 3
-prüft das Menü vor der Bestätigung auf eine vorhandene Paketkennung und
-Namenskonflikte und bietet die Auswahl erneut an. Es führt nichts automatisch
-zusammen und entscheidet nicht, welche von zwei unterschiedlichen Dateien gilt.
-Bei mehreren Einrichtungen vor Option 1 selbst prüfen, ob der gewählte Stand
-der gewünschte ist. Ein Kopieren in ein belegtes Ziel bleibt ausgeschlossen.
-
-Anschließend werden Stammverzeichnis, gegebenenfalls Kopierquelle und
-Installationsumfang angezeigt. **Erst die genaue Eingabe `y` erlaubt Änderungen.**
-Jede andere Antwort bricht ab; ein nichtinteraktiver Lauf kann die Bestätigung
-nicht umgehen.
-
-Verwaltete Dateien, private Kilo-Werkzeuge, VS-Code-Profil und Erweiterungen liegen
-unter dem Stammverzeichnis. Fehlende Basisprogramme dürfen ihre normalen
-Installationsverzeichnisse verwenden; vorhandene Programme werden weiterverwendet.
-Anwendungs-/Installer-Caches und globale Benutzerdaten können außerhalb liegen.
-**Das in LM Studio konfigurierte Modellverzeichnis bleibt unverändert.**
-Modelle werden über die vorhandene LM-Studio-Konfiguration gefunden bzw. geladen.
-
-Zum Kopieren müssen die verwaltete VS-Code-Umgebung, Router und Aufträge beendet
-sein. Aktive Prozesse/Sperren, Verknüpfungen und Namenskonflikte führen zum Abbruch.
-Bei NTFS-Hardlinks können Verzeichnisauflistungen veraltete Dateigrößen und
-Änderungszeiten enthalten. Deshalb werden diese Daten vor dem Vergleich frisch
-vom Dateisystem gelesen. Tatsächliche Änderungen während der Kopie bleiben ein
-Abbruchgrund; die Meldung nennt den betroffenen Pfad und bei Dateiänderungen
-auch die verglichenen Zeitpunkte und Größen.
-Es gibt keine automatische Zusammenführung oder Überschreibung eines anderen
-Ziels. Fremde Dateien neben der PS1 bleiben erhalten; kollidierende verwaltete Namen
-wie `app`, `runtime` oder `tooling` ohne Paketkennung werden abgelehnt.
-
-Die Kopie erfolgt zunächst in einem Zwischenordner im Ziel und benötigt entsprechend
-freien Platz für die gesamte Einrichtung. Verwaltete absolute Pfade in Toolchain,
-Kilo-Konfiguration und Arbeitsbereichen werden angepasst. Anwendungseinstellungen,
-Modell-Eigentumsnachweise und historische Daten werden nicht pauschal umgeschrieben.
-Die Quelle bleibt unverändert als Sicherung erhalten; danach **nur die neue Umgebung
-starten, niemals Quelle und Kopie parallel**. Der kopierte Bericht ist zunächst
-`INCOMPLETE`; erst ein abgeschlossener Lauf am neuen Ort ergibt `PROVISIONED`
-oder bei ausstehenden Modellprüfungen `PROVISIONED_WITH_WARNINGS`.
-Der Desktop-Shortcut wird dabei neu erstellt, sofern nicht `-NoShortcut` gesetzt ist.
-
-Optional kannst du gleich ein vorhandenes Repository registrieren:
+`ExecutionPolicy Bypass` applies to this process only. It does not change global
+policy or override Group Policy. The default root is the PS1 directory. An explicit
+root is also supported:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ProjectPath "C:\Dev\MeinProjekt"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LocalAI
 ```
 
-### Modellauswahl und Downloads
+If an old installation is found at another location, the menu offers:
 
-Bei neueren LM-Studio-Versionen werden Dateien unter Modell-IDs gruppiert.
-Das Setup gleicht die ausgewählte lokale Variante anhand von `lms ls --variants
---json` mit dem exakten Dateipfad ab und verwendet zum Laden die zugehörige
-Modell-ID mit `--exact --local`. Die Auswahl wird vor Modellaktionen und nach
-dem Laden erneut geprüft; fehlende oder mehrdeutige Metadaten führen zum Abbruch.
-Die Auswahl in LM Studio muss weiterhin auf der gewünschten Variante stehen.
+1. Use the selected destination.
+2. Reuse the previous directory.
+3. Copy the previous installation to the destination.
 
-Das Setup schlägt für `coder-high`, `coder-fast`, `review` und optional `fast` anhand des aktuell
-freien RAM/VRAM eine Vorauswahl vor. Die Empfehlung ist eine grobe Schätzung
-aus Dateigröße und Reserve, **kein** gemessener Benchmark und kein Nachweis,
-dass das Modell mit dem angeforderten Kontext passt. Pro Rolle kann eine andere
-Nummer gewählt werden. Die Auswahl muss mit `y` bestätigt werden. Bei jedem
-späteren Lauf werden die Hardwarewerte und Vorschläge neu angezeigt; die
-vorherige bestätigte Auswahl bleibt als Wiederanlauf-Standard erhalten.
+A valid installation identity does not prove that setup finished. Copying performs
+preflight checks and returns to the menu on destination conflicts; it never merges
+installations. Use option 1 for the correct existing destination. Enter the exact
+location choice; a blanket `y` or noninteractive invocation cannot bypass it.
 
-Fehlende Dateien werden danach von Hugging Face über HTTPS mit sichtbarer
-`curl`-Fortschrittsanzeige heruntergeladen. Die Quelle verwendet festgehaltene
-Repository-Revisionen und SHA-256-Werte. Netzwerkfehler werden mit sichtbarer
-30-Sekunden-Pause unbegrenzt erneut versucht; vorhandene Teildateien werden,
-wenn der Server HTTP-Range unterstützt, fortgesetzt. Es gibt kein festes
-Gesamtzeitlimit. Integritätsfehler stoppen ausdrücklich; fragliche Dateien
-bleiben erhalten. Die Geschwindigkeit des Hosts hängt von deiner Verbindung ab
-und wurde nicht als die schnellste verfügbar gemessen.
+The root contains the managed application, private Kilo tooling and profile. Base
+applications may remain in their existing global locations; some caches remain
+outside the root. LM Studio's configured model directory is not changed.
 
-Geprüfte Downloadkopien bleiben unter `model-downloads` im Stammverzeichnis
-erhalten. Eine zweite, ebenfalls geprüfte Kopie wird ohne Überschreiben atomar
-im **konfigurierten** LM-Studio-Modellverzeichnis abgelegt; das Setup wartet,
-bis LM Studio die passende Variante erkennt. Es werden keine Modelle gelöscht.
-Dadurch wird für neu heruntergeladene Modelle etwa der doppelte Dateiplatz
-benötigt, wenn beide Ordner auf demselben Laufwerk liegen. Das Setup prüft
-den zusätzlichen Platz vor Beginn. Strg+C unterbricht den Lauf; nach erneutem
-Start und Bestätigung derselben Auswahl werden Teildateien wiederverwendet.
+Before copying, close managed windows, routers and tasks. Active processes/locks,
+links and conflicting destinations stop the copy. The copy comparison refreshes
+file metadata before comparing size/time so NTFS hard-link cache behavior does not
+cause a false result. Source changes abort with size/time diagnostics. There is no
+overwrite or merge. Unrelated files beside the PS1 remain untouched; conflicting
+`app`, `runtime` or `tooling` content without a valid identity is rejected.
 
-`-SkipModelDownload` verhindert Downloads weiterhin. Ein benutzerdefiniertes
-`-ModelKey` muss lokal eindeutig vorhanden sein; bei Unklarheit `lms ls --json`
-prüfen.
+Staging requires space for the full copy. Only managed absolute paths in toolchain,
+Kilo and workspace configuration are rewritten; arbitrary application settings,
+ownership records and history are not rewritten. The original remains as a backup.
+Do not run both copies at once. The copied report stays `INCOMPLETE` until setup
+reaches `PROVISIONED` or `PROVISIONED_WITH_WARNINGS`.
 
-Ist die LM-Studio-CLI noch nicht verfügbar, beendet das Skript die Provisionierung
-mit **MANUELLE AKTION ERFORDERLICH**, Exitcode 1 und Berichtstatus `INCOMPLETE`.
-Es startet die App nicht automatisch, wartet nicht auf Dialoge und setzt sich
-nicht selbst fort. Bis dahin eingerichtete Komponenten bleiben erhalten.
-
-1. LM Studio selbst über das Windows-Startmenü öffnen; die Meldung nennt auch den Programmpfad.
-2. Erststartdialoge abschließen und gegebenenfalls die LM-Studio-CLI einrichten bzw. reparieren. Die ursprüngliche Fehlerursache bleibt in der Meldung sichtbar.
-3. Ein neues Terminal öffnen und **denselben Provisionierungsbefehl mit denselben Parametern, ohne `-AuditOnly`, erneut starten**.
-
-Ist die CLI bereits auffindbar, läuft die Provisionierung ohne diesen manuellen
-Zwischenschritt weiter. Ein bewusst erforderlicher manueller Schritt wird nicht
-durch eine automatische Bestätigung von Dialogen ersetzt.
-
-### Optional drei Modelle provisionieren
-
-Wenn ein Modell mit vollständiger GPU-Auslagerung nicht passt, kann für den
-Modellpool ausdrücklich `-AllowPartialGpuOffload` aktiviert werden:
+Setup creates a desktop shortcut unless `-NoShortcut` is supplied. To register
+an existing project during provisioning:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LocalAI -ProjectPath C:\Dev\MyProject
 ```
 
-Dann prüft das Setup pro Modell GPU-Offload `max`, `0.8` und `0.6`, jeweils
-mit der angeforderten Kontextlänge und, falls kleiner, den Fallbacks 16384 und
-8192. Die erste Kombination mit ausreichendem GPU-Speicher (1 GiB Reserve),
-ausreichendem freiem RAM (Gesamtschätzung plus 3 GiB Reserve) und bestandenen
-LM-Studio-Guardrails wird zuerst geladen. Gibt es keinen solchen Fit,
-bleibt das Modell ungeprüft. Nur mit `-AllowUnfitAttempt` versucht LoKiEnte
-eine geschätzte Konfiguration außerhalb der eigenen Reserven. Die
-LM-Studio-Guardrails bleiben aktiv. Ein Versuch ohne LoKiEnte-Reserve
-kann das System stark auslasten oder hängen lassen. Der wirksame Kontext wird für den Pool
-vereinheitlicht und geladene Modelle durchlaufen weiterhin Smoke-Tests. Die
-gespeicherte Option gilt auch bei späteren Modellwechseln; jeder neue
-Ladevorgang wird anhand aktueller Ressourcen erneut geschätzt. Scheitert der
-Ladeversuch, bleibt die Datei erhalten und das Modell wird als ungeprüft
-angezeigt. Teilweise CPU-Auslagerung kann die Inferenz verlangsamen. Ohne den
-Schalter wird nur `max` verwendet.
-Der Schalter ist nur für `-ModelMode Dual` gültig.
+### Models and first-run requirements
+
+Model selection supports grouped LM Studio IDs from `lms ls --variants --json`.
+The selected variant must match its exact file path. Loading uses the exact local
+ID/path and is verified before actions and after loading. Ambiguity stops the run;
+retain the selected variant rather than silently substituting another quantization.
+
+Choose `coder-high`, `coder-fast`, `review` and optionally `fast`. Recommendations
+use currently free RAM/VRAM, file size, reserves and load estimates. They are not
+benchmarks or guarantees of speed/quality. Confirm each role; the last selection
+becomes the next run's default while hardware is measured again.
+
+Missing model files are downloaded over HTTPS from pinned Hugging Face revisions
+with SHA-256 verification. curl displays progress and retries/resumes after 30
+seconds, without a total transfer deadline; Ctrl+C stops the attempt and retains
+partial files. A hash mismatch stops rather than adopting the suspect file. Verified
+downloads remain under `model-downloads` in the installation root. A second verified,
+atomic copy goes to LM Studio's configured model directory without overwriting;
+setup waits for LM Studio discovery. If both locations share a drive, allow space
+for both copies; preflight accounts for this. `-SkipModelDownload` stops with manual
+instructions when files are missing. A custom `-ModelKey` must be unambiguous.
+
+If the LM Studio CLI is unavailable, setup reports `MANUAL ACTION REQUIRED`, exits
+with code 1 and records `INCOMPLETE`. It does not automatically open the application,
+wait for dialogs or resume. Completed steps remain. Open the displayed LM Studio
+path, finish first-run setup/repair the CLI, then open a new terminal and rerun the
+same command without `-AuditOnly`. No interruption occurs if the CLI is already
+usable; setup does not approve application dialogs for you.
+
+### Optional partial GPU offload
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LocalAI -IncludeFastModel -AllowPartialGpuOffload
 ```
 
-`Dual` bezeichnet die Basis aus Coding- und Review-Modell. Der zusätzliche Schalter
-aktiviert das kleinere Modell für bewusst gewählte lesende Rollen. Er behauptet
-keinen gemessenen Geschwindigkeitsvorteil.
+With partial offload enabled, setup tries `max`, `0.8` and `0.6` GPU offload at the
+requested context and smaller 16384/8192 fallbacks where applicable. It chooses the
+first fit with a 1 GiB GPU reserve and 3 GiB RAM reserve over the estimated RAM
+requirement. LM Studio's guardrails still apply. Without a fit, the model is deferred
+unless `-AllowUnfitAttempt` explicitly allows an attempt outside those reserves;
+this can still fail, hang or run out of memory. The shared context is the smallest
+verified limit. Real smoke tests remain required. The option is saved, but later
+runs estimate available resources again. Rejected models remain downloaded and
+unverified. CPU offload may be slower; without the flag, only full offload is tried.
 
-Für den bisherigen Einmodellbetrieb:
+`-IncludeFastModel` adds the optional small read-oriented role. It does not establish
+measured speed. Dual remains the coding/review pool mode; it does not mean parallel
+model inference.
+
+An optional single-model setup is available:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LocalAI -ModelMode Single
 ```
 
-### VS Code mit deinem Projekt starten
+### Open a project
 
-Nach der Installation im gewählten Stammverzeichnis:
+Use the desktop shortcut, or run:
 
 ```powershell
-pwsh.exe -NoProfile -ExecutionPolicy Bypass -File ".\app\Start-LocalAI.ps1" -InstallRoot "." -ProjectPath "C:\Dev\MeinProjekt"
+pwsh -NoProfile -ExecutionPolicy Bypass -File D:\LocalAI\app\Start-LocalAI.ps1 -InstallRoot D:\LocalAI
 ```
 
-Das Setup gibt für jedes dort registrierte Projekt einen vollständigen Startbefehl
-mit seinem tatsächlichen Pfad aus; ohne registriertes Projekt öffnet der
-Startbefehl die Projektauswahl. Der Desktop-Shortcut **LoKiEnte** zeigt
-ebenfalls ein PowerShell-Menü: bekannte Projekte per Nummer auswählen,
-mit **N** einen weiteren vorhandenen Projektordner per Pfad öffnen oder mit
-**0** abbrechen. Pfade mit Leerzeichen und optionalen äußeren Anführungszeichen
-werden unterstützt. Nicht erreichbare Projekte bleiben in der Liste erhalten;
-nach einer ungültigen Auswahl kann erneut gewählt werden. Ein direkt
-übergebenes `-ProjectPath` öffnet das Projekt ohne Menü.
+The menu lists known projects by number. `N` selects another existing directory;
+create a new directory first if needed. `0` cancels before model startup. Quoted
+paths and spaces are supported. Unreachable registrations remain listed; invalid
+input can be retried. `-ProjectPath` bypasses the menu.
 
-Die Auswahl erfolgt vor dem Modellstart. Erst danach startet der Launcher die
-lokale Umgebung und öffnet den projektbezogenen Workspace. Der Ordner wird
-registriert; vorhandene Aufgaben und Checks bleiben erhalten. Es werden weder
-Projektdateien erzeugt noch Git-Repositories initialisiert. Auch ein leerer
-vorhandener Ordner lässt sich öffnen; für geprüfte Aufgabenläufe benötigt er
-weiterhin ein Git-Repository mit mindestens einem Commit und passende Checks.
+Registration preserves existing checks and does not initialize Git in your project.
+Only the bundled Welcome example creates its own repository. An empty directory
+can be opened, but write workflows require a Git root, an initial commit and valid
+checks. The shortcut uses `-PauseOnError`; direct invocations pause only when that
+flag is supplied. It starts PowerShell 7 with process-local policy bypass, subject
+to Group Policy.
 
-Bei einem Startfehler wartet die Desktopverknüpfung auf Enter, damit die Meldung
-lesbar bleibt. Direkte Skriptaufrufe warten nur mit `-PauseOnError`.
-Beide verwenden PowerShell 7 und `-ExecutionPolicy Bypass` nur
-für den jeweiligen Prozess; erzwungene Gruppenrichtlinien haben weiterhin Vorrang.
-Weitere Projekte registrierst du mit demselben Launcher und ihrem jeweiligen Pfad.
-Einmal registrierte Projekte bleiben im Arbeitsbereichsindex erhalten.
+## 2. What is installed and configured
 
-## 2. Was installiert und eingerichtet wird
-
-| Bestandteil | Verhalten |
+| Component | Behavior |
 |---|---|
-| PowerShell 7 | Wird über WinGet installiert, falls nicht vorhanden. Mindestens 7.4 ist erforderlich. Windows PowerShell 5.1 bleibt erhalten. |
-| Git, Node.js LTS, VS Code | Vorhandene Programme werden verwendet; fehlende werden über ihre WinGet-Pakete installiert. Eine unpassende bestehende Version wird gemeldet. |
-| curl | Wird für Modelldownloads geprüft und bei Bedarf über WinGet bereitgestellt. |
-| ripgrep | Version 15.1.0 wird aus dem offiziellen Release anhand fester SHA-256-Prüfsummen geprüft und im isolierten Kilo-Cache bereitgestellt. Setup testet Suche und Dateiauflistung mit Kilo-CLI und Erweiterungs-Backend. |
-| LM Studio | Wird bei Bedarf installiert. Vorhandener Modellordner, Authentifizierung und laufende fremde Modelle bleiben erhalten. |
-| Inferenz-Runtime | Eine vorhandene passende GGUF-GPU-Runtime wird verwendet. Fehlt sie vollständig, wird eine kompatible stabile CUDA-Runtime über LM Studio bezogen. |
-| Modellpool | Modelle pro Rolle auswählen; fehlende geprüfte Dateien werden additiv heruntergeladen. Modellprüfungen laufen, sofern das Modell geladen werden kann; andernfalls bleibt der Status ungeprüft. |
-| Lokaler Router | Ordnet die Modell-Aliase zu, serialisiert Inferenz und wechselt nur eindeutig verwaltete LM-Studio-Instanzen. |
-| Kilo CLI | Eine kompatible Installation wird wiederverwendet; sonst Installation in das eigene Werkzeugverzeichnis, ohne globale npm-Pakete zu ersetzen. |
-| Kilo in VS Code | Aktuelle Erweiterung über den vom Hersteller vorgesehenen Pre-Release-Kanal, in einem eigenen Erweiterungsverzeichnis. |
-| Rollen und Workflows | Feste lokale Modellzuordnung pro Rolle; Hauptagent, Spezialisten, Gegenprüfung und Komprimierung bleiben lokal. Rechte und Schleifengrenzen sind vorkonfiguriert. |
-| Projektanbindung | Externe `.code-workspace`-Datei, Auftragsdatei und Prüfdefinitionen. Die Einrichtung schreibt nicht in dein Repository. |
+| PowerShell | Install/reuse version 7.4 or newer; retain Windows PowerShell 5.1. |
+| Git, Node LTS, VS Code | Detect suitable existing installations; install missing components. |
+| curl | Verify a usable local executable. |
+| ripgrep | Provision version 15.1.0 from the official archive with checksum validation in the isolated cache; test CLI and extension use. |
+| LM Studio | Reuse installation, authentication and configured model storage. |
+| GGUF/GPU runtime | Reuse an appropriate runtime or install a compatible CUDA runtime; no GPU-driver changes. |
+| Models | Select/download role models; explicitly warn about deferred verification. |
+| Router | Serialize model requests and manage only owned model instances. |
+| Kilo CLI | Preserve global configuration; use the private managed configuration and tooling. |
+| VS Code Kilo extension | Install the approved prerelease extension into the dedicated extension directory. |
+| Agents | Configure local roles, permissions, context/step limits and compaction models. |
+| Workspaces | Keep generated workspace/task definitions outside existing repositories. |
 
-Standardverzeichnis: Ordner der `Provision-LoKiEnte.ps1`; alternativ das beim Start gewählte Stammverzeichnis oder `-InstallRoot`.
+This is not a universal installer for every language server or build system.
+An existing ripgrep with an unknown checksum is preserved and reported as a
+conflict. Official HTTPS downloads plus archive hashes do not constitute a separate
+cryptographic publisher signature.
 
-Die Bereitstellung deckt die geprüften Kilo-Grundwerkzeuge ab, nicht pauschal
-alle Build-Abhängigkeiten oder Sprachserver beliebiger Projekte. Installiere
-projektspezifische Abhängigkeiten nach den Projektanweisungen. Eine vorhandene
-`rg.exe` mit unbekannter Prüfsumme im verwalteten Cache wird nicht überschrieben;
-das Setup meldet den Konflikt. Das offizielle Archiv wird über HTTPS geladen,
-vor der Nutzung geprüft und bei Fehlern nicht als Erfolg gemeldet. Eine
-Prüfsumme ist keine unabhängige Herstellersignatur.
+VS Code's active `cli.js` is resolved from `bin/code.cmd`, including old and newer
+versioned layouts, without executing an unknown batch file. An unknown layout
+stops. Extension detection uses `--list-extensions --show-versions` and the manifest;
+it does not use `--locate-extension`, which VS Code 1.146.0 does not support.
 
-Bei VS Code wird der aktive `cli.js`-Pfad aus der mitgelieferten `bin\code.cmd`
-ermittelt. Das unterstützt sowohl ältere Installationslayouts als auch die
-versionsabhängigen Unterordner neuerer Windows-Versionen. Das Batch-Skript wird
-nicht ausgeführt. Ist sein Aufbau nicht eindeutig oder fehlt der referenzierte
-Einstieg, bricht das Setup mit dem betreffenden Pfad ab, statt eine beliebige
-andere Version zu wählen.
-Die verwaltete Kilo-Erweiterung wird über `--list-extensions --show-versions`
-und ihr Paketmanifest im eigenen Erweiterungsverzeichnis eindeutig bestimmt.
-Das von VS Code 1.146.0 nicht unterstützte `--locate-extension` wird nicht verwendet.
+Kilo help is checked using stdout, stderr and exit code. An npm lifecycle-script
+approval warning alone is not treated as failure. Personal VS Code, Codex, Copilot
+and Kilo configurations remain untouched: the managed profile has its own data,
+extensions and Kilo sessions, and does not overwrite global Kilo configuration.
 
-Die Kilo-CLI-Optionsprüfung wertet `stdout` und `stderr` aus und verlangt einen
-erfolgreichen Exitcode. Die CLI kann ihre Hilfe bei umgeleiteter Ausgabe auf
-`stderr` schreiben. Ein npm-Hinweis auf nicht freigegebene Installationsskripte
-ist nicht automatisch ein Fehler; bei weiterhin fehlschlagender CLI-Prüfung
-meldet das Setup den Exitcode oder die fehlenden Optionen und stoppt.
+Kilo's inline/chat autocomplete uses a separate provider path. Three related
+settings are disabled in the managed profile/workspaces, with backups and unrelated
+settings preserved. This package does not configure local FIM completion. Manual
+commands remain available and users can re-enable settings; this is not network
+isolation. Setup does not change GPU drivers, firewall rules, WSL, Docker, logins
+or project secrets, and does not trigger a reboot.
 
-Die normale persönliche VS-Code-Umgebung einschließlich Codex, Copilot, Settings und Erweiterungen wird nicht umkonfiguriert. Die neue Umgebung verwendet eigene Verzeichnisse für Benutzerdaten, Erweiterungen und Kilo-Sitzungen. Auch vorhandene globale Kilo-Konfiguration wird nicht überschrieben.
+## 3. Models, memory and switching
 
-Kilos automatische Inline- und Chat-Vervollständigung besitzt einen eigenen Providerpfad. Das Paket deaktiviert sie deshalb im verwalteten Profil und in den erzeugten Arbeitsbereichen. Bei einer bestehenden verwalteten Einrichtung werden nur diese drei Einstellungen angepasst und zuvor gesichert; andere Profilwerte bleiben erhalten. Eine lokale FIM-Codevervollständigung ist nicht Bestandteil dieses Pakets. Manuelle Autocomplete-Befehle bleiben in der Erweiterung verfügbar, und selbst geänderte Einstellungen können den Dienst wieder aktivieren. Dies ist keine Netzwerk-Sandbox.
+Selection uses actual RAM/VRAM and LM Studio state, without a hosting-vendor tie.
+Typical role suggestions include:
 
-Das Paket verändert keine Grafiktreiber, öffnet keine Firewall-Ports, installiert weder WSL noch Docker und führt keinen Neustart aus. GitHub-/Lovable-Anmeldungen und projektbezogene Zugangsdaten werden nicht erfunden oder übernommen.
+| Role | Model | Approximate file size | Intended use |
+|---|---|---:|---|
+| `coder-high` | Qwen3-14B Q4_K_M | 9.0 GB | Demanding chat, planning, architecture and implementation. |
+| `coder-fast` | Qwen3.5-9B Q4_K_M | 5.63 GB plus projector | Lighter chat, research and implementation. |
+| `review` | gpt-oss-20b MXFP4 | 12.1 GB | Separate review perspective. |
+| Optional `fast` | Qwen3.5-9B Q4_K_M | 5.63 GB plus projector | Read-only chat/research. |
 
-## 3. Mehrere Modelle, ein kontrollierter GPU-Arbeitsplatz
+These are decimal file sizes, not VRAM requirements. Context and projectors require
+additional memory; the large weights together exceed 20 GB. Model files remain
+available on disk while GPU-loaded coding models switch sequentially. The default
+router is `127.0.0.1:1235`, with LM Studio at `127.0.0.1:1234`.
 
-Modellwahl und Ladegrenzen richten sich nach dem tatsächlich erkannten RAM,
-VRAM und der Unterstützung durch LM Studio. Es gibt keine Bindung an einen
-bestimmten PC-Hersteller oder Hosting-Anbieter.
+Visible model names use `CODER HIGH`, `CODER FAST`, `REVIEW` and optional `FAST`.
+The `lmstudio/*` and `shadow-router` aliases resolve only to controlled local
+instance IDs, not arbitrary remote model names. Before each request, the controller
+checks actual state. It unloads only an owned matching ID/file while idle; foreign
+or busy instances remain protected. An inference slot is held through the end of
+a streamed response, with a bounded queue. It is released after a tool request so
+a native Kilo subagent can use another role model.
 
-| Profil | Modell | Gewichtsdatei | Standardzuordnung |
-|---|---|---|---|
-| `coder-high` | Auswählbar, z. B. Qwen3-14B Q4_K_M | etwa 9,0 GB | Anspruchsvoller Chat, Planung, Architektur und Implementierung |
-| `coder-fast` | Auswählbar, z. B. Qwen3.5-9B Q4_K_M | etwa 5,63 GB plus Projektor | Schneller Entwicklungs-Chat, Recherche und optional Implementierung |
-| `review` | Auswählbar, z. B. gpt-oss-20b MXFP4 | etwa 12,1 GB | Separater Reviewer und Security-Spezialist |
-| `fast`, optional | Auswählbar, z. B. Qwen3.5-9B Q4_K_M | etwa 5,63 GB plus Projektor | Explizit auswählbarer lesender Chat/Explorer |
+The requested default context is 32768, with controlled fallback to 16384 where
+needed. The smallest verified pool limit is shared. Estimated/unverified fit does
+not prove successful inference; compaction must fit every configured model. Model
+parallelism is 1. Deferred models are visibly marked `[NOT YET VERIFIED]`. Dual
+mode can retry verification on a request; failure returns an explicit error rather
+than switching to cloud or another model. After freeing resources, retry without
+reprovisioning. Single-mode fit failure stops unless `-AllowUnfitAttempt` permits
+the deferred attempt. Labels regenerate at launch and can remain stale until the
+next launch after a successful retry.
 
-Die Dateigrößen sind Dezimal-GB auf dem Datenträger. Sie sind keine Messung des
-VRAM-Verbrauchs; Kontext, Laufzeit und gegebenenfalls Bildprojektoren brauchen
-zusätzlichen Speicher. Die beiden großen Modelle passen zusammen schon anhand
-ihrer Gewichte nicht vollständig in 20 GB VRAM.
-
-Deshalb bleiben alle provisionierten Modelle auf dem Datenträger verfügbar,
-werden aber standardmäßig **nacheinander** in den GPU-Speicher geladen.
-Der lokale Router lauscht standardmäßig auf `127.0.0.1:1235`; LM Studio behält
-seinen eigenen Backend-Endpunkt, üblicherweise `127.0.0.1:1234`.
-
-Kilo zeigt die Modelle mit den Rollenpräfixen `[CODER HIGH]`, `[CODER FAST]`,
-`[REVIEW]` und optional `[FAST]` sowie dem jeweiligen Modellnamen. Die
-Zuordnungen `lmstudio/coder-high`, `lmstudio/coder-fast`, `lmstudio/review`
-und optional `lmstudio/fast` verweisen auf die gleichnamigen `shadow-`-Router-Aliase.
-Der Router ersetzt den öffentlichen Alias
-nur durch die nachgewiesene eigene LM-Studio-Instanz-ID. Beliebige Modellnamen
-oder entfernte Endpunkte werden nicht durchgereicht.
-
-Vor jedem Inferenz-Request prüft der Controller den tatsächlichen Modellstand.
-Ein Wechsel entlädt ausschließlich eigene, eindeutig anhand von ID und Pfad
-zugeordnete Instanzen. Fremde oder beschäftigte Modelle werden erhalten.
-Der Router hält seinen Inferenzplatz bis zum Ende einer Antwort einschließlich
-Streaming. Eine begrenzte Warteschlange ordnet weitere Anfragen ein.
-Nach einer abgeschlossenen Tool-Anforderung ist der Platz wieder frei, sodass
-ein echter Kilo-Unteragent ein anderes Modell verwenden kann.
-
-### Kontext und Prüfungen
-
-Jedes Modell wird separat geschätzt und, soweit das Laden gelingt, mit Chat,
-Funktionsaufruf und Tool-Ergebnis geprüft. Vorgabe sind 32.768 Kontext-Tokens, mit kontrolliertem
-Rückfall auf 16.384. Danach verwendet der Pool das kleinste gemeinsame
-Kontextlimit; bei ungeprüften Modellen ist dessen tatsächliche Nutzbarkeit noch
-nicht nachgewiesen. Dadurch kann auch die Komprimierungsrolle die Sitzungen
-aller Profile verarbeiten. Für jede geladene Instanz wird `parallel=1` geprüft.
-
-Passt ein Modell nicht, wird es heruntergeladen und die Provisionierung läuft
-mit Warnung weiter. Ein abgelehnter Ladeversuch oder fehlgeschlagener Modelltest
-wird als `Deferred` und in Kilo als `[NOCH NICHT GEPRUEFT]` gekennzeichnet.
-Im Dual-Modus wird beim Auswählen das Laden erneut versucht und vor der eigentlichen Anfrage
-ein Chat-/Tool-Test durchgeführt. Wenn LM Studio das Modell weiterhin nicht
-laden kann oder der Test scheitert, wird diese Anfrage mit einer konkreten
-Fehlermeldung abgelehnt; das ist keine Garantie für Ausführbarkeit bei
-unzulänglichem Speicher. Freier Speicher ermöglicht einen erneuten Versuch
-ohne erneute Provisionierung. Im Single-Modus meldet LoKiEnte bei fehlendem
-Speicherfit einen Startfehler. Mit `-AllowUnfitAttempt` kann die Provisionierung
-einen Versuch außerhalb der eigenen Reserven erlauben. Es gibt keinen stillen
-Modell- oder Cloudwechsel.
-Die sichtbare Kennzeichnung wird beim nächsten LoKiEnte-Start aus dem gespeicherten
-Modellstatus neu erzeugt; nach einem erfolgreichen Nachtest kann sie im
-bereits geöffneten Fenster bis dahin bestehen bleiben.
-Der vorherige Einmodellweg bleibt verfügbar, etwa:
+To select the review model for Single mode:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single -PreferredModel GptOss20B
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LocalAI -ModelMode Single -PreferredModel GptOss20B
 ```
 
-Ein vorhandenes eigenes Einzelmodell lässt sich weiterhin über den exakten
-`path` aus `lms ls --json` wählen:
+An already available custom model can use `-ModelKey` with `-SkipModelDownload`.
+The key must identify exactly one local model.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Single -ModelKey "EXAKTER-PFAD-AUS-LMS-LS" -SkipModelDownload
-```
+The role mapping is not a benchmark proving that GPT-OSS is universally superior
+at review. A different family can offer another perspective; a fresh Qwen validator
+does not guarantee independent errors. Switching incurs loading/cache costs while
+persistent Kilo chats remain available. Related implementation roles use the same
+coder. The optional small role is not selected for every task; fewer parameters
+do not prove better throughput. Measure on your hardware and actual tasks.
+GUI helpers/compaction use the main model; strict-runner helpers use the active
+phase model to avoid an unnecessary switch for titles or summaries.
 
-### Qualität und Wechselkosten
+## 4. Agents and reusable workflows
 
-Die Zuordnung ist eine begründete Ausgangskonfiguration, kein Benchmark, der
-GPT-OSS pauschal als besseren Reviewer ausweist. Die Gegenprüfung verwendet eine
-andere Modellfamilie; der Validator arbeitet anschließend wieder mit Qwen in einer
-frischen Sitzung. Damit entsteht eine zusätzliche Perspektive, aber keine
-Garantie unabhängiger Denkfehler.
-
-Modellwechsel kosten Ladezeit und den erneuten Aufbau des Inferenz-Caches.
-Die gespeicherten Kilo-Chats bleiben davon getrennt erhalten. Verwandte
-Implementierungsrollen verwenden deshalb dasselbe Coding-Modell. Das optionale
-9B-Modell wird nicht automatisch für jede Kleinigkeit aufgerufen. Weniger
-Gesamtparameter allein belegen auch keine höhere Geschwindigkeit; diese muss
-auf deiner Hardware und mit repräsentativen Aufgaben gemessen werden.
-
-In der GUI bleiben Hilfs- und Komprimierungsmodell beim Hauptmodell. Im strikten
-Runner verwenden diese Hilfsaufgaben jeweils das aktuelle Phasenmodell. Dadurch
-vermeiden wir dort zusätzliche Modellwechsel nur für Titel oder Zusammenfassungen.
-
-## 4. Rollen, Spezialisten und Kaskaden
-
-| Rolle | Zweck |
+| Agent | Responsibility |
 |---|---|
-| `shadow-chat` | Chat, lesende Delegation und Start/Status des kontrollierten Entwicklungsauftrags mit Coder High |
-| `shadow-chat-fast` | Lesender Entwicklungs-Chat mit Coder Fast |
-| `shadow-plan` | Aufgabenzerlegung und Akzeptanzkriterien |
-| `shadow-preparer` | Leitet Kriterien, Änderungsarten, genaue Dateien und bekannte Testkandidaten ab |
-| `shadow-preparation-reviewer` | Prüft die Vorbereitung unabhängig gegen Originalauftrag und tatsächliches Projekt |
-| `shadow-explorer` | Gezielte Suche nach Dateien, Aufrufen und bestehenden Regeln |
-| `shadow-architect` | Architektur, SSOT, Schnittstellen und begrenzter Umsetzungsplan |
-| `shadow-frontend` | UI, Komponenten, Zustandsführung und Barrierefreiheit |
-| `shadow-backend` | APIs, Datenflüsse, Berechtigungen und Fehlerbehandlung |
-| `shadow-test` | Sinnvolle Prüfungen, Regressionen und Testlücken |
-| `shadow-test-reviewer` | Prüft Testcode und Assertions unabhängig vor deren Ausführung |
-| `shadow-integration` | Pflichtreview für UI-/API-Änderungen und tatsächliche Integrationstests |
-| `shadow-security` | Konkrete Sicherheitsbefunde mit Belegen |
-| `shadow-implementer` | Begrenzte Umsetzung im kontrollierten Ablauf |
-| `shadow-reviewer` | Separater Review von Auftrag, aktuellem Diff und betroffenen Dateien |
-| `shadow-validator` | Separate Bewertung der wirklich ausgeführten Prüfungen und ihrer Aussagekraft |
+| `shadow-chat` | Primary chat using Coder High; starts and follows reviewed tasks. |
+| `shadow-chat-fast` | Lighter chat using Coder Fast. |
+| `shadow-plan` | Requirements, scope and plan. |
+| `shadow-preparer` | Derive criteria, categories, files and local test candidates. |
+| `shadow-preparation-reviewer` | Independently review the proposed task policy. |
+| `shadow-explorer` | Read-only project research. |
+| `shadow-architect` | Architecture proposals and constraints. |
+| `shadow-frontend` | Bounded frontend implementation. |
+| `shadow-backend` | Bounded backend implementation. |
+| `shadow-test` | Author tests before implementation. |
+| `shadow-test-reviewer` | Independently review tests and criterion mapping. |
+| `shadow-integration` | Integration evidence for UI/API changes. |
+| `shadow-security` | Security review for security-related changes. |
+| `shadow-implementer` | Bounded production changes. |
+| `shadow-reviewer` | Independent code review. |
+| `shadow-validator` | Independent validation of actual evidence. |
 
-Bei installiertem optionalen FAST-Profil kommen die lesenden Rollen `shadow-fast-chat` und `shadow-fast-explorer` hinzu. Sie erhalten keine abschließende Review- oder Validierungsverantwortung.
+The optional `fast` chat/explorer roles remain read-only and cannot approve work.
+Ordinary Feature, Bugfix and Refactor tasks use Coder High. Additional VS Code tasks
+marked `(Coder Fast)` use Coder Fast for implementation/frontend/backend roles.
+Planning, separate review, validation and explicitly configured checks remain
+mandatory. Selecting a model in free chat does not change the separate task runner's
+model choice.
 
-Die normalen Feature-, Bugfix- und Refactor-Aufgaben verwenden Coder High.
-Die zusätzlich angebotenen VS-Code-Aufgaben mit `(Coder Fast)` verwenden
-Coder Fast für die Implementierungs-, Frontend- und Backendrollen. Planung,
-separater Review, Validierung und die ausdrücklich konfigurierten Checks bleiben
-verpflichtend. Die Modellauswahl im freien Chat ändert die Modellwahl des
-separaten Aufgabenablaufs nicht.
+Previous `coder` selections become suggestions for `coder-high` on the next setup;
+the old `fast` selection may seed `coder-fast`. Existing models and the embedding
+index remain. After updating, close all LoKiEnte windows and open a new Kilo session:
+old sessions may retain the removed `coder` alias. Built-in selectable Kilo agents
+are disabled in the managed profile; internal helpers such as compaction remain.
 
-Frühere `coder`-Auswahlen werden beim nächsten Setup als Vorschlag für
-`coder-high` übernommen; das bisherige `fast` kann als Ausgangsvorschlag für
-`coder-fast` dienen. Vorhandene Modelle und der Embedding-Index bleiben erhalten.
-Nach dem Update alle LoKiEnte-Fenster schließen und eine neue Kilo-Sitzung öffnen;
-alte Sitzungen können noch den nicht mehr angebotenen Alias `coder` gespeichert
-haben. Eingebaute auswählbare Kilo-Agenten sind im LoKiEnte-Profil deaktiviert;
-interne Hilfsrollen wie die Kontextkomprimierung bleiben bestehen.
+The sidebar provides `/feature`, `/bugfix`, `/refactor`, `/review` and `/architecture`.
+They pass the requested workflow to `shadow-chat`. Natural-language requests also
+work without a slash command.
 
-Die Kilo-Seitenleiste erhält `/feature`, `/bugfix`, `/refactor`, `/review` und
-`/architecture`. Sie geben den gewünschten Ablauf an `shadow-chat` weiter.
-Ein Auftrag kann ebenso ohne Slash-Befehl als natürliche Beschreibung eingehen.
+**The mandatory workflow starts from Kilo through the local `loki_start` tool.**
+Chat itself receives no general file-write or shell permissions. The tool binds
+the request to the registered project and invokes the fixed runner with
+`-AutoPrepare -Workflow Auto`. Preparation and independent review must pass before
+the test author and implementer receive bounded write permissions. Subagents cannot
+start new LoKiEnte tasks. VS Code tasks remain an alternative for `task.md`, also
+with `-AutoPrepare`. Custom task definitions survive updates.
 
-**Der verbindliche Ablauf startet aus Kilo über das lokale Werkzeug `loki_start`.**
-Der Chat selbst erhält damit keine allgemeinen Schreib- oder Shellrechte.
-Das Werkzeug bindet den Auftrag an das registrierte Projekt und startet den
-festen Runner mit `-AutoPrepare -Workflow Auto`. Vorbereitung und unabhängiger
-Review müssen bestanden sein, bevor Testautor und Implementierer ihre begrenzten
-Schreibrechte erhalten. Unteragenten dürfen keine neuen LoKiEnte-Aufträge starten.
-Die vorhandenen VS-Code-Tasks bleiben eine Alternative für `task.md`; auch sie
-verwenden `-AutoPrepare`. Eigene Taskdefinitionen bleiben bei Updates erhalten.
+### Workflow stages
 
-### Wiederverwendbare Abläufe
+Every automatic workflow starts with preparation → independent preparation review.
+The subsequent quality stages are:
 
-Allen automatisch gestarteten Abläufen geht Vorbereitung → unabhängiger
-Vorbereitungsreview voraus. Danach gelten unverändert die Qualitätsstufen:
+- **Feature:** criteria/plan → test author → test review → baseline tests →
+  implementation → checks → review → required specialists → validation.
+- **Bugfix:** criteria/cause → test author → test review → a specifically failing
+  regression → fix → passing regression → review → required specialists → validation.
+- **Refactor:** behavior invariants → test author → test review → passing baseline
+  tests → refactoring → checks → review → required specialists → validation.
+- **Review:** inspect the current working tree without implementation → checks →
+  review → validation.
+- **Architecture:** proposal without code changes → review against the codebase →
+  validate existing evidence. Without relevant executable checks, no `VERIFIED`.
 
-- **Feature:** Kriterien/Plan → Testautor → Testreview → Ausgangstests → Umsetzung → Checks → Review → Pflichtspezialisten → Validierung.
-- **Bugfix:** Kriterien/Ursache → Testautor → Testreview → konkret fehlgeschlagene Regression → Fix → bestandene Regression → Review → Pflichtspezialisten → Validierung.
-- **Refactor:** Verhaltensinvarianten → Testautor → Testreview → bestandene Ausgangstests → Refactoring → Checks → Review → Pflichtspezialisten → Validierung.
-- **Review:** Bestehenden Arbeitsbaum ohne Implementierungsphase prüfen → Checks → Review → Validierung.
-- **Architecture:** Architekturvorschlag ohne Codeänderungen → Review des Vorschlags anhand der Codebasis → Prüfung der vorhandenen Evidenz. Ohne ausführbare einschlägige Checks entsteht kein `VERIFIED`.
+Findings allow at most **one correction round** by default. Checks and both reviewers
+then run again. `-MaxCorrectionRounds` accepts 0–3 to bound agent loops. Every stage
+also has step/time limits. Oversized requests or review packages are rejected rather
+than silently dropping important evidence.
 
-Bei Befunden folgt höchstens **eine Korrekturrunde** als Vorgabe. Danach laufen Checks und beide Prüfer erneut. Per `-MaxCorrectionRounds` sind 0 bis 3 Korrekturrunden einstellbar. Das verhindert unendliche Agentenschleifen. Jede Stufe hat zusätzlich eine Schritt- und Zeitbegrenzung. Zu große Aufträge oder Review-Pakete werden zurückgewiesen, statt wichtige Befunde still abzuschneiden.
+Roles and model mappings are declared in `app\AgentTemplates.ps1`, which generates
+`kilo-managed\kilo.json`. Persistent changes belong in the template because setup
+and launcher regenerate managed files. Previous versions are backed up; a package
+update also backs up and replaces the template. Maintain additional roles/process
+variants deliberately in your own versioned customization and test them against
+the existing gates. This is not a general visual workflow engine.
 
-Die Rollen und ihre Modellzuordnung stehen deklarativ in `app\AgentTemplates.ps1`; daraus entsteht `kilo-managed\kilo.json`. Dauerhafte Änderungen der mitgelieferten Rollen gehören in die Vorlage, da Setup und Launcher die generierte Datei erneuern. Änderungen verwalteter Dateien werden gesichert; ein Paket-Update ersetzt die Vorlage nach Sicherung. Zusätzliche Rollen oder Prozessvarianten sollten deshalb bewusst in einer versionierten eigenen Anpassung gepflegt und mit den vorhandenen Gates getestet werden. Die Vorlage ist keine beliebige visuelle Workflow-Engine.
+The supplied rules and `shadow-chat` prompt now default to English. German rule
+documentation is retained as `.de.md`; only the English rules are selected in the
+active agent configuration. Generated `kilo-managed\LOCAL-AI-RULES.md` and the
+configuration are renewed from source templates at launch.
 
-Die mitgelieferten Regeln fordern ausdrücklich Antworten auf Deutsch; der
-`shadow-chat`-Prompt wiederholt dies. Deshalb können auch englische Eingaben
-deutsche Antworten erhalten. `kilo-managed\LOCAL-AI-RULES.md` und die
-Agentenkonfiguration sind generierte Dateien und werden beim Start aus den
-Vorlagen erneuert.
+## 5. Running a task
 
-## 5. Einen Auftrag tatsächlich ausführen
+See [WORKFLOW.md](WORKFLOW.md) for preparation, complete schema 2, supported test
+reports, VS Code tasks and failure handling. Provisioning updates each registered
+project's managed `LOKI-WORKFLOW.md` and `LOKI-WORKFLOW.de.md`. New personal guides
+are `GUIDE.md` and `GUIDE.de.md`; existing personal guides, including `ANLEITUNG.md`,
+remain untouched. File-based task templates are provided as `task.md` / `task.de.md`;
+existing user tasks are not translated or overwritten.
 
-Siehe [WORKFLOW.md](WORKFLOW.md): Dort stehen Auftragsvorbereitung, das vollständige
-Schema 2, unterstützte Testberichte, VS-Code-Aufgaben und Fehlerbehandlung.
-Die gepflegte Anleitung wird bei jeder Provisionierung für registrierte Projekte
-als `LOKI-WORKFLOW.md` aktualisiert. Persönliche `ANLEITUNG.md` bleiben erhalten.
+`TaskPreparation.ps1` collects a bounded file inventory, manifests and locally
+available runners. It does not read `.env` files or execute project commands for
+detection. Model proposals select candidate IDs only. `Run-ProjectCheck.mjs` runs
+fixed Node/Vitest/Jest/Playwright/TypeScript templates without a shell or package
+download. Python/pytest uses the local interpreter with JUnit. Missing project
+dependencies are not installed. Unknown build systems may use existing manual
+checks with structured reports. `limits.allowedWritePaths` and
+`limits.allowedTestWritePaths` provide persistent additional boundaries.
 
-`TaskPreparation.ps1` erfasst eine begrenzte Dateiinventur, Manifeste und lokal
-vorhandene Runner. Es liest keine `.env`-Dateien und führt zur Erkennung keine
-Projektbefehle aus. Modellvorschläge wählen ausschließlich Kandidaten-IDs;
-`Run-ProjectCheck.mjs` führt die festen Node-/Vitest-/Jest-/Playwright-/TypeScript-
-Vorlagen ohne Shell und Paketdownload aus. Python/pytest nutzt den lokalen
-Interpreter mit JUnit. Fehlende Projektabhängigkeiten werden nicht installiert.
-Unbekannte Buildketten können vorhandene manuelle Checks mit strukturierten
-Berichten verwenden. Für dauerhafte zusätzliche Grenzen stehen
-`limits.allowedWritePaths` und `limits.allowedTestWritePaths` bereit.
+The first automatic run archives old task-specific values under
+`automation.importedTaskFields` and discloses them to preparation review. Custom
+commands and unknown fields remain. Hashes prevent silent replacement of manually
+edited automatic criteria/checks. Backup and publication occur only after PASS and
+fresh verification of source state, inputs and the previous `checks.json`.
 
-Auftragsspezifische Altwerte werden beim ersten automatischen Lauf unter
-`automation.importedTaskFields` archiviert und im Vorbereitungsreview offengelegt.
-Eigene Befehle und unbekannte Felder bleiben erhalten. Prüfsummen verhindern,
-dass manuell geänderte automatische Kriterien oder Checks still ersetzt werden.
-Die Sicherung und neue Datei entstehen erst nach bestandenem Review und erneuter
-Prüfung von Quellstand, Eingaben und bisheriger `checks.json`.
+## 6. What VERIFIED means
 
-## 6. Was VERIFIED genau bedeutet
+A current source fingerprint, successful actual checks, complete mapping of fixed
+criteria to passing cases, independent test review, code review and validation,
+plus any required security/integration judgments are mandatory. Test files remain
+locked during implementation; hash/scope checks detect changes before later checks.
 
-Ein aktueller Quellfingerabdruck, erfolgreiche tatsächliche Checks, vollständige
-Zuordnung aller festen Kriterien zu bestandenen Testfällen, unabhängiger Testreview,
-Code-Review und Validierung sowie die gegebenenfalls erforderlichen Security-/
-Integrationsurteile sind zwingend. Testdateien bleiben während der Umsetzung
-gesperrt; Hash- und Umfangsprüfungen erkennen Änderungen vor nachfolgenden Checks.
+A test report is evidence produced by executed project code. It does not establish
+the authenticity of every assertion or functional completeness. Test review, code
+review, validation and your acceptance remain necessary. Ignored files and external
+state are outside the source fingerprint. `VERIFIED` applies only to the captured
+revision; unresolved mandatory findings prevent it even when every process exits 0.
 
-Ein Testbericht ist vom ausgeführten Projektcode erzeugte Evidenz. Er beweist
-weder die Echtheit jeder Assertion noch fachliche Vollständigkeit. Dafür sind
-Testreview, Code-Review, Validierung und deine Abnahme erforderlich. Ignorierte
-Dateien und externe Zustände liegen weiterhin außerhalb des Quellfingerabdrucks.
-`VERIFIED` gilt ausschließlich für den erfassten Stand; offene Pflichtbefunde
-verhindern diesen Status auch dann, wenn alle Testprozesse Exitcode 0 liefern.
+## 7. Chats, context and logs
 
-## 7. Chats, Kontext und Protokolle
+The dedicated Kilo environment stores sessions under `runtime-profile`. Reopen them
+through Kilo's session history for that managed profile. Personal Kilo/Copilot chats
+are not automatically imported.
 
-Die eigene Kilo-Umgebung speichert Sitzungen unter `runtime-profile`. Wiederöffnen erfolgt in der Kilo-Sitzungshistorie. Das gilt für den laufenden verwalteten Profilpfad; normale Kilo-/Copilot-Chats werden nicht automatisch importiert.
+Automatic compaction uses the actual loaded context limit. Summaries are lossy:
+long history on disk does not put every old message into the active model context.
+Keep durable requirements in project instructions, SSOT and testable criteria.
 
-Automatische Kontextkomprimierung ist konfiguriert und erhält das tatsächlich geladene Kontextlimit. Eine Zusammenfassung bleibt verlustbehaftet: lange Historie auf Platte bedeutet nicht, dass jede alte Nachricht gleichzeitig im Modellkontext liegt. Dauerhafte Anforderungen gehören deshalb in die vorhandenen Projektanweisungen, SSOT und überprüfbare Akzeptanzkriterien.
+Strict workflows start fresh sessions per stage. `runs\<timestamp-id>` retains the
+request, plan, responses, check commands, outputs, session IDs, requested role models
+and receipt. These records support inspection and subsequent work; they do not
+simulate an unlimited shared context.
 
-Die strikten Aufgabenläufe starten bewusst frische Sitzungen pro Stufe. Unter `runs\<Zeitstempel-ID>` bleiben Auftrag, Plan, Antworten, Prüfbefehle, Ausgaben, Sitzungs-IDs, angeforderte Rollenmodelle und Receipt erhalten. Diese Ablaufbelege ermöglichen spätere Wiederaufnahme und Prüfung; sie simulieren keinen unbegrenzt großen gemeinsamen Kontext.
+Kilo follows a background task through `loki_status`, showing actual phases, agent
+roles, requested role models, states and tool activity. `loki_details` provides a
+bounded report; `LOKI-STATUS.md` in the task directory mirrors the latest published
+state. Controlled phases are external CLI sessions, not automatically native Kilo
+task-child sessions or an Inspector graph. Native read-only chat subagents may
+additionally have their own Kilo sessions.
 
-Der Kilo-Chat verfolgt seinen Hintergrundauftrag mit `loki_status`. Die Ausgabe
-zeigt reale Phasen, Agentenrollen, angeforderte Rollenmodelle, Zustände und
-Werkzeugaktivität. `loki_details` liefert den begrenzten Bericht; `LOKI-STATUS.md`
-im Projekt-Auftragsordner spiegelt den aktuellen Status. Die kontrollierten
-Phasen sind externe CLI-Sitzungen und werden nicht automatisch als native
-Kilo-Task-Kindersitzungen oder als Inspector-Graph angezeigt. Native lesende
-Chat-Unteragenten können zusätzlich ihre eigenen Kilo-Sitzungen haben.
+Interrupting a status request does not stop the background task. Explicit cancellation
+uses `loki_cancel`; only `CANCELLED` confirms termination of the owned process tree.
+Existing changes remain. Only one controlled task per project may run at a time.
+`NEEDS_INPUT` states missing prerequisites or conflicts instead of implying approval.
 
-Eine unterbrochene Statusabfrage beendet den Hintergrundauftrag nicht. Ein
-ausdrücklicher Abbruch nutzt `loki_cancel`; erst `CANCELLED` bestätigt das Ende
-des eigenen Prozessbaums. Bisherige Änderungen bleiben erhalten. Je Projekt ist
-nur ein kontrollierter Auftrag gleichzeitig erlaubt. `NEEDS_INPUT` benennt
-fehlende Voraussetzungen oder Konflikte, statt eine Freigabe vorzutäuschen.
+`WORKER_UNRESPONSIVE` stops automatic polling after 30 seconds without worker startup
+or 120 seconds without a heartbeat. It confirms neither termination nor success;
+the project lock remains. Inspect job logs and local processes rather than blindly
+deleting the lock. `loki_status` may check again later and `loki_cancel` can still
+record cancellation. Targeted recovery requires confirmed process termination or
+a system restart.
 
-`WORKER_UNRESPONSIVE` beendet automatisches Polling nach 30 Sekunden ohne
-Workerstart bzw. 120 Sekunden ohne Heartbeat. Das bestätigt weder Prozessende
-noch Erfolg; die Projektsperre bleibt bestehen. Jobprotokolle und lokale Prozesse
-prüfen und die Sperre nicht blind löschen. `loki_status` kann später erneut prüfen,
-`loki_cancel` weiterhin einen Abbruch vormerken. Eine gezielte Wiederherstellung
-setzt bestätigtes Prozessende oder einen Systemneustart voraus.
+## 8. Local processing and existing credentials
 
-## 8. Lokale Verarbeitung und bestehende Zugänge
+The model server and router bind to loopback. An existing publicly bound server
+is not silently reconfigured; setup stops with an explanation. Main, helper,
+subagent, memory and compaction models are constrained to the local provider and
+selected catalogue. Unverified models are explicitly marked. Effective configuration,
+including possible managed policy, is checked before CLI work; deviations fail.
 
-Modellserver und Router sind an Loopback gebunden. Ein vorhandener öffentlich gebundener Server wird nicht still umgestellt; die Einrichtung stoppt mit einem Hinweis. Haupt-, Hilfs-, Unteragenten-, Memory- und Komprimierungsmodelle sind auf den lokalen Provider und den ausgewählten Modellkatalog festgelegt. Noch ungeprüfte Modelle sind ausdrücklich gekennzeichnet. Vor CLI-Arbeit wird die wirksame Konfiguration geprüft, einschließlich möglicher verwalteter Vorgaben. Abweichungen führen zu einem Fehler.
+Kilo telemetry is disabled for launched processes, as is VS Code telemetry in the
+managed profile. Dual mode configures the local embedding service described above;
+project indexing still requires Kilo's per-project enablement. Single mode leaves
+indexing disabled. Agents can also use file search and targeted reading. Setup
+requires Internet access for software and model downloads. “Local” means inference
+on the Windows machine where LoKiEnte is installed; on a hosted VM this is the
+hosting provider's infrastructure. The package is not network isolation and cannot
+guarantee that every third-party application avoids update or metadata requests.
 
-Kilo-Telemetrie wird für die gestarteten Prozesse abgeschaltet; VS-Code-Telemetrie im eigenen Profil ebenfalls. Automatische Code-Vektorindizierung ist in diesem Profil deaktiviert; die Agenten verwenden Dateisuche und gezielte Lesezugriffe. Es wird kein zusätzlicher Embedding-Dienst eingerichtet. Die Einrichtung selbst benötigt Internet für Software und Modell-Dateien. „Lokal“ bedeutet Modellinferenz auf dem Windows-Rechner, auf dem du LoKiEnte installierst. Bei einer gehosteten Windows-VM liegt dieser Rechner auf der Infrastruktur deines Hosting-Anbieters. Das Paket ist kein Netzwerk-Isolationssystem und enthält keine pauschale Garantie, dass jedes Drittprogramm nie eine Update- oder Metadatenabfrage macht.
-
-Wenn dein bestehender LM-Studio-Server Authentifizierung verlangt, stelle das Token im Prozess bereit, bevor du Setup bzw. Launcher startest:
+If your existing LM Studio server requires authentication, provide the token in
+the process before starting setup or the launcher:
 
 ```powershell
-$env:LOKIENTE_LM_API_KEY = 'DEIN_BESTEHENDES_TOKEN'
-# Bei Updates gilt der gespeicherte Variablenname, sofern nicht explizit geaendert.
+$env:LOKIENTE_LM_API_KEY = 'YOUR_EXISTING_TOKEN'
+# Updates retain the saved variable name unless explicitly changed.
 ```
 
-Konfiguration und Bericht speichern nur den Namen der Umgebungsvariable, nicht das bestehende LM-Studio-API-Token. Der Router erhält es als Prozessumgebung. Für sein eigenes kontrolliertes Beenden erzeugt das Paket zusätzlich ein lokales zufälliges Kontrolltoken in `runtime\router-control.json`; dieses ist kein Modellanbieter-Zugang. Der Desktop-Shortcut erbt keine nur in einem anderen Terminal gesetzte Variable. Starte den Launcher in diesem Fall aus demselben Terminal. Das Paket schaltet vorhandene Authentifizierung nicht aus.
+Configuration and reports store only the environment variable name, not the LM
+Studio API token. The router receives it through its process environment. For its
+own controlled shutdown, the package also generates a random local control token
+in `runtime\router-control.json`; this is not a model-provider credential. A desktop
+shortcut does not inherit a variable set only in another terminal. In that case,
+start the launcher from the same terminal. Existing authentication is not disabled.
 
-## 9. Lovable und weitere Projekte
+## 9. Lovable and other projects
 
-Verbinde das gewünschte Lovable-Projekt mit seinem GitHub-Repository und klone es auf den Windows-PC, oder verwende einen vorhandenen Klon. Anmeldung, Organisation, Repository-URL und Branch sind deine bestehenden Projektdaten. Anschließend registrierst du den lokalen Ordner mit dem Launcher.
+Connect the desired Lovable project to its GitHub repository and clone it to the
+Windows PC, or use an existing clone. Authentication, organization, repository URL
+and branch remain your project data. Register the local directory with the launcher.
 
-Ein lokaler Klon kann weiterhin denselben Supabase-/Cloud-Backendzustand verwenden wie die veröffentlichte Anwendung. Ein Git-Branch schafft keine getrennte Datenbank. Das Paket migriert, veröffentlicht, merged oder pusht deshalb nichts. Lokale Änderungen lassen sich später über deinen üblichen Review-/Git-Prozess in den mit Lovable synchronisierten Branch übernehmen.
+A local clone may still access the same Supabase/cloud backend as the published
+application. A Git branch does not create a separate database. The package therefore
+does not migrate, deploy, merge or push project changes. Review changes through your
+normal Git process before bringing them into the Lovable-synchronized branch.
 
-Der Ansatz ist auch für andere Git-Projekte nutzbar. Die benötigte Programmiersprachen-Runtime, Package-Manager-Version und projektspezifischen Checks müssen zum Projekt passen; dieses Paket behauptet nicht, unbekannte Python-, Java-, .NET- oder native Buildketten automatisch vollständig einzurichten.
+Other Git projects are supported too. Their language runtimes, package-manager
+versions and checks must match the project; the package does not claim to completely
+configure unknown Python, Java, .NET or native build systems automatically.
 
-## 10. Wiederholung, Updates und typische Stopps
+## 10. Repeated runs, updates and common stops
 
-Beende vor einem Update laufende KI-Aufträge. Ein normaler erneuter Lauf verwendet passende Programme, heruntergeladene Modelle und verwaltete Dateien weiter. Er prüft alle ausgewählten Modelle erneut und beendet einen vorhandenen eigenen Router nur, wenn dieser keine aktive oder wartende Arbeit hat. Eine identische Datei wird nicht erneut geschrieben. Geänderte verwaltete Konfiguration erhält eine Sicherung. Aufgaben und projektspezifische Prüfdateien werden nach ihrer ersten Erstellung nicht neu initialisiert.
+Finish active AI tasks before updating. A normal rerun reuses suitable applications,
+downloaded models and managed files. It checks every selected model again and stops
+an owned router only when it has no active/queued work. Identical files are not
+rewritten. Changed managed configuration is backed up. User tasks and project check
+files are not reinitialized after their first creation.
 
-Ein normaler Provisionierungslauf ist auch ein Update. Verwende für eine
-bestehende Umgebung denselben `-InstallRoot` und schließe deren VS-Code-Fenster
-und laufende Aufträge vorher. Die zuletzt gespeicherte Modellkonfiguration dient
-als Vorgabe. Ausdrücklich übergebene Optionen haben Vorrang.
+Provisioning is also the update procedure. Use the same `-InstallRoot` and first
+close that environment's VS Code windows and active tasks. Saved model configuration
+provides defaults; explicit parameters take precedence.
 
-Alle erreichbaren registrierten Projekte werden in diesem Lauf aktualisiert.
-`-ProjectPath` nimmt zusätzlich weitere Projektordner auf. Der Installer
-erneuert die verwalteten VS-Code-Aufgaben und erzeugt `LOKI-WORKFLOW.md` mit
-dem Stand des Pakets. In alten `checks.json` ergänzt er fehlende Felder und
-sichert das Original. Vorhandene Testbefehle, Schreibfreigaben, Aufträge und
-eigene Workspace-Aufgaben bleiben erhalten. Die verwalteten Tasks erhalten
-`-AutoPrepare` und einen zusätzlichen `Workflow Auto`-Einstieg. Der konkrete
-Schreibumfang wird je Auftrag abgeleitet und unabhängig geprüft; er wird nicht
-als neue unbegrenzte Dauerfreigabe übernommen. Unerreichbare Ordner bleiben im Index und
-werden im Bericht genannt.
+All reachable registered projects are updated. `-ProjectPath` adds more directories.
+Managed VS Code tasks and bilingual `LOKI-WORKFLOW` guides are refreshed. Missing
+fields are added to old `checks.json` files after backing up the originals. Existing
+commands, write authorizations, requests and custom workspace tasks remain. Managed
+tasks receive `-AutoPrepare` and an additional `Workflow Auto` entry. Each request's
+write scope is derived and independently reviewed, not installed as an unlimited
+persistent permission. Unreachable directories remain in the index and report.
 
-Die geprüfte Version der Kilo-Erweiterung wird ohne Zusatzschalter installiert,
-wenn sie neuer ist als die installierte. Weitere freigegebene exakte
-Werkzeugversionen können in `dependency-versions.json` im **Installationsordner**
-stehen. Ein Beispiel mit lediglich der mitgelieferten Erweiterungsfreigabe:
+The approved Kilo extension is installed without an extra flag when newer than the
+installed version. Further approved exact tool versions can be listed in
+`dependency-versions.json` in the **installation root**. This example includes only
+the bundled extension approval:
 
 ```json
 {
@@ -701,92 +619,111 @@ stehen. Ein Beispiel mit lediglich der mitgelieferten Erweiterungsfreigabe:
 }
 ```
 
-Für ein freigegebenes Update den jeweiligen Wert durch eine exakte
-Versionsnummer ersetzen. Ein neuerer freigegebener Stand wird beim nächsten
-Lauf installiert und anschließend geprüft. Ohne Versionsfreigabe bleibt ein
-vorhandenes Basiswerkzeug erhalten. Bei einer Erstinstallation nutzt WinGet
-für ein fehlendes, nicht gepinntes Basiswerkzeug seinen Standardkandidaten.
-Eine fehlende, nicht gepinnte Kilo CLI wird installiert und auf Kompatibilität
-geprüft. Die Kilo CLI wird in einem Versionsordner vorbereitet und erst nach
-den Setup-Prüfungen im Toolchain-Index aktiviert. LanceDB, ripgrep und die
-Modelldateien behalten ihre vom Paket geprüften Versionen bzw. Hashes.
-`-UpdateManaged` wird für ältere Startbefehle weiterhin akzeptiert und ist
-für Updates nicht mehr nötig. Freigaben und ausgewählte Werkzeugversionen
-stehen im Provisionierungsbericht.
+Replace a value with an exact approved version. A newer approved release is installed
+and verified on the next run. Without an approval, an existing base tool remains.
+For a missing unpinned base tool, initial installation uses WinGet's default candidate.
+A missing unpinned Kilo CLI is installed and checked for compatibility. CLI updates
+are prepared in a versioned directory and activated in the toolchain index only
+after setup checks. LanceDB, ripgrep and model files retain package-verified versions
+or hashes. `-UpdateManaged` remains accepted for older commands but is no longer
+required. Approvals and selected versions appear in the report.
 
-Der Installer verwaltet die LoKiEnte-Werkzeuge. Die Manifest- und Lockdateien deiner
-Projekt-Repositories gehören weiterhin zum jeweiligen Repository.
+The installer manages LoKiEnte tooling. Project repository manifests and lockfiles
+remain the project's responsibility. npm metadata accepts a single version string,
+a one-element array or a version object; a missing `engines` field is valid.
+Ambiguous/empty responses are rejected before installation, with StrictMode active.
+The installed manifest must match the requested version.
 
-Die npm-Abfrage akzeptiert eine einzelne Versionszeichenfolge, ein einelementiges Array oder ein Versionsobjekt. Ein fehlendes `engines`-Feld ist kein Fehler. Mehrdeutige/leere Antworten werden vor der Installation abgewiesen; StrictMode bleibt aktiv. Nach der Installation wird die angeforderte Version mit dem installierten Manifest verglichen.
+Before a pool load, the package records a pending load intent. If verification then
+fails, a rerun can recognize an exact local instance by ID and model file. This
+establishes ownership only: idle state, actual configuration and relevant setup
+smoke tests are still checked. Foreign models or different files are not adopted.
+An interruption of an **older version without a recorded load intent** cannot gain
+this evidence retroactively; you may need to deliberately unload that instance once
+in LM Studio.
 
-Vor einem Modellpool-Ladevorgang wird ein ausstehender Ladeauftrag gespeichert. Scheitert die anschließende Prüfung, kann ein erneuter Lauf eine exakt passende lokale Instanz anhand von ID und Modelldatei wiedererkennen. Das ist nur ein Eigentumsnachweis: Leerlauf, tatsächliche Konfiguration und gegebenenfalls die Setup-Smoke-Tests werden weiterhin geprüft. Ein fremdes Modell oder eine abweichende Datei wird nicht übernommen. Für einen Abbruch einer **älteren Version ohne gespeicherten Ladeauftrag** kann dieser Nachweis nicht nachträglich erfunden werden; gegebenenfalls muss die Instanz einmal bewusst in LM Studio entladen werden.
+A known unready router returning HTTP 503 can be restarted once it reports no
+active/queued work and the control evidence matches. Foreign or unauthenticated
+services are not stopped. Extraction uses an exclusive provisioning lock. The lock
+file's existence alone does not mean a run is active; the OS lock is released when
+the process ends.
 
-Ein bekannter, nicht bereiter Router mit HTTP 503 kann kontrolliert neu gestartet werden, sobald er keine aktive/wartende Arbeit mehr meldet und der Kontrollnachweis stimmt. Ein fremder oder nicht authentifizierbarer Dienst wird nicht beendet. Die Paketextraktion wird durch eine exklusive Provisionierungssperre vor parallelen Läufen geschützt. Das Vorhandensein der Sperrdatei allein bedeutet keinen aktiven Lauf; die Dateisperre wird beim Prozessende freigegeben.
+Failure reports include script name, line and error ID. After a process timeout,
+downstream installers/services may still be running; inspect their state before
+retrying. Manual edits to installed application files are backed up and replaced
+by the embedded package on the next bootstrap. Use the updated standalone PS1,
+not just a locally patched extracted file.
 
-Bei Fehlern enthält der Provisionierungsbericht zusätzlich Skriptname, Zeilennummer und Fehlerkennung. Nach einem Prozesszeitlimit können nachgelagerte Installer oder Dienste noch arbeiten: Status prüfen, bevor du den Lauf wiederholst.
-
-Manuelle Änderungen an installierten Programmdateien werden beim nächsten Bootstrap-Lauf nach Sicherung durch den eingebetteten Paketstand ersetzt. Verwende deshalb diese aktualisierte PS1-Datei, nicht nur eine lokal korrigierte entpackte Datei.
-
-| Meldung | Nächster Schritt |
+| Message/condition | Next step |
 |---|---|
-| WinGet fehlt | Microsoft App Installer installieren/aktualisieren, danach erneut starten. |
-| `lms.exe` fehlt | LM Studio einmal öffnen und Erststart abschließen. Falls nötig die offizielle CLI-Einrichtung verwenden. |
-| Bestehende Node-/PowerShell-/LM-Studio-Version ungeeignet | Bestehende Installation gezielt aktualisieren bzw. reparieren. Der Installer ersetzt sie nicht blind. |
-| Fremdes Modell geladen | Laufende Arbeit abschließen, das Modell in LM Studio bewusst entladen, erneut starten. |
-| Kein Speicherfit | Andere GPU-/RAM-intensive Prozesse schließen, 16K-Kontext bzw. das kleinere Modellprofil wählen. |
-| Öffentlicher Listener oder belegter Port | Bestehenden Dienst prüfen; Loopback bewusst konfigurieren oder einen freien `-Port` wählen. |
-| Modell liefert keinen gültigen Tool-Aufruf | Lade-/Template-/Runtimeeinstellungen prüfen; keine Erfolgsmeldung erzwingen. |
-| Wirksame Kilo-Konfiguration weicht ab | Kompatibilität bzw. verwaltete Vorgaben prüfen; sie werden nicht umgangen. |
-| `NOT_VERIFIED` | `receipt.json` und die konkreten Agenten-/Checkausgaben lesen, Befund bearbeiten und erneut prüfen. |
-| `NEEDS_INPUT` | Konkrete Rückfrage oder Voraussetzung aus `loki_details` klären und den ergänzten Auftrag erneut starten. |
+| WinGet missing | Install/update Microsoft App Installer, then retry. |
+| `lms.exe` missing | Open LM Studio and complete first-run setup; use the official CLI setup if needed. |
+| Unsuitable existing Node/PowerShell/LM Studio | Update or repair that installation deliberately; it is not blindly replaced. |
+| Foreign model loaded | Finish active work, deliberately unload it in LM Studio and retry. |
+| No memory fit | Close GPU/RAM-heavy processes, use 16K context or a smaller profile. |
+| Public listener or occupied port | Inspect the service; explicitly configure loopback or choose a free `-Port`. |
+| No valid tool call | Inspect loading/template/runtime settings; do not force a success result. |
+| Effective Kilo configuration differs | Check compatibility/managed policy; it is not bypassed. |
+| `NOT_VERIFIED` | Read `receipt.json` and the concrete agent/check output, resolve findings and rerun. |
+| `NEEDS_INPUT` | Resolve the specific question/prerequisite from `loki_details`, then restart the amended request. |
 
-Nach Konfigurationsänderungen alle Fenster des verwalteten Profils schließen und mit dem Launcher neu öffnen. Nach dem Wechsel vom Einmodellprofil eine neue Kilo-Sitzung beginnen oder in einer alten Sitzung ausdrücklich das neue lokale Modell auswählen: manuelle Modellwahlen können sitzungsbezogen erhalten bleiben. VS Code kann sonst den bereits laufenden Prozess und dessen alte Umgebung weiterverwenden. Die erste echte GUI-Nutzung muss bestätigen, dass die lokale Modellauswahl und Rollen in der installierten Erweiterung ankommen; Setup und Launcher prüfen sowohl die separate CLI als auch die eingebettete CLI der Erweiterung. Das ersetzt dennoch keinen sichtbaren GUI-Test für jede spätere Erweiterungsversion.
+After configuration changes, close all managed-profile windows and reopen through
+the launcher. After switching from Single mode, start a new Kilo session or explicitly
+select the new local model in an old session: manual selections may persist per
+session. Otherwise VS Code may reuse a running process and its old environment.
+The first real GUI use must confirm that local models and roles reach the installed
+extension. Setup and launcher check both the standalone CLI and the extension's
+embedded CLI, but this does not replace visible GUI testing for future versions.
 
-## 11. Dateiaufbau und Sicherung
+## 11. Installation layout and backup
 
-Wesentliche Dateien in der Installation:
+- `app`: readable scripts, templates and documentation.
+- `inventory.json`, `toolchain.json`, `provisioning-report.json`: detected state,
+  selected tools and provisioning result.
+- `runtime\model-pool.json`: verified models, context limits and endpoints.
+- `runtime\model-ownership.json`: package-controlled model instance ownership.
+- `runtime\router-events.jsonl`: router events without prompt, response or API-token content.
+- `runtime\runtime-state.json`: optional Single-mode state.
+- `kilo-managed`: generated roles, rules and slash commands.
+- `runtime-profile`: managed Kilo configuration, cache and sessions.
+- `vscode-data`, `vscode-extensions`: separate VS Code data and extensions.
+- `projects`, `workspaces`, `workspaces.json`: requests, checks and external workspaces.
+- `runs`: inspectable evidence for each task run.
+- `workflow-jobs`: background Kilo jobs, events, status and cancellation signals.
+- `projects\<project-id>\LOKI-STATUS.md`: visible progress of the latest published task.
+- `backups`: prior versions of changed managed files.
 
-- `app`: lesbare Skripte und diese Anleitung.
-- `inventory.json`, `toolchain.json`, `provisioning-report.json`: erkannte Ausgangslage, konkrete Werkzeuge und Ergebnis.
-- `runtime\model-pool.json`: tatsächlich überprüfte Modelle, Kontextgrenzen und Endpunkte.
-- `runtime\model-ownership.json`: Zuordnung der vom Paket kontrollierten Modellinstanzen.
-- `runtime\router-events.jsonl`: Router-Ereignisse ohne Prompt-, Antwort- oder Tokeninhalte.
-- `runtime\runtime-state.json`: weiterhin vorhandener Zustand des optionalen Einmodellprofils.
-- `kilo-managed`: erzeugte Rollen, Arbeitsregeln und Slash-Befehle.
-- `runtime-profile`: lokale Kilo-Konfiguration, Cache und Sitzungsdaten für dieses Profil.
-- `vscode-data`, `vscode-extensions`: separate VS-Code-Daten.
-- `projects`, `workspaces`, `workspaces.json`: Aufträge, Checks und externe Projektarbeitsbereiche.
-- `runs`: nachvollziehbare Prüfbelege je Aufgabenlauf.
-- `workflow-jobs`: Hintergrundaufträge aus Kilo, Ereignisse, Status und Abbruchsignale.
-- `projects\<Projektkennung>\LOKI-STATUS.md`: sichtbarer Verlauf des zuletzt veröffentlichten Kilo-Auftrags.
-- `backups`: Sicherungen geänderter verwalteter Dateien.
+Back up requirements, tasks, customized templates, sessions and receipts using
+your normal backup process. The package does not automatically delete them. It has
+no blanket uninstaller that removes shared tools or your models.
 
-Sichere insbesondere Anforderungen, Aufgaben, angepasste Vorlagen, Sitzungsdaten und Receipts entsprechend deinem üblichen Backupverfahren. Das Paket löscht diese Daten nicht automatisch. Es enthält keinen pauschalen Uninstaller, der gemeinsam benutzte Werkzeuge oder deine Modelle entfernt.
+## 12. Primary references and validation limits
 
-## 12. Primärquellen und Validierungsgrenze
+Implementation was checked against vendor documentation and CLI sources:
 
-Die Umsetzung wurde gegen die aktuellen Herstellerdokumentationen und CLI-Quellen geprüft:
+- [LM Studio CLI](https://lmstudio.ai/docs/cli)
+- [Local load options](https://github.com/lmstudio-ai/lms/blob/main/src/subcommands/load.ts)
+- [LM Studio REST model status](https://lmstudio.ai/docs/developer/rest/list)
+- [Qwen model](https://lmstudio.ai/models/qwen/qwen3.8-27b)
+- [Review model](https://huggingface.co/openai/gpt-oss-20b)
+- [Optional small model](https://huggingface.co/Qwen/Qwen3.5-9B)
+- [Model TTL/auto-evict](https://lmstudio.ai/docs/developer/core/ttl-and-auto-evict)
+- [Exact unload](https://lmstudio.ai/docs/developer/rest/unload)
+- [Exact GGUF files](https://huggingface.co/lmstudio-community/Qwen3.8-27B-GGUF/tree/main)
+- [Kilo installation and extension channel](https://kilo.ai/docs/getting-started/installing)
+- [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cli-reference)
+- [Subagents](https://kilo.ai/docs/customize/custom-subagents)
+- [Role permissions](https://kilo.ai/docs/customize/agent-permissions)
+- [Reusable commands](https://kilo.ai/docs/customize/workflows)
+- [Compaction](https://kilo.ai/docs/customize/context/context-condensing)
+- [Role/helper models](https://kilo.ai/docs/code-with-ai/agents/model-selection)
+- [Separate autocomplete path](https://kilo.ai/docs/code-with-ai/features/autocomplete)
+- [Extension settings](https://github.com/Kilo-Org/kilocode/blob/main/packages/kilo-vscode/package.json)
+- [VS Code CLI](https://code.visualstudio.com/docs/configure/command-line)
+- [WinGet installation](https://learn.microsoft.com/en-us/windows/package-manager/winget/install)
+- [Lovable Git sync](https://docs.lovable.dev/integrations/git-sync-overview)
 
-- LM Studio CLI: https://lmstudio.ai/docs/cli
-- LM Studio lokale Modellladeoptionen: https://github.com/lmstudio-ai/lms/blob/main/src/subcommands/load.ts
-- LM Studio REST-Modellstatus: https://lmstudio.ai/docs/developer/rest/list
-- Qwen-Modell: https://lmstudio.ai/models/qwen/qwen3.8-27b
-- Review-Modell: https://huggingface.co/openai/gpt-oss-20b
-- Optionales kleines Modell: https://huggingface.co/Qwen/Qwen3.5-9B
-- Modellwechsel/Auto-Evict: https://lmstudio.ai/docs/developer/core/ttl-and-auto-evict
-- Exaktes Entladen: https://lmstudio.ai/docs/developer/rest/unload
-- Exakte GGUF-Dateien: https://huggingface.co/lmstudio-community/Qwen3.8-27B-GGUF/tree/main
-- Kilo-Installation und Erweiterungskanal: https://kilo.ai/docs/getting-started/installing
-- Kilo CLI: https://kilo.ai/docs/code-with-ai/platforms/cli-reference
-- Unteragenten: https://kilo.ai/docs/customize/custom-subagents
-- Rollenrechte: https://kilo.ai/docs/customize/agent-permissions
-- Wiederverwendbare Befehle: https://kilo.ai/docs/customize/workflows
-- Kontextkomprimierung: https://kilo.ai/docs/customize/context/context-condensing
-- Rollen- und Hilfsmodelle: https://kilo.ai/docs/code-with-ai/agents/model-selection
-- Separater Autocomplete-Pfad: https://kilo.ai/docs/code-with-ai/features/autocomplete
-- Aktuelle Erweiterungseinstellungen: https://github.com/Kilo-Org/kilocode/blob/main/packages/kilo-vscode/package.json
-- VS-Code-Kommandozeile: https://code.visualstudio.com/docs/configure/command-line
-- WinGet-Installation: https://learn.microsoft.com/en-us/windows/package-manager/winget/install
-- Lovable/Git-Synchronisierung: https://docs.lovable.dev/integrations/git-sync-overview
-
-Die beiliegenden Tests verwenden PowerShell 7 und echte temporäre Prozesse/Git-Repositories, simulieren aber Modellantworten und Windows-/GPU-Grenzen. Sie testen das Kontrollverhalten, keine Modellintelligenz. Der separate `VALIDATION.md` beschreibt den konkret ausgeführten Stand. Der abschließende Windows-/GPU-/VS-Code-Test erfolgt beim ersten Einsatz auf deinem Windows-PC.
+Bundled tests use PowerShell 7 and real temporary processes/Git repositories while
+simulating model responses and Windows/GPU boundaries. They test control behavior,
+not model intelligence. [VALIDATION.md](VALIDATION.md) records executed checks and
+their limits. Final Windows/GPU/VS Code acceptance happens on your target machine.

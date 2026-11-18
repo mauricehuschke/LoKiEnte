@@ -48,7 +48,7 @@ $larger=[pscustomobject]@{Gpu=[pscustomobject]@{FreeBytes=24GB};FreeRamBytes=26G
 $upgraded=Get-ShadowRecommendedModel -Role coder -Catalog $catalog -Hardware $larger
 Assert-Selection ($upgraded.Id -ceq 'qwen38-27b') 'Additional RAM and VRAM can produce a stronger model recommendation on a later run'
 foreach($answer in @('2','3','','n')){$script:answers.Enqueue($answer)}
-Assert-SelectionThrow {Select-ShadowModels -Hardware $hardware -Downloaded @()} 'abgebrochen' 'Declining selection prevents downloads'
+Assert-SelectionThrow {Select-ShadowModels -Hardware $hardware -Downloaded @()} 'cancelled' 'Declining selection prevents downloads'
 $root=Join-Path ([IO.Path]::GetTempPath()) ('shadow-selection-'+[guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($root)
 try{
@@ -64,7 +64,7 @@ try{
     Copy-ShadowModelFile -Source $source -ModelRoot $modelRoot -Repository 'test/repo' -File $file
     Assert-Selection ([IO.File]::ReadAllText($target) -ceq 'synthetic completed model') 'Identical existing target is reused'
     [IO.File]::WriteAllText($target,'different user content')
-    Assert-SelectionThrow {Copy-ShadowModelFile -Source $source -ModelRoot $modelRoot -Repository 'test/repo' -File $file} 'existiert' 'Existing conflicting model is never overwritten'
+    Assert-SelectionThrow {Copy-ShadowModelFile -Source $source -ModelRoot $modelRoot -Repository 'test/repo' -File $file} 'exists' 'Existing conflicting model is never overwritten'
     Assert-Selection ([IO.File]::ReadAllText($target) -ceq 'different user content') 'Conflicting user file remains unchanged'
     $downloadRoot=Join-Path $root 'downloads'
     $fixture=[ordered]@{Id='fixture';Repository='test/repo';Revision=('a'*40)}
@@ -106,7 +106,7 @@ try{
     $corrupt=Join-Path $downloadRoot 'corrupt\model.gguf.partial'
     [IO.File]::WriteAllBytes($corrupt,(New-Object byte[] $bytes.Length))
     $priorAttempts=$script:attempts
-    Assert-SelectionThrow {Invoke-ShadowModelDownload -Model $corruptModel -File $file -DownloadRoot $downloadRoot} 'falschen Hash' 'Complete but corrupt partial file is preserved and rejected'
+    Assert-SelectionThrow {Invoke-ShadowModelDownload -Model $corruptModel -File $file -DownloadRoot $downloadRoot} 'incorrect hash' 'Complete but corrupt partial file is preserved and rejected'
     Assert-Selection ((Test-Path -LiteralPath $corrupt) -and $script:attempts -eq $priorAttempts) 'Corrupt user data is not deleted or silently replaced'
     $targetRoot=Join-Path $root 'registration target'
     [void][IO.Directory]::CreateDirectory($targetRoot)
@@ -122,7 +122,7 @@ try{
     $outside=Join-Path $root 'outside';[void][IO.Directory]::CreateDirectory($outside)
     $linkedRoot=Join-Path $root 'linked-root'
     $null=New-Item -ItemType Junction -Path $linkedRoot -Target $outside
-    Assert-SelectionThrow {Copy-ShadowModelFile -Source $source -ModelRoot $linkedRoot -Repository 'test/repo' -File $file} 'Verknuepfung' 'Model destination junction is refused'
+    Assert-SelectionThrow {Copy-ShadowModelFile -Source $source -ModelRoot $linkedRoot -Repository 'test/repo' -File $file} 'link' 'Model destination junction is refused'
     Assert-Selection (@(Get-ChildItem -LiteralPath $outside -Force).Count -eq 0) 'Junction rejection leaves external files untouched'
     [IO.Directory]::Delete($linkedRoot)
     $raceRoot=Join-Path $root 'race-root'
@@ -135,7 +135,9 @@ try{
         }
         return $true
     }
-    Assert-SelectionThrow {Copy-ShadowModelFile -Source $source -ModelRoot $raceRoot -Repository 'test/repo' -File $file} 'exist|already|vorhanden' 'Concurrent creation of final destination causes an explicit failure'
+    $raceFailure=$null
+    try{Copy-ShadowModelFile -Source $source -ModelRoot $raceRoot -Repository 'test/repo' -File $file}catch{$raceFailure=$_.Exception.GetBaseException()}
+    Assert-Selection ($raceFailure -is [IO.IOException]) 'Concurrent creation of final destination causes an explicit I/O failure'
     Assert-Selection ([IO.File]::ReadAllText($raceTarget) -ceq 'concurrent user file') 'Atomic publication never replaces a concurrently created model'
     [pscustomobject]@{suite='Model selection and additive files';passed=$true;checks=$count}|ConvertTo-Json
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}

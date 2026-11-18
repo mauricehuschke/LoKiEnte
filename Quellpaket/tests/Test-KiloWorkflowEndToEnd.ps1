@@ -15,6 +15,7 @@ try{
     Get-ChildItem -LiteralPath $SourceRoot -File | Where-Object {$_.Extension -in @('.ps1','.mjs','.md')} | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination (Join-Path (Join-Path $install 'app') $_.Name)
     }
+    Copy-Item -LiteralPath (Join-Path $SourceRoot 'templates') -Destination (Join-Path $install 'app/templates') -Recurse
     $node=(Get-Command node -CommandType Application|Select-Object -First 1).Source
     $pwsh=(Get-Process -Id $PID).Path
     $git=(Get-Command git -CommandType Application|Select-Object -First 1).Source

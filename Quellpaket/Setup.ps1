@@ -56,10 +56,10 @@ function Get-ShadowStartCommands {
 function Get-ShadowKiloExtensionVersion {
     param([AllowEmptyString()][string]$Output)
     $lines=@($Output -split '\r?\n'|Where-Object {$_ -match '(?i)^kilocode\.kilo-code(?:@|[ \t]*$)'})
-    if($lines.Count -gt 1){throw 'Mehrere Kilo-Erweiterungsversionen im verwalteten Profil gemeldet; keine automatische Aenderung.'}
+    if($lines.Count -gt 1){throw 'Multiple Kilo extension versions reported in the managed profile; no automatic change.'}
     if(-not $lines.Count){return $null}
     if($lines[0] -notmatch '(?i)^kilocode\.kilo-code@(\d+\.\d+\.\d+)[ \t]*$'){
-        throw 'Die installierte Kilo-Erweiterung meldet keine eindeutig unterstuetzbare Versionsnummer.'
+        throw 'The installed Kilo extension does not report an unambiguously supported version number.'
     }
     return $Matches[1]
 }
@@ -78,7 +78,7 @@ function Install-ShadowLanceDb {
     $marker=Join-Path $root 'shadow-lancedb-owner.txt'
     if((Test-Path -LiteralPath $root) -and
        (-not(Test-Path -LiteralPath $marker -PathType Leaf) -or [IO.File]::ReadAllText($marker) -cne 'shadow-lancedb-0.26.2')){
-        throw 'Unbekanntes LanceDB-Verzeichnis bleibt unveraendert. Das eigene Verzeichnis pruefen.'
+        throw 'Unknown LanceDB directory remains unchanged. Inspect the custom directory.'
     }
     if(-not(Test-Path -LiteralPath $entry -PathType Leaf)){
         if(-not(Test-Path -LiteralPath $root)){
@@ -87,9 +87,9 @@ function Install-ShadowLanceDb {
         }
         $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--prefix',$root,'@lancedb/lancedb@0.26.2','--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
     }
-    if(-not(Test-Path -LiteralPath $manifest -PathType Leaf)){throw 'LanceDB-Manifest fehlt.'}
+    if(-not(Test-Path -LiteralPath $manifest -PathType Leaf)){throw 'LanceDB manifest missing.'}
     $package=Get-Content -LiteralPath $manifest -Raw|ConvertFrom-Json
-    if($package.name -cne '@lancedb/lancedb' -or $package.version -cne '0.26.2'){throw 'LanceDB-Version stimmt nicht mit der Kilo-Integration ueberein.'}
+    if($package.name -cne '@lancedb/lancedb' -or $package.version -cne '0.26.2'){throw 'LanceDB version does not match the Kilo integration.'}
     $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @('-e','require(process.argv[1])',$entry) -Quiet -TimeoutSeconds 60
     return $entry
 }
@@ -98,26 +98,26 @@ function Resolve-ShadowSetupLms {
     param([Parameter(Mandatory)][string]$StudioPath)
     try {
         $lms=Resolve-LocalLmsCommand
-        if(-not $lms){throw 'LM-Studio-CLI ist noch nicht verfuegbar.'}
+        if(-not $lms){throw 'LM Studio CLI is not available yet.'}
     } catch {
         $message=@"
 
 ======================================================================
-  MANUELLE AKTION ERFORDERLICH: LM Studio einrichten
+  MANUAL ACTION REQUIRED: Set up LM Studio
 ======================================================================
 
-1. LM Studio selbst oeffnen:
+1. Open LM Studio yourself:
    $StudioPath
-2. Erststartdialoge abschliessen und die LM-Studio-CLI
-   gegebenenfalls einrichten oder reparieren.
-3. Ein neues Terminal oeffnen und das Provisionierungsskript
-   mit denselben Parametern erneut starten (ohne -AuditOnly).
+2. Complete first-run dialogs and configure or repair
+   the LM Studio CLI if necessary.
+3. Open a new terminal and rerun provisioning with the
+   same parameters (without -AuditOnly).
 
-Ursache:
+Cause:
   $($_.Exception.Message)
 
-Die Provisionierung ist angehalten und wird nicht automatisch fortgesetzt.
-Bereits eingerichtete Komponenten bleiben erhalten.
+Provisioning is paused and will not resume automatically.
+Already configured components are preserved.
 "@
         $action=[InvalidOperationException]::new($message)
         $action.Data['ShadowManualAction']='LM_STUDIO_INITIALIZATION'
@@ -147,37 +147,37 @@ function Assert-ShadowSetupModels {
     $lines=[Collections.Generic.List[string]]::new()
     $lines.Add('')
     $lines.Add('======================================================================')
-    $lines.Add('  MANUELLE AKTION ERFORDERLICH: Modelle herunterladen')
+    $lines.Add('  MANUAL ACTION REQUIRED: Download models')
     $lines.Add('======================================================================')
     $lines.Add('')
-    $lines.Add('Die folgenden fehlenden Modelle selbst in LM Studio herunterladen.')
-    $lines.Add('Bitte jeweils genau die angegebene Datei und Quantisierung waehlen.')
+    $lines.Add('Download the following missing models yourself in LM Studio.')
+    $lines.Add('Choose exactly the specified file and quantization for each model.')
     $lines.Add('')
     if($ModelKey){
-        $lines.Add("  Ausgewaehltes Modell: $ModelKey")
-        $lines.Add('  Lokal nicht eindeutig gefunden. In LM Studio herunterladen und')
-        $lines.Add('  den exakten path oder modelKey mit lms ls --json pruefen.')
+        $lines.Add("  Selected model: $ModelKey")
+        $lines.Add('  No unique local match found. Download in LM Studio and')
+        $lines.Add('  check the exact path or modelKey with lms ls --json.')
         $lines.Add('')
     }else{
         $number=0
         foreach($item in $missing){
             $number++
             $lines.Add("  $number. [$($item.Alias)] $($item.Name)")
-            $lines.Add("     Datei:  $($item.Definition.ExpectedPath)")
-            $lines.Add('     Quelle:')
+            $lines.Add("     File:   $($item.Definition.ExpectedPath)")
+            $lines.Add('     Source:')
             $lines.Add("       $($item.Definition.DownloadUrl)")
             $lines.Add('')
         }
     }
-    $lines.Add('Naechste Schritte:')
-    $lines.Add('  1. Downloads in LM Studio vollstaendig abschliessen.')
-    $lines.Add('  2. Dasselbe Provisionierungsskript mit denselben Parametern')
-    $lines.Add('     erneut starten (ohne -AuditOnly).')
+    $lines.Add('Next steps:')
+    $lines.Add('  1. Complete all downloads in LM Studio.')
+    $lines.Add('  2. Run the same provisioning script with the same parameters')
+    $lines.Add('     again (without -AuditOnly).')
     $lines.Add('')
-    $lines.Add('Das LM-Studio-Modellverzeichnis bleibt unveraendert.')
-    $lines.Add('Vorhandene Modelle und eingerichtete Komponenten bleiben erhalten.')
-    $lines.Add('Die Provisionierung wird nicht automatisch fortgesetzt.')
-    $lines.Add('Status: INCOMPLETE (manueller Schritt ausstehend; Exitcode 1)')
+    $lines.Add('The LM Studio model directory remains unchanged.')
+    $lines.Add('Existing models and configured components are preserved.')
+    $lines.Add('Provisioning will not resume automatically.')
+    $lines.Add('Status: INCOMPLETE (manual action pending; exit code 1)')
     $lines.Add('')
     $action=[InvalidOperationException]::new(($lines -join [Environment]::NewLine))
     $action.Data['ShadowManualAction']='MODEL_DOWNLOAD'
@@ -190,7 +190,7 @@ function Get-ShadowKiloEntry {
     if (-not (Test-Path -LiteralPath $manifest)) { return $null }
     $package=Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json -AsHashtable
     if ($package -isnot [Collections.IDictionary] -or (Get-LrProperty $package 'name') -ne '@kilocode/cli') {
-        Write-ShadowMessage "Kein gueltiges Kilo-Paketmanifest: $manifest" 'WARN'
+        Write-ShadowMessage "No valid Kilo package manifest: $manifest" 'WARN'
         return $null
     }
     $bin=Get-LrProperty $package 'bin'
@@ -198,7 +198,7 @@ function Get-ShadowKiloEntry {
     if (-not $relative) { return $null }
     $entry=[IO.Path]::GetFullPath((Join-Path $PackageRoot $relative))
     if (-not $entry.StartsWith([IO.Path]::GetFullPath($PackageRoot)+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Unerwarteter CLI-Einstieg ausserhalb des installierten Pakets.'
+        throw 'Unexpected CLI entry point outside installed package.'
     }
     if (-not (Test-Path -LiteralPath $entry -PathType Leaf)) { return $null }
     $version=ConvertFrom-ShadowKiloMetadata -Json ($package|ConvertTo-Json -Depth 30)
@@ -208,11 +208,11 @@ function Get-ShadowKiloEntry {
 function ConvertFrom-ShadowKiloMetadata {
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Json)
     try { $info=ConvertFrom-Json -InputObject $Json -AsHashtable -NoEnumerate -ErrorAction Stop }
-    catch { throw 'npm lieferte kein gueltiges JSON fuer die Kilo-Version. Registry/Proxy und npm-Ausgabe pruefen.' }
+    catch { throw 'npm returned no valid JSON for the Kilo version. Check registry/proxy and npm output.' }
     if ($info -is [array] -and $info.Count -eq 1) { $info=$info[0] }
     $version=if ($info -is [string]) { $info } elseif ($info -is [Collections.IDictionary]) { Get-LrProperty $info 'version' } else { $null }
     if ($version -isnot [string] -or $version -cnotmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
-        throw 'npm lieferte keine eindeutige Kilo-Version. Erwartet wird genau eine Versionszeichenfolge oder ein Objekt mit version.'
+        throw 'npm did not return a unique Kilo version. Expected exactly one version string or an object with version.'
     }
     return $version
 }
@@ -224,11 +224,11 @@ function Test-ShadowKiloEntry {
     $text=$help.StdOut+"`n"+$help.StdErr
     $missing=@('--format','--agent','--dir'|Where-Object {$text -notmatch ([regex]::Escape($_)+'(?=[\s<,=]|$)')})
     if($help.ExitCode -ne 0){
-        Write-ShadowMessage "Kilo-CLI-Hilfe meldete Exitcode $($help.ExitCode); Ausgabe wurde nicht als erfolgreiche Optionspruefung gewertet." 'WARN'
+        Write-ShadowMessage "Kilo CLI help returned exit code $($help.ExitCode); output was not accepted as successful option verification." 'WARN'
         return $false
     }
     if($missing.Count){
-        Write-ShadowMessage "Kilo-CLI-Hilfe bestaetigt erforderliche Optionen nicht: $($missing -join ', ')." 'WARN'
+        Write-ShadowMessage "Kilo CLI help does not confirm required options: $($missing -join ', ')." 'WARN'
         return $false
     }
     return $true
@@ -250,11 +250,11 @@ function Install-ShadowKilo {
     }
     $current=if($entry){$entry.kiloVersion -as [version]}else{$null}
     if ($entry -and (-not $AcceptedVersion -or ($current -and $current -ge [version]$AcceptedVersion)) -and (Test-ShadowKiloEntry $entry)) {
-        Write-ShadowMessage "Verwende vorhandene verwaltete Kilo CLI $($entry.kiloVersion)."
+        Write-ShadowMessage "Using existing managed Kilo CLI $($entry.kiloVersion)."
         return $entry
     }
     if($current -and $AcceptedVersion -and $current -gt [version]$AcceptedVersion){
-        throw "Die neuere installierte Kilo CLI $current hat die Kompatibilitaetspruefung nicht bestanden. Sie wird nicht herabgestuft."
+        throw "The newer installed Kilo CLI $current failed compatibility checks. It will not be downgraded."
     }
     if (-not $AcceptedVersion -and -not $entry) {
         $existing=Get-Command kilo -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -266,7 +266,7 @@ function Install-ShadowKilo {
                 $entry=Get-ShadowKiloEntry -PackageRoot $existingPackage -NodePath $NodePath
             }
             if ($entry -and (Test-ShadowKiloEntry $entry)) {
-                Write-ShadowMessage 'Verwende vorhandene kompatible Kilo CLI; deren Konfiguration wird nicht veraendert.'
+                Write-ShadowMessage 'Using existing compatible Kilo CLI; its configuration remains unchanged.'
                 return $entry
             }
         }
@@ -284,24 +284,24 @@ function Install-ShadowKilo {
     $candidate=Get-ShadowKiloEntry -PackageRoot $privateRoot -NodePath $NodePath
     if($candidate -and $candidate.kiloVersion -ceq $version -and (Test-ShadowKiloEntry $candidate)){return $candidate}
     [IO.Directory]::CreateDirectory($prefix) | Out-Null
-    Write-ShadowMessage "Installiere Kilo CLI $version in das eigene Werkzeugverzeichnis ..."
+    Write-ShadowMessage "Installing Kilo CLI $version in the private tool directory ..."
     $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--prefix',$prefix,"@kilocode/cli@$version",'--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
     $entry=Get-ShadowKiloEntry -PackageRoot $privateRoot -NodePath $NodePath
-    if (-not $entry -or $entry.kiloVersion -cne $version) { throw 'Die installierte Kilo-Version stimmt nicht mit der angeforderten Version ueberein.' }
-    if (-not (Test-ShadowKiloEntry $entry)) { throw 'Installierte Kilo CLI konnte nicht gestartet werden oder ihre Hilfe bestaetigt die benoetigten Agenten-/JSON-Optionen nicht. Vorherigen Warnhinweis pruefen.' }
+    if (-not $entry -or $entry.kiloVersion -cne $version) { throw 'Installed Kilo version does not match the requested version.' }
+    if (-not (Test-ShadowKiloEntry $entry)) { throw 'Installed Kilo CLI could not start or its help does not confirm required agent/JSON options. Check the preceding warning.' }
     return $entry
 }
 
 
 $report=$null
 try {
-    if (-not $IsWindows -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'X64') { throw 'Dieses Provisionierungsskript ist fuer Windows x64 vorgesehen.' }
-    if($ModelMode -eq 'Single' -and $IncludeFastModel){throw 'IncludeFastModel benoetigt ModelMode Dual.'}
-    if($ModelMode -ne 'Dual' -and $AllowPartialGpuOffload){throw 'AllowPartialGpuOffload wird nur im Modellpool (ModelMode Dual) unterstuetzt.'}
-    if($ModelMode -eq 'Dual' -and ($ModelKey -or $PreferredModel -eq 'GptOss20B')){throw 'ModelMode Dual nutzt den geprueften Qwen/GPT-OSS-Pool. Fuer ein eigenes Einzelmodell ModelMode Single verwenden.'}
-    if($ModelMode -eq 'Dual' -and $Port -eq $RouterPort){throw 'Backend- und Routerport muessen verschieden sein.'}
-    if($ApiTokenEnvironmentVariable -and $ApiTokenEnvironmentVariable -notmatch '^[A-Za-z_][A-Za-z0-9_]*$'){throw 'Ungueltiger Name der API-Token-Umgebungsvariable.'}
-    foreach($project in $ProjectPath){if(-not(Test-Path -LiteralPath $project -PathType Container)){throw "Projektverzeichnis fehlt: $project"}}
+    if (-not $IsWindows -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'X64') { throw 'This provisioning script is designed for Windows x64.' }
+    if($ModelMode -eq 'Single' -and $IncludeFastModel){throw 'IncludeFastModel requires ModelMode Dual.'}
+    if($ModelMode -ne 'Dual' -and $AllowPartialGpuOffload){throw 'AllowPartialGpuOffload is supported only in the model pool (ModelMode Dual).'}
+    if($ModelMode -eq 'Dual' -and ($ModelKey -or $PreferredModel -eq 'GptOss20B')){throw 'ModelMode Dual uses the verified Qwen/GPT-OSS pool. For a custom single model, use ModelMode Single.'}
+    if($ModelMode -eq 'Dual' -and $Port -eq $RouterPort){throw 'Backend and router ports must be different.'}
+    if($ApiTokenEnvironmentVariable -and $ApiTokenEnvironmentVariable -notmatch '^[A-Za-z_][A-Za-z0-9_]*$'){throw 'Invalid API token environment variable name.'}
+    foreach($project in $ProjectPath){if(-not(Test-Path -LiteralPath $project -PathType Container)){throw "Project directory not found: $project"}}
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
     [IO.Directory]::CreateDirectory($InstallRoot) | Out-Null
     $report=[ordered]@{schema=1;bundleVersion=$BundleVersion;payloadSha256=$PayloadSha256;startedUtc=[DateTime]::UtcNow.ToString('o');status='IN_PROGRESS';installRoot=$InstallRoot;steps=@();warnings=@();allowUnfitAttempt=[bool]$AllowUnfitAttempt}
@@ -310,20 +310,20 @@ try {
     $inventory=Get-ShadowInventory
     $report.inventoryFile='inventory.json'
     $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'inventory.json') -Content ($inventory|ConvertTo-Json -Depth 15) -BackupRoot (Join-Path $InstallRoot 'backups/inventory')
-    if (-not $inventory.GPU) { throw 'NVIDIA-GPU nicht ueber nvidia-smi erreichbar. Es werden keine Grafiktreiber automatisch ersetzt.' }
+    if (-not $inventory.GPU) { throw 'NVIDIA GPU not reachable through nvidia-smi. Graphics drivers will not be replaced automatically.' }
     $winget=Resolve-ShadowTool -Name winget
-    if (-not $winget) { throw 'WinGet fehlt. Windows App Installer installieren/aktualisieren und dieses Skript erneut ausfuehren.' }
+    if (-not $winget) { throw 'WinGet missing. Install/update Windows App Installer and rerun this script.' }
     $git=Install-ShadowPackage -Tool git -PackageId 'Git.Git' -WingetPath $winget -AcceptedVersion $versions.git
     $node=Install-ShadowPackage -Tool node -PackageId 'OpenJS.NodeJS.LTS' -WingetPath $winget -AcceptedVersion $versions.node
     $curl=Install-ShadowPackage -Tool curl -PackageId 'cURL.cURL' -WingetPath $winget -AcceptedVersion $versions.curl
     $curlVersion=(Invoke-ShadowNative -FilePath $curl -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut
-    if($curlVersion -notmatch '(?m)^curl \d+\.\d+\.\d+'){throw 'curl ist vorhanden, aber nicht als funktionierende curl-CLI verifizierbar.'}
+    if($curlVersion -notmatch '(?m)^curl \d+\.\d+\.\d+'){throw 'curl exists but cannot be verified as a working curl CLI.'}
     $code=Install-ShadowPackage -Tool code -PackageId 'Microsoft.VisualStudioCode' -WingetPath $winget -AcceptedVersion $versions.vsCode
     $studio=Install-ShadowPackage -Tool lmstudio -PackageId 'ElementLabs.LMStudio' -WingetPath $winget -AcceptedVersion $versions.lmStudio
     $npm=Resolve-ShadowNpm -NodePath $node
     $nodeVersion=(Invoke-ShadowNative -FilePath $node -ArgumentList @('--version') -Quiet).StdOut.Trim()
     if ($nodeVersion -notmatch '^v(\d+)\.' -or [int]$Matches[1] -lt 20) {
-        throw "Vorhandenes Node $nodeVersion ist fuer diese Basis zu alt. Es wurde nicht ersetzt. Eine passende Node-LTS-Version bereitstellen und erneut starten."
+        throw "Existing Node $nodeVersion is too old for this baseline. It was not replaced. Provide a suitable Node LTS version and retry."
     }
     $kilo=Install-ShadowKilo -NodePath $node -NpmEntry $npm -Root $InstallRoot -AcceptedVersion $versions.kiloCli
     $report.toolVersions=[ordered]@{
@@ -355,7 +355,7 @@ try {
     $settings=[ordered]@{}
     if (Test-Path -LiteralPath $settingsFile) {
         $settings=Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json -AsHashtable -NoEnumerate
-        if ($settings -isnot [Collections.IDictionary]) { throw 'Das settings.json im verwalteten VS-Code-Profil muss ein JSON-Objekt enthalten.' }
+        if ($settings -isnot [Collections.IDictionary]) { throw 'The managed VS Code profile settings.json must contain a JSON object.' }
     }
     foreach($key in $managedSettings.Keys){$settings[$key]=$managedSettings[$key]}
     $profiles='terminal.integrated.profiles.windows'
@@ -384,12 +384,12 @@ try {
     }
     $extensionList=Invoke-ShadowCodeCli -CodePath $code -Arguments ($codeArgs+@('--list-extensions','--show-versions'))
     $extensionVersion=Get-ShadowKiloExtensionVersion -Output $extensionList.StdOut
-    if(-not $extensionVersion){throw 'Kilo-Erweiterung wurde im verwalteten VS-Code-Profil nicht gefunden.'}
-    if($extensionSpec -and $extensionVersion -cne $versions.kiloVsCode){throw 'VS Code meldet nach der Installation nicht die freigegebene Kilo-Version.'}
+    if(-not $extensionVersion){throw 'Kilo extension not found in the managed VS Code profile.'}
+    if($extensionSpec -and $extensionVersion -cne $versions.kiloVsCode){throw 'VS Code does not report the approved Kilo version after installation.'}
     $report.kiloVsCodeExtensionVersion=$extensionVersion
     $bundledKilo=Get-ShadowBundledKilo -CodePath $code -InstallRoot $InstallRoot
     $toolchain.bundledKiloExecutable=$bundledKilo
-    $report.steps+=@('Git/Node/curl/VSCode/LMStudio vorhanden','Kilo CLI vorhanden','Kilo VSCode Erweiterung vorhanden','Ripgrep geprueft')
+    $report.steps+=@('Git/Node/curl/VSCode/LMStudio available','Kilo CLI available','Kilo VS Code extension available','Ripgrep verified')
 
     $lms=Resolve-ShadowSetupLms -StudioPath $studio
     $poolPath=Join-Path $InstallRoot 'runtime/model-pool.json'
@@ -406,7 +406,7 @@ try {
         if(Test-Path -LiteralPath $selectionFile -PathType Leaf){
             $savedSelection=Get-Content -LiteralPath $selectionFile -Raw|ConvertFrom-Json
             if((Get-LrProperty $savedSelection 'schema') -ne 1 -or $null -eq $savedSelection.PSObject.Properties['roles'] -or $savedSelection.roles -isnot [array]){
-                throw 'Gespeicherte Modellauswahl ist ungueltig. Bestehende Dateien bleiben erhalten.'
+                throw 'Saved model selection is invalid. Existing files are preserved.'
             }
             $previousProfiles=@($savedSelection.roles)
         }else{$previousProfiles=if($previousPool){@(Get-LrProperty $previousPool 'Profiles' @())}else{@()}}
@@ -432,26 +432,26 @@ try {
         $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable -EmbeddingModelId $embedding.InstanceId -EmbeddingApiBaseUrl $pool.BackendApiBaseUrl
         $report.runtime=$pool;$report.router=$router
         $report.embedding=$embedding
-        $report.warnings+=@('Lokale Indexierung ist konfiguriert; die Freigabe und der Abschluss muessen in Kilo fuer jedes Projekt geprueft werden.')
+        $report.warnings+=@('Local indexing is configured; permission and completion must be checked in Kilo for each project.')
         foreach($profile in $pool.Profiles){
-            if($profile.VerificationState -ceq 'Deferred'){$report.warnings+=@("Modell $($profile.Alias) ist heruntergeladen, aber noch ungeprueft: $($profile.VerificationMessage)")}
-            elseif((Get-LrProperty $profile.Estimate 'ReserveOverride' $false)){$report.warnings+=@("Modell $($profile.Alias) wurde ohne LoKiEnte-Speicherreserve getestet.")}
+            if($profile.VerificationState -ceq 'Deferred'){$report.warnings+=@("Model $($profile.Alias) is downloaded but unverified: $($profile.VerificationMessage)")}
+            elseif((Get-LrProperty $profile.Estimate 'ReserveOverride' $false)){$report.warnings+=@("Model $($profile.Alias) was tested without LoKiEnte memory reserve.")}
         }
-        if($embedding.Status -ceq 'Deferred'){$report.warnings+=@("CPU-Embeddingmodell ist noch nicht betriebsbereit: $($embedding.Message)")}
-        elseif(Get-LrProperty $embedding 'ReserveOverride' $false){$report.warnings+=@('CPU-Embeddingmodell wurde ohne LoKiEnte-Speicherreserve getestet.')}
+        if($embedding.Status -ceq 'Deferred'){$report.warnings+=@("CPU embedding model is not ready yet: $($embedding.Message)")}
+        elseif(Get-LrProperty $embedding 'ReserveOverride' $false){$report.warnings+=@('CPU embedding model was tested without LoKiEnte memory reserve.')}
         $report.smokeTests=@($pool.Profiles|ForEach-Object {@{model=$_.Alias;checks=$_.SmokeTests}})
     }else{
-        $report.warnings+=@('Die lokale semantische Indexierung wird im Single-Modus nicht eingerichtet.')
+        $report.warnings+=@('Local semantic indexing is not configured in Single mode.')
         if((Test-Path -LiteralPath $poolPath) -and -not $ModelKey){
             $alias=if($PreferredModel -eq 'GptOss20B'){'review'}else{[string](Get-LrProperty $previousPool 'PrimaryAlias' 'coder')}
             $null=Switch-ShadowLocalModel -InstallRoot $InstallRoot -Alias $alias
         }
         $singleProfile=if($selectedDefinitions.Count){$selectedDefinitions[0].Definition}else{$null}
         $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -PreferredModel $PreferredModel -ModelKey $ModelKey -SelectedProfile $singleProfile -ContextLength $ContextLength -Port $Port -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable -AllowUnfitAttempt:$AllowUnfitAttempt
-        if($runtime.Status -cnotin @('Ready','Deferred')){throw "Unbekannter Modellstatus: $($runtime.Status)"}
-        $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOCH NICHT GEPRUEFT]'}else{'LoKiEnte local - verified workflow'}
-        if($runtime.Status -ceq 'Deferred'){$report.warnings+=@("Einzelmodell ist heruntergeladen, aber noch ungeprueft: $($runtime.VerificationMessage)")}
-        elseif(Get-LrProperty $runtime.Estimate 'ReserveOverride' $false){$report.warnings+=@('Einzelmodell wurde ohne LoKiEnte-Speicherreserve getestet.')}
+        if($runtime.Status -cnotin @('Ready','Deferred')){throw "Unknown model status: $($runtime.Status)"}
+        $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOT YET VERIFIED]'}else{'LoKiEnte local - verified workflow'}
+        if($runtime.Status -ceq 'Deferred'){$report.warnings+=@("Single model is downloaded but unverified: $($runtime.VerificationMessage)")}
+        elseif(Get-LrProperty $runtime.Estimate 'ReserveOverride' $false){$report.warnings+=@('Single model was tested without LoKiEnte memory reserve.')}
         $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
         $report.runtime=$runtime;$report.smokeTests=$runtime.SmokeTests
     }
@@ -462,43 +462,24 @@ try {
     $searchConfig=$configuration.Config|ConvertTo-Json -Depth 40 -Compress
     Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -ConfigJson $searchConfig
     Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $bundledKilo -ConfigJson $searchConfig
-    $report.steps+=@('Dateisuche in Kilo CLI und VS-Code-Erweiterung geprueft')
+    $report.steps+=@('File search verified in Kilo CLI and VS Code extension')
     if(($ModelMode -eq 'Dual' -and $pool.VerificationStatus -cne 'Verified') -or
        ($ModelMode -eq 'Single' -and $runtime.Status -ceq 'Deferred')){
-        $report.steps+=@('Lokaler Endpunkt konfiguriert; mindestens ein Modelltest steht aus')
-    }else{$report.steps+=@('Modell und lokaler Endpunkt verifiziert')}
-    $report.steps+=@('Agenten/Rollen/Workflows erzeugt und wirksame CLI-Konfiguration geprueft')
+        $report.steps+=@('Local endpoint configured; at least one model test remains pending')
+    }else{$report.steps+=@('Model and local endpoint verified')}
+    $report.steps+=@('Agents/roles/workflows generated and effective CLI configuration verified')
 
     $welcome=Join-Path $InstallRoot 'welcome'
     [IO.Directory]::CreateDirectory($welcome)|Out-Null
-    $welcomeText=@'
-# LoKiEnte
-
-Dieses Fenster verwendet ein eigenes VS-Code-Profil und lokale Modelle.
-
-1. Starte die Desktopverknuepfung LoKiEnte. Waehle ein bekanntes Projekt per Nummer oder N fuer einen weiteren vorhandenen Projektordner (Pfad eingeben). 0 bricht vor dem Modellstart ab. Ein direkter Launcher-Aufruf mit -ProjectPath oeffnet das Projekt ohne Menue.
-2. Chat/Planung: Kilo-Seitenleiste. Rollen und /feature, /bugfix, /refactor, /review, /architecture sind vordefiniert.
-3. Codeaenderungen direkt in shadow-chat eingeben. Kriterien und checks.json werden automatisch vorbereitet und unabhaengig geprueft.
-4. Zum Ausprobieren im Launcher welcome/workflow-test waehlen. Der fertige Testauftrag steht in [workflow-test/README.md](workflow-test/README.md). Das Beispiel nutzt nur kuenstliche Daten, Node-Bordmittel und ein eigenes lokales Git-Repository.
-5. Nur ein bestandener Aufgabenlauf darf VERIFIED melden. Der Status bezieht sich auf genau den geprueften Arbeitsbaum und die konfigurierten Pruefungen.
-
-Fuer semantische Suche im Dual-Modus im Kilo-Bereich Einstellungen > Indexing
-oeffnen und fuer das jeweilige Projekt die Indexierung freigeben. Vorher
-.gitignore und .kilocodeignore auf sensible Dateien pruefen. Der Index wird
-lokal gespeichert und ist nicht automatisch verschluesselt. Den Status
-Complete abwarten; eine Konfiguration allein beweist keinen fertigen Index.
-
-Kilo zeigt Rollen/Modelle/Phasen ueber loki_status und LOKI-STATUS.md; loki_details erklaert Befunde. Der Runner fuehrt die Tests aus. Der Chat schreibt nicht direkt.
-Ein bearbeitetes Testprojekt bleibt beim Update erhalten. Ein frisches Beispiel erzeugt app/New-WelcomeTestProject.ps1 -InstallRoot <Installationsordner> -NewExample in PowerShell 7. Das Beispiel ist keine Betriebssystem-Sandbox.
-Anmeldungen bei GitHub/Lovable und projektspezifische Geheimnisse werden nicht durch dieses Paket eingerichtet.
-'@
+    $welcomeText=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'templates/START_HERE.md')).Replace('(../welcome-example/README.md)','(workflow-test/README.md)')
     $null=Write-ShadowManagedFile -Path (Join-Path $welcome 'START_HERE.md') -Content $welcomeText -BackupRoot (Join-Path $InstallRoot 'backups/welcome')
+    $null=Write-ShadowManagedFile -Path (Join-Path $welcome 'START_HERE.de.md') -Content ([IO.File]::ReadAllText((Join-Path $PSScriptRoot 'templates/START_HERE.de.md')).Replace('(../welcome-example/README.de.md)','(workflow-test/README.de.md)')) -BackupRoot (Join-Path $InstallRoot 'backups/welcome')
     $welcomeProject=New-ShadowWelcomeTestProject -InstallRoot $InstallRoot
     $ProjectPath=@($ProjectPath)+@($welcomeProject.project)
     $workspaceUpdate=Update-ShadowWorkspaces -Root $InstallRoot -ProjectPath $ProjectPath -PwshPath $toolchain.powerShellExecutable
     $report.workspaces=@($workspaceUpdate.Entries)
     $report.warnings+=@($workspaceUpdate.Warnings)
-    $report.steps+=@('Registrierte und neue Arbeitsbereiche auf den Paketstand gebracht')
+    $report.steps+=@('Registered and new workspaces updated to the package version')
     if (-not $NoShortcut) {
         $desktop=[Environment]::GetFolderPath('Desktop')
         if ($desktop) {
@@ -511,12 +492,12 @@ Anmeldungen bei GitHub/Lovable und projektspezifische Geheimnisse werden nicht d
             $shortcut=$shell.CreateShortcut($shortcutPath)
             $shortcut.TargetPath=$toolchain.powerShellExecutable
             $launcher=Join-Path $InstallRoot 'app/Start-LocalAI.ps1'
-            if ($launcher.Contains('"')) { throw 'Unzulaessiges Anfuehrungszeichen im Installationspfad.' }
+            if ($launcher.Contains('"')) { throw 'Invalid quotation mark in installation path.' }
             $shortcut.Arguments='-NoLogo -NoProfile -ExecutionPolicy Bypass -File "'+$launcher+'" -InstallRoot "'+$InstallRoot+'" -PauseOnError'
             $shortcut.WorkingDirectory=$InstallRoot
-            $shortcut.Description='Lokales Modell, eigene VS-Code-Umgebung und gepruefte Agentenablaeufe'
+            $shortcut.Description='Local model, dedicated VS Code environment and reviewed agent workflows'
             $iconPath=Join-Path $InstallRoot 'app/assets/lokiente.ico'
-            if(-not(Test-Path -LiteralPath $iconPath -PathType Leaf)){throw 'LoKiEnte-Desktopicon fehlt im Installationspaket.'}
+            if(-not(Test-Path -LiteralPath $iconPath -PathType Leaf)){throw 'LoKiEnte desktop icon missing from installation package.'}
             $shortcut.IconLocation=$iconPath+',0'
             $shortcut.Save()
             # Rename only shortcuts managed by this same installation.
@@ -549,7 +530,7 @@ Anmeldungen bei GitHub/Lovable und projektspezifische Geheimnisse werden nicht d
     $report.finishedUtc=[DateTime]::UtcNow.ToString('o')
     $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-report.json') -Content ($report|ConvertTo-Json -Depth 25) -BackupRoot (Join-Path $InstallRoot 'backups/reports')
     $statusLevel=if($report.status -ceq 'PROVISIONED_WITH_WARNINGS'){'WARN'}else{'OK'}
-    Write-ShadowMessage "Einrichtung: $($report.status). Bericht: $(Join-Path $InstallRoot 'provisioning-report.json')" $statusLevel
+    Write-ShadowMessage "Setup: $($report.status). Report: $(Join-Path $InstallRoot 'provisioning-report.json')" $statusLevel
     $projectPaths=@($report.workspaces|ForEach-Object {$_.project})
     foreach($command in (Get-ShadowStartCommands -PowerShellPath $toolchain.powerShellExecutable -InstallRoot $InstallRoot -ProjectPaths $projectPaths)){
         Write-ShadowMessage "Start: $command"
@@ -567,9 +548,9 @@ catch {
             line=$_.InvocationInfo.ScriptLineNumber
             errorId=$_.FullyQualifiedErrorId
         }
-        try { $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-report.json') -Content ($report|ConvertTo-Json -Depth 25) -BackupRoot (Join-Path $InstallRoot 'backups/reports') } catch { Write-Warning 'Bericht konnte nicht gespeichert werden.' }
+        try { $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-report.json') -Content ($report|ConvertTo-Json -Depth 25) -BackupRoot (Join-Path $InstallRoot 'backups/reports') } catch { Write-Warning 'Could not save report.' }
     }
     if($isManualAction){Write-Host $_.Exception.Message}
-    else{Write-Error -Message ("Einrichtung nicht vollstaendig: "+$_.Exception.Message) -ErrorAction Continue}
+    else{Write-Error -Message ("Setup incomplete: "+$_.Exception.Message) -ErrorAction Continue}
     exit 1
 }

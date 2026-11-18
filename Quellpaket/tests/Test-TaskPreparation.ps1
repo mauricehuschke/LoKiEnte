@@ -9,7 +9,7 @@ $project=Join-Path $root 'project';$install=Join-Path $root 'install';$checks=Jo
 [void][IO.Directory]::CreateDirectory($install)
 $script:count=0
 function Assert-True($Value,[string]$Message){if(-not $Value){throw $Message};$script:count++}
-function Reject([scriptblock]$Action,[string]$Message){$rejected=$false;try{& $Action|Out-Null}catch{$rejected=$true;if($_.Exception.Message -notmatch 'NEEDS_INPUT|Schreibpfad|Geschuetzt|geschuetzt|Projekt- oder Pruefkonfiguration'){throw}};Assert-True $rejected $Message}
+function Reject([scriptblock]$Action,[string]$Message){$rejected=$false;try{& $Action|Out-Null}catch{$rejected=$true;if($_.Exception.Message -notmatch 'NEEDS_INPUT|write path|Protected|protected|project or check configuration'){throw}};Assert-True $rejected $Message}
 function Context {Get-ShadowPreparationContext -ProjectPath $project -InstallRoot $install -ChecksFile $checks -ApplicationRoot $SourceRoot}
 function Proposal {
     return [ordered]@{workflow='Feature';acceptanceCriteria=@(@{id='AC-1';description='Function returns two'});changeTypes=@('other');writePaths=@('src/app.cjs');testWritePaths=@('tests/app.test.cjs');checkIds=@('loki-node-test')}

@@ -29,7 +29,7 @@ $SkipModelDownload=$false;$ContextLength=32768;$Port=1234;$RouterPort=1235;$ApiT
 $ProjectPath=@();$NoShortcut=$true;$node='node-fixture';$toolchain=@{powerShellExecutable='pwsh-fixture'}
 $kilo=@{kiloExecutable='cli-fixture';kiloArgumentPrefix=@()};$bundledKilo='gui-fixture'
 $script:selectionPrompt=0
-function Read-Host {param($Prompt) if($Prompt -like '*bestaetigen*'){return 'y'};$script:selectionPrompt++;if($script:selectionPrompt -eq 1){return '3'};return ''}
+function Read-Host {param($Prompt) if($Prompt -like '*Confirm*'){return 'y'};$script:selectionPrompt++;if($script:selectionPrompt -eq 1){return '3'};return ''}
 '@
     $harness+="`n. '$commonFile'`n. '$runtimeFile'`n. '$selectionFile'`n"
     $harness+=@'
@@ -58,6 +58,7 @@ function New-ShadowWelcomeTestProject {param($InstallRoot) return @{project=(Joi
 function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPaths) return 'synthetic-start-command'}
 '@
     $harness+="`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
+    Copy-Item -LiteralPath (Join-Path $SourceRoot 'templates') -Destination (Join-Path $root 'templates') -Recurse
     $harnessPath=Join-Path $root 'harness.ps1'
     [IO.File]::WriteAllText($harnessPath,$harness)
     $result=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root,'-Scenario','failure') -AllowFailure -Quiet -TimeoutSeconds 30

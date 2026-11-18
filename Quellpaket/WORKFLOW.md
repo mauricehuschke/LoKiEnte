@@ -1,82 +1,75 @@
-# LoKiEnte anwenden: vom Auftrag zum geprüften Code
+# Using LoKiEnte: from request to verified code
 
-Diese Anleitung beschreibt den Workflow ab Paket **2026.11.18.18**. Sie richtet
-sich an Anwender, die mit VS Code und Git arbeiten können. Die lokale KI
-unterstützt Entwicklung und Prüfung; fachliche Abnahme und Commit bleiben bei dir.
+[Deutsch](WORKFLOW.de.md)
 
-## 1. Projekt öffnen
+This guide describes the workflow introduced in package **2026.11.18.18**, with
+English defaults from **2026.11.18.22**. It assumes familiarity with VS Code and
+Git. Local AI assists with development and verification; functional acceptance
+and commits remain your responsibility.
 
-Starte die erzeugte Desktopverknüpfung. Wähle ein bekanntes Projekt oder gib
-einen weiteren vorhandenen Projektordner an. Für ein ganz neues Projekt zunächst
-den Ordner und das gewünschte Grundgerüst selbst anlegen. Schreibende Workflows
-benötigen die Wurzel eines Git-Repositories mit mindestens einem Commit.
+## 1. Open a project
 
-VS Code öffnet den Quellordner und den zugehörigen LoKiEnte-Auftragsordner. Die
-Arbeitsbereichsdateien und LoKiEnte-Konfiguration liegen außerhalb deines Repositories
-unter `<InstallRoot>\projects\<Projektkennung>` bzw. `workspaces`.
+Launch the desktop shortcut. Select a known project or another existing directory.
+For a new project, create the directory and scaffold first. Write workflows require
+the root of a Git repository with at least one commit.
 
-Wähle in Kilo `shadow-chat` und gib deinen Auftrag direkt ein. Der Chat kann
-lesen, beraten und über `loki_start` den kontrollierten Entwicklungsablauf starten.
-Die eigentlichen Dateiänderungen erfolgen in dessen begrenzten Agentenphasen.
-Ein eigener Auftragsdatei- oder JSON-Schritt ist im normalen Ablauf nicht nötig.
+VS Code opens both the sources and the associated LoKiEnte task directory.
+Workspace files and configuration live outside your repository under
+`<InstallRoot>\projects\<project-id>` and `workspaces`.
 
-## 2. Einen kleinen Auftrag formulieren
+Select `shadow-chat` in Kilo and enter your request directly. Chat can read, advise
+and start the controlled workflow through `loki_start`. Actual file changes take
+place in its bounded agent phases. No separate task-file or JSON step is normally required.
 
-Beschreibe gewünschtes Verhalten, Randbedingungen und Grenzen, beispielsweise:
+## 2. Describe a small task
 
-> Ergänze in der Lagerlogik eine Nachbestellempfehlung: Sie soll gelten, wenn der
-> Bestand unter der Mindestmenge liegt. Gleicher oder höherer Bestand genügt.
-> Decke die Grenzfälle mit Tests ab; ändere keine Datenbank oder Oberfläche.
+Describe expected behavior, constraints and boundaries, for example:
 
-Kilo übergibt den vollständigen Auftrag an `loki_start`. Ein lesender
-Vorbereitungsagent untersucht Projekt, vorhandene Tests und Regeln. Er leitet
-Workflow, Akzeptanzkriterien `AC-1`, `AC-2`, …, Änderungsarten und exakte
-Produktions-/Testdateien ab. Testbefehle wählt er aus lokal erkannten Vorlagen
-oder vorhandenen Projektchecks; er darf keine freien Shellbefehle erfinden.
+> Add a reorder recommendation to the inventory logic: recommend reordering when
+> stock is below the minimum. Equal or higher stock is sufficient. Cover boundary
+> cases with tests; do not change the database or UI.
 
-Ein unabhängiger **Vorbereitungsreview** prüft die Zuordnung zum Originalauftrag,
-die Grenzen und die Testauswahl. Erst nach dessen `PASS` wird `checks.json`
-gesichert und ergänzt. Bei unklaren Anforderungen, fehlenden Werkzeugen oder
-Konflikten stoppt der Ablauf mit einer konkreten `NEEDS_INPUT`-Meldung. Kläre den
-Punkt in Kilo und starte den ergänzten Auftrag erneut; es gibt keinen stillen
-Wechsel zu weniger strengen Prüfungen.
+Kilo passes the complete request to `loki_start`. A read-only preparation agent
+examines the project, existing tests and rules. It derives the workflow, acceptance
+criteria `AC-1`, `AC-2`, …, change types and exact production/test files. Test commands
+come from locally detected templates or existing checks; it cannot invent arbitrary shell commands.
 
-Die Kriterien werden zu Laufbeginn festgehalten. Der Testautor darf ihre IDs
-und Anzahl nicht ändern. Eine Zuordnung aller IDs beweist allein noch keine
-vollständige fachliche Abdeckung; dafür bleiben die unabhängigen Reviews nötig.
+An independent **preparation review** checks alignment with the original request,
+scope and test selection. Only after PASS is checks.json backed up and extended.
+Unclear requirements, missing tools or conflicts stop the workflow with a specific
+NEEDS_INPUT message. Clarify in Kilo and restart the amended request; checks are
+never silently weakened.
 
-## 3. Automatische Checks und eigene Vorgaben
+Criteria are fixed at run start. The test author cannot change their IDs or count.
+Mapping every ID alone does not prove complete functional coverage; independent
+reviews remain necessary.
 
-`checks.json` enthält den geprüften Auftrag und wiederverwendbare Projektchecks.
-Die automatisch verwalteten Kriterien, Kategorien und Dateipfade werden beim
-nächsten Auftrag neu abgeleitet. Herkunft, Prüfsummen und Sicherungen verhindern,
-dass manuelle Änderungen daran still überschrieben werden. Eigene vollständige
-Checks bleiben verpflichtend; unbekannte Felder und Originalbefehle bleiben erhalten.
-Beim ersten automatischen Auftrag werden ältere auftragsspezifische Felder unter
-`automation.importedTaskFields` archiviert und dem Reviewer ausdrücklich gezeigt.
+## 3. Automatic checks and custom requirements
 
-Erkannt werden der eingebaute Node-Test-Runner, lokal installierte Vitest-, Jest-
-und Playwright-Runner, Python/pytest-Projekte sowie TypeScript-Typechecks. Node,
-Vitest, Playwright und pytest nutzen JUnit; der Jest-Adapter übernimmt tatsächliche
-Assertion-Ergebnisse in das unten beschriebene JSON. Die automatische Vorbereitung
-installiert keine Pakete. Fehlt etwa pytest in der Python-Umgebung, muss es gemäß
-Projektanleitung eingerichtet werden. Unbekannte Buildketten benötigen einmalig
-einen passenden eigenen Check.
+checks.json stores the reviewed task and reusable project checks. Automatically
+managed criteria, categories and paths are derived again for the next task.
+Provenance, hashes and backups prevent silent overwrites of manual edits.
+Complete custom checks remain mandatory; unknown fields and original commands
+are preserved. On the first automatic task, older task-specific fields are
+archived under `automation.importedTaskFields` and explicitly shown to the reviewer.
 
-Alte reine `npm test`-/Exitcode-Checks bleiben gespeichert. Ein erkannter
-strukturierter Ersatz wird nur nach unabhängigem Vergleich mit ihrem Zweck
-für den Auftrag eingesetzt. Ist keine passende Variante vorhanden, stoppt die
-Vorbereitung. Das reine Umbenennen eines Checks erzeugt keinen Testnachweis.
+Detection covers built-in Node tests, locally installed Vitest, Jest and Playwright,
+Python/pytest projects and TypeScript typechecks. Node, Vitest, Playwright and pytest
+use JUnit; the Jest adapter converts actual assertion results into the JSON format
+below. Preparation installs no packages. If pytest is missing, install it according
+to the project instructions. Unknown build systems need a suitable custom check once.
 
-Alle Befehle laufen mit deinen **Benutzerrechten** im Projekt. Installiere
-Projektabhängigkeiten vorher nach dessen Anleitung. Verwende lokale Testdaten
-und nichtinteraktive Befehle. Für dauerhafte zusätzliche Grenzen kannst du
-`limits.allowedWritePaths` und `limits.allowedTestWritePaths` als exakte
-Dateipfadarrays hinterlegen; die automatische Vorbereitung erweitert sie nicht.
+Legacy plain npm test/exit-code checks remain stored. A detected structured replacement
+is used only after independent comparison with their purpose. If no suitable replacement
+exists, preparation stops. Merely renaming a check does not create test evidence.
 
-Optionales Referenzbeispiel für einen selbst konfigurierten Node-Check. Für den
-normalen Kilo-Auftrag musst du dieses JSON nicht von Hand erstellen. Die genannte
-Testdatei darf vom Testautor neu angelegt werden:
+All commands run in the project with your **user permissions**. Install project
+dependencies first. Use local test data and noninteractive commands. Permanent
+additional boundaries can be specified as exact path arrays in
+`limits.allowedWritePaths` and `limits.allowedTestWritePaths`; preparation cannot expand them.
+
+Optional reference example for a custom Node check. Normal Kilo tasks do not require
+you to write this JSON manually. The test author may create the specified test file:
 
 ```json
 {
@@ -85,7 +78,7 @@ Testdatei darf vom Testautor neu angelegt werden:
   "testWritePaths": ["tests/stock.test.cjs"],
   "changeTypes": ["other"],
   "acceptanceCriteria": [
-    {"id": "AC-1", "description": "Bei Bestand unter der Mindestmenge wird eine Nachbestellung empfohlen; bei gleichem oder höherem Bestand nicht."}
+    {"id": "AC-1", "description": "Recommend reordering below the minimum stock level, but not at or above it."}
   ],
   "regressionCheck": "tests",
   "checks": [
@@ -101,96 +94,90 @@ Testdatei darf vom Testautor neu angelegt werden:
 }
 ```
 
-| Feld | Bedeutung |
+| Field | Meaning |
 |---|---|
-| `writePaths` | Exakte Produktionsdateien relativ zur Repository-Wurzel; `/` als Trenner. Keine Globs. |
-| `testWritePaths` | Exakte Dateien für den Testautor, getrennt von `writePaths`. Ein leeres Array erlaubt nur die Zuordnung bestehender Tests. |
-| `acceptanceCriteria` | Eindeutige IDs `AC-1`, `AC-2`, … und konkrete Beschreibungen. |
-| `changeTypes` | Eine oder mehrere Kategorien: `security`, `ui`, `api`, `other`. |
-| `regressionCheck` | Bei Bugfix der Testcheck, dessen konkrete Regressionsfälle vor dem Fix scheitern müssen. |
-| `checks[].kind` | `test` für Verhaltenstests, `integration` für Zusammenspiel von Komponenten, `static` für z. B. Typecheck/Lint/Build. |
-| `reportFormat` | Für `test` und `integration`: `junit` oder das unten beschriebene `json`. Für `static` nicht nötig. |
+| `writePaths` | Exact production paths relative to repository root, with `/` separators. No globs. |
+| `testWritePaths` | Exact paths for the test author, separate from writePaths. An empty array permits mapping existing tests only. |
+| `acceptanceCriteria` | Unique IDs AC-1, AC-2, … and concrete descriptions. |
+| `changeTypes` | One or more of security, ui, api, other. |
+| `regressionCheck` | For Bugfix, the check whose specified regression cases must fail before the fix. |
+| `checks[].kind` | test for behavior; integration for component interaction; static for typecheck/lint/build, for example. |
+| `reportFormat` | For test/integration: junit or the JSON format below. Not needed for static checks. |
 
-Jeder Check braucht einen eindeutigen Namen, `command`, einzelne Stringargumente
-und ein ganzzahliges Zeitlimit zwischen 1 und 7200 Sekunden. Maximal zwölf Checks
-pro Auftrag. Mindestens ein Testcheck ist für eine vollständige Abnahme nötig;
-ein erfolgreicher Build allein deckt keine Verhaltensanforderung ab.
+Each check requires a unique name, command, individual string arguments and an
+integer timeout from 1 to 7200 seconds. At most twelve checks per task. Full acceptance
+requires at least one test check; a successful build alone cannot cover behavior.
 
-Der Runner ersetzt `{report}` in Argumenten durch einen neuen absoluten Pfad für
-genau diesen Check und diese Phase. Derselbe Pfad steht als `LOKI_TEST_REPORT`
-bereit. Das Testwerkzeug muss seinen Bericht dorthin schreiben. Bereits vorhandene
-Berichte werden nicht wiederverwendet. Die mitgelieferten Adapter sind Teil der
-Provisionierung; eigene Testkommandos bleiben möglich. Der Testautor darf beides
-nicht ändern. Keine Watch-Modi, Installations-,
-Deployment- oder Produktivdatenbankbefehle als Checks verwenden.
+The runner replaces `{report}` in arguments with a fresh absolute path for that
+check and phase. The same path is available as `LOKI_TEST_REPORT`. The test tool
+must write its report there. Existing reports are never reused. Bundled adapters
+are provisioned, but custom commands remain possible. The test author cannot
+change either. Never use watch modes, installation, deployment or production
+database commands as checks.
 
-Projektkonfiguration, Manifest-/Lockdateien, Ignore-Dateien und Zugangsdaten sind
-keine freigebbaren Produktionsdateien. Eine nötige Änderung daran erledigst du
-vor dem Lauf selbst. Bekannte Testpfade in `writePaths` werden zurückgewiesen;
-auch Tests mit ungewöhnlichen Namen gehören ausdrücklich in `testWritePaths`.
+Project configuration, manifests/lockfiles, ignore files and credentials cannot
+be approved as production files. Make any necessary changes yourself before the run.
+Known test paths in writePaths are rejected; unusually named tests also belong
+explicitly in testWritePaths.
 
-## 4. Was automatisch geschieht
+## 4. What happens automatically
 
-1. **Vorbereitung und Vorbereitungsreview:** Kriterien, Kategorien, Dateiumfang
-   und lokale Checks werden aus dem Auftrag abgeleitet und unabhängig geprüft.
-2. **Planung:** Ein lesender Architekturagent untersucht Projektregeln, Aufgabe
-   und Risiken. Die Quelländerungen und Akzeptanzkriterien werden festgehalten.
-3. **Testerstellung:** `shadow-test` schreibt ausschließlich freigegebene Tests.
-   Er ordnet jedem Kriterium konkrete Testfall-IDs und Checknamen zu und nennt
-   gegebenenfalls genau die erwarteten Ausgangsfehler.
-4. **Testreview:** `shadow-test-reviewer` prüft die Tests in einer frischen Sitzung,
-   bevor der Runner sie ausführt. Fehlende Assertions, abgeschwächte bestehende
-   Tests, fingierte Berichte oder problematische Nebenwirkungen verhindern den Start.
-5. **Ausgangstests:** Der Runner führt die Checks aus. Bei Bugfix müssen die
-   benannten Regressionsfälle tatsächlich fehlschlagen. Bei Features sind vorab
-   benannte neue Fehler erlaubt; bei Refactoring müssen die Ausgangstests bestehen.
-6. **Implementierung:** Der Coding-Agent darf nur Produktionsdateien bearbeiten.
-   Geprüfte Testdateien sind über Schreibrechte und Hashvergleiche geschützt.
-7. **Erneute Checks und Review:** Tests laufen erneut; ein separater Reviewer
-   prüft den Quellstand und beurteilt auch die tatsächlichen Änderungsarten.
-8. **Pflichtspezialisten:** Je nach Änderungsart folgen Security- und
-   Integrationsprüfung, jeweils in eigener Sitzung.
-9. **Validierung:** Ein weiterer Agent beurteilt die fachliche Aussagekraft der
-   ausgeführten Checks. Das Skript prüft zusätzlich die Kriterienzuordnung und
-   einzelnen Testergebnisse. Erst danach ist `VERIFIED` möglich.
+1. **Preparation and preparation review:** derive and independently review criteria,
+   categories, file scope and local checks.
+2. **Planning:** a read-only architect examines project rules, task and risks.
+   Source changes and criteria are recorded.
+3. **Test authoring:** shadow-test writes approved tests only, maps every criterion
+   to concrete test IDs/check names, and names exact expected baseline failures.
+4. **Test review:** shadow-test-reviewer examines tests in a fresh session before
+   execution. Missing assertions, weakened existing tests, fabricated reports or
+   unsafe side effects prevent execution.
+5. **Baseline tests:** the runner executes checks. Bugfix requires actual failure
+   of the specified regression cases. Features may allow declared new failures;
+   Refactor requires a passing baseline.
+6. **Implementation:** the coder edits production files only. Reviewed tests are
+   protected through permissions and hash comparisons.
+7. **Repeat checks and review:** tests run again; a separate reviewer assesses
+   source state and actual change types.
+8. **Required specialists:** security/integration reviews follow as required,
+   each in a separate session.
+9. **Validation:** another agent evaluates the functional significance of executed
+   checks. The script also verifies criteria mappings and individual results.
+   Only then can VERIFIED be issued.
 
-Frontend-/Backend-Spezialisten können während der Umsetzung sequenziell helfen.
-Es läuft jeweils eine Modellgenerierung. Coder Fast betrifft die Umsetzung;
-Testreview, Code-Review und Validierung behalten ihre eigenen Modellzuordnungen.
+Frontend/backend specialists may help sequentially during implementation. Only
+one model generation runs at a time. Coder Fast changes implementation routing;
+test review, code review and validation retain their own model assignments.
 
-Muss ein bereits geprüfter Test geändert werden, stoppt der Auftrag. Korrigiere
-bei Bedarf Aufgabe/Freigaben und starte einen neuen Lauf mit erneuter Testerstellung
-und Testreview. Eine Korrekturrunde innerhalb desselben Laufs darf nur die
-Produktion ändern. Es gibt standardmäßig höchstens eine solche Korrekturrunde.
+If a reviewed test must change, the task stops. Adjust the task/permissions if
+needed and start a new run with test authoring and review again. A correction
+round within the same run may change production only; at most one such round is allowed by default.
 
-## 5. Wann Spezialprüfungen verpflichtend sind
+## 5. When specialist checks are mandatory
 
-| Kategorie | Beispiele | Erforderliche Prüfung |
+| Category | Examples | Required verification |
 |---|---|---|
-| `security` | Anmeldung, Berechtigungen, Dateizugriff, externe Eingaben, Geheimnisse, Vertrauensgrenzen | Separater `shadow-security` mit bestandenem Urteil |
-| `ui` | Bedienoberfläche, Interaktionen, Zustände | Ein zugeordnetes `integration`-Testergebnis und `shadow-integration` |
-| `api` | Schnittstellen, Endpunkte, Zusammenspiel von Komponenten | Ein zugeordnetes `integration`-Testergebnis und `shadow-integration` |
-| `other` | Rein interne Logik ohne obige Merkmale | Testreview, Code-Review und Validierung bleiben verpflichtend |
+| security | Authentication, permissions, file access, external input, secrets, trust boundaries | Separate shadow-security with a passing verdict |
+| ui | Interface, interaction, state | A mapped integration test result and shadow-integration |
+| api | Interfaces, endpoints, component interaction | A mapped integration test result and shadow-integration |
+| other | Internal logic without the above characteristics | Test review, code review and validation remain mandatory |
 
-Deine Kategorien, Planer- und Reviewerbewertung sowie konservative Pfadhinweise
-werden zusammengeführt. Eine spätere Einstufung kann eine Prüfung hinzufügen,
-aber nicht deine Einstufung abschwächen. Erkennt der Reviewer erst nach der
-Implementierung einen Integrationsbedarf und fehlt der passende Check, ist das
-Ergebnis nicht verifiziert. Ergänze ihn und starte neu.
+Your categories, planner/reviewer assessments and conservative path hints are
+combined. Later classification may add checks but cannot weaken your classification.
+If a reviewer discovers integration requirements after implementation and the
+corresponding check is missing, the result is unverified. Add the check and restart.
 
-Ein Unit-Test wird durch die Bezeichnung `integration` nicht zum Integrationstest.
-Der Spezialist muss den tatsächlichen Bezug zu UI/API und ausgeführten Testfällen
-prüfen. Diese semantische Einordnung bleibt eine Modellbewertung und kann irren.
+Calling a unit test integration does not make it an integration test. The specialist
+must examine its actual relationship to UI/API and executed cases. This semantic
+classification remains a model judgment and can be wrong.
 
-## 6. Unterstützte Berichte
+## 6. Supported reports
 
-JUnit wird anhand der einzelnen `<testcase>`-Elemente ausgewertet. Eine Test-ID
-ist `classname::name`, bei leerem `classname` nur `name`. Doppelte IDs innerhalb
-eines Checks sind nicht zulässig; Testnamen entsprechend eindeutig gestalten.
-`failure`/`error` zählen als fehlgeschlagen, `skipped` als übersprungen. XML-DTDs
-und externe Entitäten werden abgewiesen. Testberichte sind auf 16 MiB begrenzt.
+JUnit is evaluated through individual `<testcase>` elements. IDs are `classname::name`,
+or just name when classname is empty. Duplicate IDs within a check are forbidden.
+failure/error mean failed, skipped means skipped. XML DTDs and external entities
+are rejected. Reports are limited to 16 MiB.
 
-Ein eigenes bestätigtes Testwerkzeug kann alternativ dieses JSON schreiben:
+An approved custom test tool may alternatively write:
 
 ```json
 {
@@ -203,107 +190,96 @@ Ein eigenes bestätigtes Testwerkzeug kann alternativ dieses JSON schreiben:
 }
 ```
 
-Das Beispiel zeigt die Struktur, keinen erfolgreichen Lauf. Die Werte müssen
-aus tatsächlich ausgeführten Assertions stammen. Ein eigener Reporter darf
-keine pauschale Erfolgsliste erzeugen. Für verfügbare Frameworks deren Reporter
-verwenden. Änderungen am Reporter erfolgen außerhalb des Agentenauftrags.
+This illustrates structure, not a successful run. Values must come from actual
+assertions. A custom reporter must not fabricate a blanket success list. Prefer
+framework reporters where available. Change reporters outside the agent task.
 
-Ein leerer Bericht, null ausgeführte Tests, fehlende/übersprungene Pflichtfälle,
-unerwartete Ausgangsfehler und fehlgeschlagene Endtests verhindern `VERIFIED`.
-Nicht zugeordnete übersprungene Tests bleiben im Bericht sichtbar. Erwartete
-Ausgangsfehler benötigen Exitcode 1 und genau die vorher benannten fehlgeschlagenen
-Testfälle; Import-/Syntaxfehler sind kein gültiger Regressionsnachweis.
+Empty reports, zero executed tests, missing/skipped required cases, unexpected
+baseline failures and failed final tests prevent VERIFIED. Unmapped skipped cases
+remain visible. Expected baseline failures require exit code 1 and exactly the
+previously named failing cases; import/syntax errors are not valid regression evidence.
 
-## 7. Sichtbarer Ablauf, Start und Ergebnis
+## 7. Visible progress, starting and results
 
-Nach `loki_start` verfolgt Kilo den Auftrag mit `loki_status`. Die Werkzeugausgabe
-zeigt Phase, Agentenrolle, angefordertes Rollenmodell und Zustand sowie aktuelle
-Werkzeugaktivität. `loki_details` liefert den begrenzten Laufbericht und Ereignisse.
-Zusätzlich steht im LoKiEnte-Auftragsordner `LOKI-STATUS.md`; dort kannst du den Verlauf
-auch neben dem Chat ansehen. Die Anzeigen stammen aus tatsächlichen Laufereignissen.
+After loki_start, Kilo tracks the task with loki_status. Tool output shows phase,
+agent role, requested model, state and current tool activity. loki_details returns
+the bounded run report and events. LOKI-STATUS.md in the task directory provides
+the same progress alongside chat. Displays come from actual run events.
 
-Die kontrollierten Phasen laufen als getrennte externe Kilo-CLI-Sitzungen. Sie
-erscheinen über diese Statusansicht, nicht automatisch als native Kilo-Task-
-Kindersitzungen oder als vollständiger Graph im Inspector. Native lesende
-Chat-Unteragenten können daneben ihren eigenen Kilo-Verlauf haben. Sichtbar sind
-Rollen, Aktivitäten und Ergebnisse, kein vollständiger interner Denkprozess.
+Controlled phases run as separate external Kilo CLI sessions. They appear through
+this status view, not automatically as native Kilo child tasks or a complete Inspector
+graph. Native read-only chat subagents may have their own Kilo history. Roles,
+activity and results are visible, not a complete internal reasoning process.
 
-Zum Abbrechen ausdrücklich in Kilo um Stopp bitten: `loki_cancel` beendet den
-eigenen Prozessbaum; `loki_status` bestätigt anschließend `CANCELLED`. Das Abbrechen
-einer Statusabfrage allein beendet einen Hintergrundauftrag nicht. Bereits
-geschriebene Änderungen bleiben für deine Diff-Prüfung erhalten.
+To cancel, explicitly ask Kilo to stop: loki_cancel terminates the owned process
+tree; loki_status subsequently confirms CANCELLED. Cancelling a status query alone
+does not stop a background job. Written changes are preserved for your diff review.
 
-Als Alternative kannst du einen Auftrag in `task.md` schreiben und in VS Code
-**Terminal > Aufgabe ausfuehren** → `Local AI: Auftrag automatisch mit Pruefung`
-wählen. Auch die spezifischen Tasks `Local AI: Feature mit Pruefung`, `Bugfix`,
-`Refactor` und die Varianten mit `(Coder Fast)` bereiten `checks.json` automatisch
-vor. Der gewählte spezifische Workflow bleibt dabei verbindlich. Terminaltasks
-schreiben ihre Ereignisse und Belege in den Laufordner; die Chat-Statuswerkzeuge
-beziehen sich auf über `loki_start` gestartete Aufträge.
-`Review` und `Architecture` bleiben lesend. Für eine vollständige Review-Abnahme
-sind ebenfalls Kriterien und strukturierte Checks nötig. Ohne Checks können sie
-höchstens `REVIEWED_UNVALIDATED` ergeben.
+Alternatively, write a task in task.md and select **Terminal > Run Task** →
+`Local AI: Automatic task with verification`. Specific tasks such as
+`Local AI: Feature with verification`, Bugfix, Refactor and `(Coder Fast)` variants
+also prepare checks.json automatically. The selected specific workflow remains
+binding. Terminal tasks write events/evidence to the run directory; chat status
+tools refer to jobs started through loki_start.
 
-Im Terminal stehen Status und Pfad zu `runs\<Laufkennung>\receipt.json`.
-Der Bericht enthält Kriterien, Testsitzung, Testreview, eingefrorene Testhashes,
-Ausgangs- und Endergebnisse, Spezialurteile und konkrete Ablehnungsgründe.
+Review and Architecture remain read-only. Full review acceptance still requires
+criteria and structured checks. Without checks, the maximum result is
+REVIEWED_UNVALIDATED.
 
-| Status | Bedeutung |
+The terminal prints status and `runs\<run-id>\receipt.json`. This report contains
+criteria, test session, test review, frozen test hashes, baseline/final results,
+specialist verdicts and concrete rejection reasons.
+
+| Status | Meaning |
 |---|---|
-| `VERIFIED`, Exitcode 0 | Alle technischen und agentengestützten Prüfbedingungen für diesen Quellstand bestanden. |
-| `REVIEWED_UNVALIDATED`, Exitcode 2 | Lesender Review ohne ausführbare Abnahme; keine fertige Codefreigabe. |
-| `NOT_VERIFIED`, Exitcode 1 | Fehler, fehlender Nachweis oder offener Befund; Bericht prüfen. |
-| `NEEDS_INPUT` in Kilo | Konkrete Anforderung, Konfigurationsänderung oder fehlende Voraussetzung klären; noch keine Freigabe. |
-| `CANCELLED` / `FAILED` in Kilo | Auftrag abgebrochen bzw. technische Ausführung gescheitert; vorhandenen Diff und Belege prüfen. |
-| `WORKER_UNRESPONSIVE` in Kilo | Worker meldet sich nicht; automatisches Polling endet, Prozessende und Prüfergebnis sind unbestätigt. |
+| VERIFIED, exit 0 | All technical and agent-assisted verification conditions passed for this source state. |
+| REVIEWED_UNVALIDATED, exit 2 | Read-only review without executable acceptance; not final code approval. |
+| NOT_VERIFIED, exit 1 | Error, missing evidence or unresolved finding; inspect report. |
+| NEEDS_INPUT in Kilo | Clarify a requirement/configuration change/missing prerequisite; no approval yet. |
+| CANCELLED / FAILED in Kilo | Task cancelled or technical execution failed; inspect existing diff and evidence. |
+| WORKER_UNRESPONSIVE in Kilo | Worker is not responding; automatic polling stops, process exit and result remain unconfirmed. |
 
-Bleibt ein Auftrag länger als 30 Sekunden in der Startwarteschlange oder fehlt
-120 Sekunden lang ein Worker-Heartbeat, zeigt Kilo `WORKER_UNRESPONSIVE`.
-Die Projektsperre bleibt erhalten. Prüfe lokale Jobprotokolle und Prozesse;
-starte keinen zweiten Auftrag und lösche die Sperre nicht ungeprüft. Ein erneuter
-Statusabruf kann einen wieder erreichbaren Worker zeigen; ein Abbruch kann
-weiterhin vorgemerkt werden. Wiederherstellung erst nach bestätigtem Prozessende
-oder Systemneustart, ohne den Auftrag dadurch als erfolgreich zu behandeln.
+More than 30 seconds in the startup queue or 120 seconds without a heartbeat
+produces WORKER_UNRESPONSIVE. The project lock stays. Inspect logs and processes;
+do not start another job or blindly remove the lock. Another query may show a
+recovered worker; cancellation can still be recorded. Recover only after confirmed
+process exit or a system restart, without treating recovery as task success.
 
-Prüfe den Git-Diff und die Anwendung selbst, bevor du committest. LoKiEnte erzeugt
-keinen separaten Worktree und führt keine automatischen Commits oder Pushes aus.
-Bestehende Änderungen werden nicht zurückgesetzt. Nach Änderungen am geprüften
-Quellstand ist ein neuer Prüflauf nötig.
+Review the diff and application before committing. LoKiEnte creates no separate
+worktree and makes no automatic commits/pushes. Existing changes are not reset.
+Any changes after verification require another run.
 
-Tests laufen unter deinem Windows-Konto. Bereinigte Umgebungsvariablen und eigene
-Temp-/Profilpfade sind keine Betriebssystem-Sandbox. Projektcode und Tests können
-weiterhin Dateien und Netzwerk erreichen. Verwende bestätigte Befehle, lokale
-Testdaten und keine produktiven Zugangsdaten. Auch strukturierte Testberichte
-beweisen nicht, dass Tests fachlich sinnvoll oder manipulationssicher sind.
+Tests run under your Windows account. Sanitized environments and separate temp/profile
+paths are not an OS sandbox. Project code/tests can still access files and networks.
+Use approved commands, local data and no production credentials. Structured reports
+alone do not prove meaningful or tamper-proof tests.
 
-## 8. Bestehende Projekte aktualisieren
+## 8. Update existing projects
 
-Beende aktive LoKiEnte-Aufträge und Fenster. Führe den neuen Provisionierer mit dem
-bisherigen Installationsverzeichnis aus. Er aktualisiert alle erreichbaren
-registrierten Projekte, ihre Aufgaben und `LOKI-WORKFLOW.md`.
+Stop active tasks/windows and run the new provisioner with the existing installation
+directory. Reachable registered projects, tasks and LOKI-WORKFLOW.md are updated.
+Legacy checks.json files are backed up and extended. Previously authorized,
+unambiguous test paths move from writePaths to testWritePaths on first migration.
+Commands/custom fields remain. Managed VS Code tasks gain automatic preparation;
+new requests can start directly in chat. Criteria, categories and suitable reports
+are derived and reviewed for each task. Legacy exit-code-only checks do not
+automatically become complete evidence.
 
-Alte `checks.json` erhalten eine Sicherung und die neuen Felder. Bereits
-freigegebene, eindeutig erkennbare Testpfade werden bei der erstmaligen Migration
-von `writePaths` nach `testWritePaths` verschoben. Befehle und eigene Felder bleiben
-erhalten. Die verwalteten VS-Code-Tasks verwenden danach die automatische
-Vorbereitung; neue Aufträge können direkt im Kilo-Chat starten. Kriterien,
-Kategorien und passende Berichte werden für den nächsten konkreten Auftrag
-abgeleitet und reviewed. Alte reine Exitcode-Prüfungen gelten weiterhin nicht
-automatisch als vollständiger Testnachweis.
+Existing personal ANLEITUNG.md or GUIDE.md files remain untouched. The managed
+LOKI-WORKFLOW.md describes the current workflow. German companions are supplied
+as LOKI-WORKFLOW.de.md, GUIDE.de.md and task.de.md. Existing user task text is not
+translated or replaced. Legacy managed German task labels are migrated without
+duplicating them or deleting unrelated custom tasks.
 
-Ein vorhandenes persönliches `ANLEITUNG.md` bleibt erhalten. Maßgeblich für den
-aktuellen Ablauf ist die verwaltete Datei `LOKI-WORKFLOW.md`.
+Technical references: [Node reporters](https://nodejs.org/api/test.html#test-reporters)
+and [Kilo agents](https://kilo.ai/docs/customize/custom-subagents). Approved versions
+for your installation appear in the provisioning report.
 
-Technischer Hintergrund: [Node-Testreporter](https://nodejs.org/api/test.html#test-reporters)
-und [Kilo-Agenten](https://kilo.ai/docs/customize/custom-subagents). Die für deine
-Installation freigegebenen Versionen stehen im Provisionierungsbericht.
-# Welcome-Probelauf
+## Welcome trial
 
-Die Provisionierung registriert ein eigenes Testprojekt unter
-welcome/workflow-test. Wähle es im Launcher und kopiere den Auftrag aus seiner
-README in shadow-chat. Die absichtlich fehlerhafte Rabattfunktion benötigt
-nur Node.js ohne externe Pakete. Ein Anfangscommit ist bereits vorhanden.
-Updates erhalten den bearbeiteten Stand; New-WelcomeTestProject.ps1 -NewExample
-erzeugt einen weiteren, getrennten Versuch. Der Test prüft den Basisworkflow
-mit roten/grünen Tests; Security-/Integrationsrollen sind bedarfsabhängig.
-
+Provisioning registers welcome/workflow-test. Select it in the launcher and paste
+its README task into shadow-chat. Its intentionally faulty discount function needs
+only Node.js without external packages. An initial commit already exists. Updates
+preserve modifications; New-WelcomeTestProject.ps1 -NewExample creates a separate
+fresh attempt. The test exercises the basic workflow with failing/passing tests;
+security/integration roles are required only when applicable.

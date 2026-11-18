@@ -278,7 +278,7 @@ try{
     $probeResult=Invoke-AuditNative $exe @('-NoLogo','-NoProfile','-NonInteractive','-Command','[Console]::Error.Write("expected refusal"); exit 1') -AllowFailure
     Assert-AuditTest ($probeResult.ExitCode -eq 1 -and $probeResult.Stderr -ceq 'expected refusal') 'Native probe preserves expected exit status and stderr'
     $failed=$false
-    try{$null=Invoke-AuditNative $exe @('-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 30') -TimeoutSeconds 1}catch{$failed=$_.Exception.Message -match 'Zeitlimit'}
+    try{$null=Invoke-AuditNative $exe @('-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 30') -TimeoutSeconds 1}catch{$failed=$_.Exception.Message -match 'Timeout'}
     Assert-AuditTest $failed 'Real audit subprocess timeout terminates its own process and reports failure'
     $httpDefinition=$auditAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-AuditJson'},$false)
     . ([scriptblock]::Create($httpDefinition.Extent.Text))
@@ -303,7 +303,7 @@ try{
         try{$null=Invoke-AuditJson -Uri "http://127.0.0.1:$httpPort/redirect" -BearerToken synthetic}catch{$failed=$_.Exception.Message -match 'HTTP 302'}
         Assert-AuditTest $failed 'HTTP redirects are rejected rather than forwarding credentials'
         $failed=$false
-        try{$null=Invoke-AuditJson -Uri "http://127.0.0.1:$httpPort/ok" -BearerToken ("private-header-fragment`ninvalid")}catch{$failed=$_.Exception.Message -notmatch 'private-header-fragment' -and $_.Exception.Message -match 'Headerzeichen'}
+        try{$null=Invoke-AuditJson -Uri "http://127.0.0.1:$httpPort/ok" -BearerToken ("private-header-fragment`ninvalid")}catch{$failed=$_.Exception.Message -notmatch 'private-header-fragment' -and $_.Exception.Message -match 'header characters'}
         Assert-AuditTest $failed 'Invalid token header characters fail without printing the token'
     }finally{
         if(-not $serverProcess.HasExited){$serverProcess.Kill();$serverProcess.WaitForExit()}

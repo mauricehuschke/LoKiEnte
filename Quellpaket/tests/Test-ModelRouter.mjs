@@ -100,10 +100,10 @@ test('resource refusal is reported explicitly by the real controller process', a
     const switcher = makePowerShellSwitcher({ installRoot: root, pwsh: 'pwsh.exe', switchScript: script });
     await assert.rejects(() => switcher({ Alias: 'coder-high' }),
       error => error.code === 'model_memory_unavailable' && error.status === 503 &&
-        error.message.includes('Modelldatei bleibt erhalten'));
+        error.message.includes('model file is preserved'));
     await assert.rejects(() => switcher({ Alias: 'coder-fast' }),
       error => error.code === 'model_unverified' && error.status === 503 &&
-        error.message.includes('Werkzeugtest'));
+        error.message.includes('tool test'));
     const profiles = ['coder-high', 'review'].map(alias => ({
       Alias: alias, RouteId: `shadow-${alias}`, InstanceId: `owned-${alias}`,
       ContextLength: 16384, OutputLimit: 4096,

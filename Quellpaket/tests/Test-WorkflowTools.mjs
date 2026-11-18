@@ -20,7 +20,7 @@ const context = { directory: project, sessionID: 'fixture-session', abort: new A
 let passed = 0;
 const started = [];
 let tools;
-function runIdFrom(text) { const match = text.match(/Auftrag: `([a-f0-9-]{36})`/); assert.ok(match, text); return match[1]; }
+function runIdFrom(text) { const match = text.match(/Task: `([a-f0-9-]{36})`/); assert.ok(match, text); return match[1]; }
 async function state(runId) { return JSON.parse(await fs.readFile(path.join(root, 'workflow-jobs', runId, 'status.json'), 'utf8')); }
 async function waitFor(runId, predicate, timeout = 15000) {
   const until = Date.now() + timeout;
@@ -81,7 +81,7 @@ if ($task -eq 'wrong-exit') { $exit=1 }
 $receipt=Join-Path $run 'receipt.json'
 @{schema_version=2;request_id=$request;project=$ProjectPath;status=$status;final_fingerprint=$fingerprint;error=$errorText;rounds=@(@{status=$status;reasons=@('fixture evidence');checks=@(@{name='fixture-check';passed=$true})})} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receipt -Encoding utf8
 Event 'validation' 'shadow-validator' 'finished' 'Tests checked'
-Write-Output "Pruefbericht: $receipt"
+Write-Output "Verification report: $receipt"
 exit $exit
 `;
 
@@ -102,24 +102,24 @@ try {
   await test('permission and child guards, fixed tool argument surface', async () => {
     assert.deepEqual(Object.keys(tools.startTool.args), ['task']);
     for (const name of ['statusTool', 'cancelTool', 'detailsTool']) assert.deepEqual(Object.keys(tools[name].args), ['runId']);
-    await assert.rejects(tools.startTool.execute({ task: 'test' }, { directory: project }), /Werkzeugberechtigung/);
+    await assert.rejects(tools.startTool.execute({ task: 'test' }, { directory: project }), /tool authorization/);
     await assert.rejects(tools.startTool.execute({ task: 'test' }, { ...context, ask: async () => { throw new Error('Denied by Kilo'); } }), /Denied by Kilo/);
     const previous = process.env.LOKI_WORKFLOW_CHILD;
     try {
       process.env.LOKI_WORKFLOW_CHILD = '1';
-      for (const tool of Object.values(tools)) await assert.rejects(tool.execute({ task: 'test', runId: 'x' }, context), /Unteragent/);
+      for (const tool of Object.values(tools)) await assert.rejects(tool.execute({ task: 'test', runId: 'x' }, context), /subagent/);
     } finally { if (previous === undefined) delete process.env.LOKI_WORKFLOW_CHILD; else process.env.LOKI_WORKFLOW_CHILD = previous; }
     await assert.rejects(tools.startTool.execute({ task: 'x'.repeat(20001) }, context), /20000/);
     await assert.rejects(tools.startTool.execute({ task: '  ' }, context), /20000/);
-    await assert.rejects(tools.startTool.execute({ task: 'test' }, { ...context, directory: fixture }), /registriert/);
-    await assert.rejects(tools.statusTool.execute({ runId: '../outside' }, context), /Auftragskennung/);
-    await assert.rejects(managedPath(root, path.join(fixture, 'elsewhere')), /ausserhalb/);
+    await assert.rejects(tools.startTool.execute({ task: 'test' }, { ...context, directory: fixture }), /registered/);
+    await assert.rejects(tools.statusTool.execute({ runId: '../outside' }, context), /task identifier/);
+    await assert.rejects(managedPath(root, path.join(fixture, 'elsewhere')), /outside/);
   });
 
   await test('visible phases, project lock, binding and verified receipt', async () => {
     const runId = await start('success');
-    await assert.rejects(tools.startTool.execute({ task: 'parallel' }, context), /bereits ein LoKiEnte-Auftrag/);
-    await assert.rejects(tools.statusTool.execute({ runId }, { ...context, directory: secondProject }), /gehoert nicht/);
+    await assert.rejects(tools.startTool.execute({ task: 'parallel' }, context), /LoKiEnte task is already/);
+    await assert.rejects(tools.statusTool.execute({ runId }, { ...context, directory: secondProject }), /does not belong/);
     const done = await finish(runId);
     assert.equal(done.status, 'VERIFIED', JSON.stringify(done)); assert.equal(done.exitCode, 0);
     assert.ok(done.phaseSummary.some(event => event.role === 'shadow-reviewer'));
@@ -133,7 +133,7 @@ try {
     assert.match(card, /shadow-planner/); assert.match(card, /shadow-reviewer/);
     assert.match(card, /shadow-validator/); assert.match(card, /fixture\/local/);
     const details = await tools.detailsTool.execute({ runId }, context);
-    assert.match(details, /fixture evidence/); assert.match(details, /Pruefbericht/);
+    assert.match(details, /fixture evidence/); assert.match(details, /Verification report/);
     assert.match(await fs.readFile(path.join(root, 'projects', 'one', 'LOKI-STATUS.md'), 'utf8'), /VERIFIED/);
   });
 
@@ -145,17 +145,17 @@ try {
     const runId = await start('cancel');
     await waitFor(runId, current => current.events.some(event => event.role === 'shadow-coder'));
     const owner = (await state(runId)).workerPid;
-    await assert.rejects(runJob(root, runId), /bereits einen Worker/);
+    await assert.rejects(runJob(root, runId), /already has a worker/);
     assert.equal((await state(runId)).workerPid, owner);
     assert.equal((await fs.readdir(path.join(root, 'workflow-jobs', 'locks'))).length, 1);
-    assert.match(await tools.detailsTool.execute({ runId }, context), /Bericht liegt noch nicht vor/);
+    assert.match(await tools.detailsTool.execute({ runId }, context), /No final verified report is available/);
     const descendant = Number((await fs.readFile(path.join(root, 'workflow-jobs', runId, 'fixture-child-pid.txt'), 'utf8')).trim());
     const abort = new AbortController(); abort.abort();
     const before = Date.now();
     const status = await tools.statusTool.execute({ runId }, { ...context, abort: abort.signal });
     assert.ok(Date.now() - before < 1000); assert.match(status, /RUNNING/);
     assert.equal((await state(runId)).status, 'RUNNING');
-    assert.match(await tools.cancelTool.execute({ runId }, context), /Abbruch/);
+    assert.match(await tools.cancelTool.execute({ runId }, context), /cancellation/i);
     const done = await finish(runId); assert.equal(done.status, 'CANCELLED', JSON.stringify(done));
     assert.throws(() => process.kill(descendant, 0), error => error.code === 'ESRCH', 'Own descendant must also be stopped');
     assert.equal((await fs.readdir(path.join(root, 'workflow-jobs', 'locks'))).length, 0);
@@ -172,16 +172,16 @@ try {
     await fs.writeFile(path.join(job, 'request.json'), JSON.stringify(request));
     await fs.writeFile(path.join(job, 'status.json'), JSON.stringify(stale));
     assert.match(await tools.statusTool.execute({ runId }, context), /WORKER_UNRESPONSIVE/);
-    assert.match(await tools.cancelTool.execute({ runId }, context), /Abbruch/);
+    assert.match(await tools.cancelTool.execute({ runId }, context), /cancellation/i);
     assert.equal((await fs.stat(path.join(job, 'cancel'))).isFile(), true);
   });
 
   await test('state symlinks and duplicate registrations rejected', async () => {
     const link = path.join(root, 'linked-state');
     await fs.symlink(path.join(root, 'projects', 'one'), link, process.platform === 'win32' ? 'junction' : 'dir');
-    await assert.rejects(managedPath(root, path.join(link, 'checks.json')), /Verknuepfungen/);
+    await assert.rejects(managedPath(root, path.join(link, 'checks.json')), /Links/);
     await fs.writeFile(path.join(root, 'workspaces.json'), JSON.stringify([...registrations, registrations[0]]));
-    await assert.rejects(tools.startTool.execute({ task: 'test' }, context), /eindeutig registriert/);
+    await assert.rejects(tools.startTool.execute({ task: 'test' }, context), /uniquely registered/);
     await fs.writeFile(path.join(root, 'workspaces.json'), JSON.stringify(registrations));
   });
   assert.ok(['loki_start', 'loki_status', 'loki_cancel', 'loki_details'].every(permission => calls.includes(permission)));

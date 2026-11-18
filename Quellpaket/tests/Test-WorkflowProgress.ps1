@@ -38,6 +38,7 @@ const poll=setInterval(()=>{if(fs.existsSync(marker)){clearTimeout(timer);clearI
     Write-ShadowAgentProgress -Line '{"type":"tool_use","sessionID":"session-1","part":{"tool":"read","state":{"status":"completed","input":{"password":"not-in-progress"}}}}' -Phase 'review' -Role 'shadow-reviewer' -Model 'lmstudio/review'
     $event=ConvertFrom-Json ([IO.File]::ReadAllText($events))
     Assert ($event.role -ceq 'shadow-reviewer' -and $event.tool -ceq 'read' -and $event.sessionId -ceq 'session-1') 'Progress lost role/model/tool identity'
+    Assert ($event.message -ceq 'Tool: completed') 'Tool progress is not English'
     Assert (-not [IO.File]::ReadAllText($events).Contains('not-in-progress')) 'Raw tool arguments leaked into progress'
     $failed=$false;try{Initialize-ShadowWorkflowProgress -InstallRoot $root -RunPath $run -ProgressFile (Join-Path $root 'outside/events.jsonl')}catch{$failed=$true}
     Assert $failed 'Arbitrary progress path accepted'

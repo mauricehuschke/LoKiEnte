@@ -48,13 +48,13 @@ Assert-Variant ($null -ne (Find-LrModel -Models @($legacy) -Profile $profiles[0]
 $wrong=[pscustomobject]@{type='llm';modelKey=$keys[0]+'@q8_0';path=$keys[0];deviceIdentifier=$null;indexedModelIdentifier=$keys[0]+'@lmstudio-community/Qwen3.8-27B-GGUF/other.gguf'}
 $script:models[0].selectedVariant=$wrong.modelKey
 $script:groups[0].variants=@($wrong)
-Assert-VariantThrow {Assert-LrSelectedModel -LmsPath fixture -LogDirectory fixture -ExpectedPath $profiles[0].Definition.ExpectedPath -ModelPath $keys[0]} 'geaendert' 'Changed selected variant stops before loading'
+Assert-VariantThrow {Assert-LrSelectedModel -LmsPath fixture -LogDirectory fixture -ExpectedPath $profiles[0].Definition.ExpectedPath -ModelPath $keys[0]} 'changed' 'Changed selected variant stops before loading'
 $script:models[0].selectedVariant=$keys[0]+'@'+$suffixes[0]
 $script:groups[0].variants=@()
-Assert-VariantThrow {Get-LrDownloadedModels -LmsPath fixture -LogDirectory fixture} 'nicht eindeutig' 'Missing variant metadata fails closed'
+Assert-VariantThrow {Get-LrDownloadedModels -LmsPath fixture -LogDirectory fixture} 'not unique|not.*uniquely|ambiguous' 'Missing variant metadata fails closed'
 $script:groups[0].variants=@([pscustomobject]@{modelKey=$script:models[0].selectedVariant;path=$keys[0];deviceIdentifier=$null;indexedModelIdentifier='unexpected'})
-Assert-VariantThrow {Get-LrDownloadedModels -LmsPath fixture -LogDirectory fixture} 'Dateiidentitaet' 'Unverifiable variant source fails closed'
+Assert-VariantThrow {Get-LrDownloadedModels -LmsPath fixture -LogDirectory fixture} 'file identity' 'Unverifiable variant source fails closed'
 $script:groups[0].variants=@([pscustomobject]@{modelKey=$script:models[0].selectedVariant;path=$keys[0];deviceIdentifier=$null;indexedModelIdentifier=$keys[0]+'@'+$profiles[0].Definition.ExpectedPath})
 $script:groups+=@($script:groups[0])
-Assert-VariantThrow {Get-LrDownloadedModels -LmsPath fixture -LogDirectory fixture} 'nicht eindeutig' 'Duplicate local groups fail closed'
+Assert-VariantThrow {Get-LrDownloadedModels -LmsPath fixture -LogDirectory fixture} 'not unique|not.*uniquely|ambiguous' 'Duplicate local groups fail closed'
 [pscustomobject]@{suite='LM Studio model variants';passed=$true;checks=$count}|ConvertTo-Json

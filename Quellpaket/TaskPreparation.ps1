@@ -40,15 +40,15 @@ function Get-ShadowPreparationContext {
     $source=Get-ShadowSourceFingerprint -ProjectPath $project
     $all=Get-ShadowGitOutput $project @('ls-files','--cached','--others','--exclude-standard','-z')
     $files=@($all.Split([char]0,[StringSplitOptions]::RemoveEmptyEntries) | Sort-Object -Unique | Where-Object {Test-ShadowPreparationFile $project $_})
-    if($files.Count -gt 20000){throw 'NEEDS_INPUT: Projekt hat mehr als 20000 relevante Dateien. Einen begrenzten Projektteil vorbereiten.'}
+    if($files.Count -gt 20000){throw 'NEEDS_INPUT: Project has more than 20000 relevant files. Prepare a bounded part of the project.'}
     $tests=@($files | Where-Object {$_ -match '(?i)(?:^|/)(?:tests?|__tests__|specs?|e2e|integration)/|\.(?:test|spec)\.|(?:^|/)test_[^/]+$|_test\.[^/]+$'})
     $inputs=[ordered]@{};$manifests=[ordered]@{};$candidates=[Collections.Generic.List[object]]::new()
     $node=Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     $adapter=Join-Path $ApplicationRoot 'Run-ProjectCheck.mjs'
     $packagePath=Join-Path $project 'package.json';$package=@{}
     if(Test-Path -LiteralPath $packagePath -PathType Leaf){
-        if(-not(Test-ShadowPreparationFile $project 'package.json')){throw 'NEEDS_INPUT: package.json ist verknuepft.'}
-        if((Get-Item -LiteralPath $packagePath).Length -gt 1048576){throw 'NEEDS_INPUT: package.json ist zu gross.'}
+        if(-not(Test-ShadowPreparationFile $project 'package.json')){throw 'NEEDS_INPUT: package.json is linked.'}
+        if((Get-Item -LiteralPath $packagePath).Length -gt 1048576){throw 'NEEDS_INPUT: package.json is too large.'}
         $package=ConvertFrom-ShadowJsonObject ([IO.File]::ReadAllText($packagePath))
         $inputs['package.json']=(Get-FileHash -LiteralPath $packagePath).Hash
         $dependencies=@()
@@ -102,14 +102,14 @@ function Get-ShadowPreparationContext {
     $existing=[ordered]@{};$existingHash=$null
     if(Test-Path -LiteralPath $ChecksFile){
         $item=Get-Item -LiteralPath $ChecksFile -Force
-        if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 1048576){throw 'NEEDS_INPUT: checks.json ist keine regulaere begrenzte Datei.'}
+        if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 1048576){throw 'NEEDS_INPUT: checks.json is not a regular size-limited file.'}
         $existing=ConvertFrom-ShadowJsonObject ([IO.File]::ReadAllText($ChecksFile))
         $existingHash=(Get-FileHash -LiteralPath $ChecksFile).Hash
         if($existing.Contains('checks')){
-            if($existing.checks -isnot [array]){throw 'NEEDS_INPUT: Vorhandenes checks-Feld ist kein Array.'}
+            if($existing.checks -isnot [array]){throw 'NEEDS_INPUT: Existing checks field is not an array.'}
             $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
             foreach($check in $existing.checks){
-                if($check -isnot [Collections.IDictionary] -or -not $check.Contains('name') -or $check.name -isnot [string] -or -not $seen.Add($check.name)){throw 'NEEDS_INPUT: Vorhandene Checks sind ungueltig oder doppelt benannt.'}
+                if($check -isnot [Collections.IDictionary] -or -not $check.Contains('name') -or $check.name -isnot [string] -or -not $seen.Add($check.name)){throw 'NEEDS_INPUT: Existing checks are invalid or have duplicate names.'}
                 $usable=$check.Contains('kind') -and $check.kind -in @('test','integration','static') -and $check.Contains('command') -and $check.Contains('arguments') -and $check.arguments -is [array] -and $check.Contains('timeoutSeconds')
                 if($usable -and $check.kind -ne 'static'){$usable=$check.Contains('reportFormat') -and $check.reportFormat -in @('junit','json')}
                 $candidates.Add([ordered]@{id='existing:'+ $check.name;origin='existing';framework='existing';usable=[bool]$usable;definition=$check;notes=if($usable){'Existing user check; retained unchanged.'}else{'Legacy incomplete check. A detected structured replacement must be explicitly selected and independently reviewed; original definition remains saved.'}})
@@ -161,55 +161,55 @@ function Get-ShadowPreparationPromptContext {
 function New-ShadowPreparedPolicy {
     [CmdletBinding()]
     param([Parameter(Mandatory)]$Context,[Parameter(Mandatory)][string]$TaskText,[Parameter(Mandatory)][Collections.IDictionary]$Proposal)
-    foreach($key in @('workflow','acceptanceCriteria','changeTypes','writePaths','testWritePaths','checkIds')){if(-not $Proposal.Contains($key)){throw "NEEDS_INPUT: Vorbereitung ohne $key."}}
-    if($Proposal.workflow -cnotin @('Feature','Bugfix','Refactor','Review','Architecture')){throw 'NEEDS_INPUT: Unbekannter Workflow.'}
-    if($TaskText.Length -gt 20000 -or [string]::IsNullOrWhiteSpace($TaskText)){throw 'NEEDS_INPUT: Auftrag fehlt oder ist zu gross.'}
+    foreach($key in @('workflow','acceptanceCriteria','changeTypes','writePaths','testWritePaths','checkIds')){if(-not $Proposal.Contains($key)){throw "NEEDS_INPUT: Preparation missing $key."}}
+    if($Proposal.workflow -cnotin @('Feature','Bugfix','Refactor','Review','Architecture')){throw 'NEEDS_INPUT: Unknown workflow.'}
+    if($TaskText.Length -gt 20000 -or [string]::IsNullOrWhiteSpace($TaskText)){throw 'NEEDS_INPUT: Task missing or too large.'}
     $readonly=$Proposal.workflow -in @('Review','Architecture')
     foreach($key in @('writePaths','testWritePaths')){
-        if($Proposal[$key] -isnot [array] -or $Proposal[$key].Count -gt 60){throw "NEEDS_INPUT: $key muss ein begrenztes Array sein."}
+        if($Proposal[$key] -isnot [array] -or $Proposal[$key].Count -gt 60){throw "NEEDS_INPUT: $key must be a bounded array."}
         if($Proposal[$key].Count){$null=Get-ShadowWritePaths -Policy @{writePaths=$Proposal[$key]} -ProjectPath $Context.ProjectPath}
     }
-    if(-not $readonly -and -not $Proposal.writePaths.Count){throw 'NEEDS_INPUT: Kein Produktionsdateiumfang ermittelt.'}
-    if($readonly -and ($Proposal.writePaths.Count -or $Proposal.testWritePaths.Count)){throw 'NEEDS_INPUT: Lesender Auftrag darf keine Schreibrechte enthalten.'}
-    foreach($path in $Proposal.writePaths){if($path -in $Proposal.testWritePaths){throw 'NEEDS_INPUT: Produktions- und Testdateiumfang ueberlappen.'}}
+    if(-not $readonly -and -not $Proposal.writePaths.Count){throw 'NEEDS_INPUT: No production file scope identified.'}
+    if($readonly -and ($Proposal.writePaths.Count -or $Proposal.testWritePaths.Count)){throw 'NEEDS_INPUT: Read-only task must not include write permissions.'}
+    foreach($path in $Proposal.writePaths){if($path -in $Proposal.testWritePaths){throw 'NEEDS_INPUT: Production and test file scopes overlap.'}}
     $existing=$Context.ExistingPolicy
-    if($existing.Contains('schemaVersion') -and $existing.schemaVersion -notin @(1,2)){throw 'NEEDS_INPUT: Unbekannte checks.json-Schemaversion. Keine automatische Herabstufung.'}
+    if($existing.Contains('schemaVersion') -and $existing.schemaVersion -notin @(1,2)){throw 'NEEDS_INPUT: Unknown checks.json schema version. No automatic downgrade.'}
     $policy=ConvertFrom-ShadowJsonObject (ConvertTo-Json -InputObject $existing -Depth 80)
     $notes=[Collections.Generic.List[string]]::new();$imported=[ordered]@{}
     $taskFields=@('writePaths','testWritePaths','acceptanceCriteria','changeTypes','regressionCheck')
     $previousAuto=$null
     if($existing.Contains('automation')){
-        if($existing.automation -isnot [Collections.IDictionary] -or -not $existing.automation.Contains('owner') -or $existing.automation.owner -cne 'LoKi task preparation v1'){throw 'NEEDS_INPUT: automation ist bereits anderweitig belegt.'}
+        if($existing.automation -isnot [Collections.IDictionary] -or -not $existing.automation.Contains('owner') -or $existing.automation.owner -cne 'LoKi task preparation v1'){throw 'NEEDS_INPUT: automation is already owned by something else.'}
         $previousAuto=$existing.automation
         if(-not $previousAuto.Contains('fieldHashes') -or $previousAuto.fieldHashes -isnot [Collections.IDictionary] -or
             -not $previousAuto.Contains('checkHashes') -or $previousAuto.checkHashes -isnot [Collections.IDictionary] -or
-            -not $previousAuto.Contains('generatedCheckNames') -or $previousAuto.generatedCheckNames -isnot [array]){throw 'NEEDS_INPUT: Herkunftsnachweis der vorbereiteten Felder fehlt.'}
+            -not $previousAuto.Contains('generatedCheckNames') -or $previousAuto.generatedCheckNames -isnot [array]){throw 'NEEDS_INPUT: Provenance record for prepared fields missing.'}
         foreach($field in $taskFields){
             if(-not $existing.Contains($field) -or -not $previousAuto.fieldHashes.Contains($field) -or (Get-ShadowPreparationHash $existing[$field]) -cne $previousAuto.fieldHashes[$field]){
-                throw "NEEDS_INPUT: $field wurde seit der letzten automatischen Vorbereitung manuell geaendert. Die Aenderung zuerst ausdruecklich als Vorgabe klaeren."
+                throw "NEEDS_INPUT: $field was manually changed since the last automatic preparation. First clarify this change explicitly as a requirement."
             }
         }
         foreach($name in $previousAuto.generatedCheckNames){
             $previousChecks=@(if($existing.Contains('checks')){$existing.checks | Where-Object {$_.name -ceq $name}})
             if($previousChecks.Count -ne 1 -or -not $previousAuto.checkHashes.Contains($name) -or
-                (Get-ShadowPreparationHash $previousChecks[0]) -cne $previousAuto.checkHashes[$name]){throw "NEEDS_INPUT: Automatisch erzeugter Check '$name' wurde manuell geaendert/entfernt. Herkunft zuerst klaeren."}
+                (Get-ShadowPreparationHash $previousChecks[0]) -cne $previousAuto.checkHashes[$name]){throw "NEEDS_INPUT: Automatically generated check '$name' was manually changed/removed. Clarify provenance first."}
         }
         if($previousAuto.Contains('importedTaskFields')){$imported=$previousAuto.importedTaskFields}
     }else{
         foreach($field in $taskFields){if($existing.Contains($field) -and $existing[$field]){$imported[$field]=$existing[$field]}}
-        if($imported.Count){$notes.Add('Vorhandene auftragsspezifische Felder werden fuer den neuen Auftrag neu abgeleitet; ihr Original bleibt unter automation.importedTaskFields und in der Dateisicherung erhalten. Reviewer muss die beabsichtigte Aufgabenabgrenzung bestaetigen.')}
+        if($imported.Count){$notes.Add('Existing task-specific fields will be derived again for the new task; originals are retained under automation.importedTaskFields and in the file backup. Reviewer must confirm the intended task boundary.')}
     }
     # Explicit durable limits are never inferred or broadened by a model.
     if($existing.Contains('limits')){
-        if($existing.limits -isnot [Collections.IDictionary]){throw 'NEEDS_INPUT: limits muss ein Objekt sein.'}
+        if($existing.limits -isnot [Collections.IDictionary]){throw 'NEEDS_INPUT: limits must be an object.'}
         foreach($pair in @(@('allowedWritePaths','writePaths'),@('allowedTestWritePaths','testWritePaths'))){
             if($existing.limits.Contains($pair[0])){
-                if($existing.limits[$pair[0]] -isnot [array]){throw 'NEEDS_INPUT: Grenzen muessen exakte Dateipfadarrays sein.'}
-                foreach($path in $Proposal[$pair[1]]){if($path -notin $existing.limits[$pair[0]]){throw "NEEDS_INPUT: $path liegt ausserhalb von limits.$($pair[0])."}}
+                if($existing.limits[$pair[0]] -isnot [array]){throw 'NEEDS_INPUT: Boundaries must be arrays of exact file paths.'}
+                foreach($path in $Proposal[$pair[1]]){if($path -notin $existing.limits[$pair[0]]){throw "NEEDS_INPUT: $path is outside limits.$($pair[0])."}}
             }
         }
     }
-    if($Proposal.checkIds -isnot [array]){throw 'NEEDS_INPUT: checkIds muss ein Array sein.'}
+    if($Proposal.checkIds -isnot [array]){throw 'NEEDS_INPUT: checkIds must be an array.'}
     $selected=[Collections.Generic.List[object]]::new();$selectedIds=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $generatedNames=if($previousAuto -and $previousAuto.Contains('generatedCheckNames')){@($previousAuto.generatedCheckNames)}else{@()}
     $wanted=@($Proposal.checkIds)
@@ -217,16 +217,16 @@ function New-ShadowPreparedPolicy {
     # different task do not silently become permanent scope or test requirements.
     foreach($candidate in $Context.Candidates){if($candidate.origin -ceq 'existing' -and $candidate.usable -and $candidate.definition.name -cnotin $generatedNames){$wanted+=@($candidate.id)}}
     foreach($id in $wanted){
-        if($id -isnot [string]){throw 'NEEDS_INPUT: Check-ID muss eine Zeichenfolge sein.'}
+        if($id -isnot [string]){throw 'NEEDS_INPUT: Check ID must be a string.'}
         if(-not $selectedIds.Add($id)){continue}
         $matches=@($Context.Candidates | Where-Object {$_.id -ceq $id})
-        if($matches.Count -ne 1){throw "NEEDS_INPUT: Unbekannter Checkkandidat $id."}
+        if($matches.Count -ne 1){throw "NEEDS_INPUT: Unknown check candidate $id."}
         $candidate=$matches[0]
-        if($candidate.origin -ceq 'existing' -and $candidate.definition.name -cin $generatedNames){throw "NEEDS_INPUT: Vorher erzeugter Check $id muss ueber seinen aktuellen erkannten Kandidaten neu gebunden werden."}
-        if($candidate.origin -ceq 'existing' -and -not $candidate.usable){throw "NEEDS_INPUT: Alter Check $id hat noch kein unterstuetztes strukturiertes Ergebnisformat. Erkannten Ersatz waehlen."}
+        if($candidate.origin -ceq 'existing' -and $candidate.definition.name -cin $generatedNames){throw "NEEDS_INPUT: Previously generated check $id must be rebound through its currently detected candidate."}
+        if($candidate.origin -ceq 'existing' -and -not $candidate.usable){throw "NEEDS_INPUT: Legacy check $id has no supported structured result format yet. Select a detected replacement."}
         $definition=ConvertFrom-ShadowJsonObject ($candidate.definition|ConvertTo-Json -Depth 30)
         if($candidate.origin -ceq 'detected' -and $candidate.framework -cne 'tsc'){
-            if($Context.Inventory.testFilesTruncated){throw 'NEEDS_INPUT: Mehr als 200 Testdateien erkannt; vorhandenen gezielten Projektcheck verwenden.'}
+            if($Context.Inventory.testFilesTruncated){throw 'NEEDS_INPUT: More than 200 test files detected; use an existing targeted project check.'}
             $pool=@($Context.AllTestFiles)+@($Proposal.testWritePaths)
             $extension=if($candidate.framework -ceq 'pytest'){'\.py$'}elseif($candidate.framework -ceq 'node'){'\.(?:cjs|mjs|js)$'}else{'\.(?:cjs|mjs|js|jsx|ts|tsx)$'}
             $paths=@($pool | Sort-Object -Unique | Where-Object {$_ -match $extension})
@@ -235,29 +235,29 @@ function New-ShadowPreparedPolicy {
                 $paths=@($paths | Where-Object {$_ -match $integrationPattern})
             }
             elseif($candidate.framework -ne 'playwright'){$paths=@($paths | Where-Object {$_ -notmatch '(?i)(?:^|/)(?:integration|e2e)(?:/|\.)|\.(?:integration|e2e)\.'})}
-            if(-not $paths.Count){throw "NEEDS_INPUT: Keine passenden Testdateien fuer $id. Exakte neue Testdateien im Vorschlag nennen."}
-            if($paths.Count -gt 200){throw "NEEDS_INPUT: Mehr als 200 Testdateien fuer $id; Projektchecks gezielt konfigurieren."}
-            foreach($path in $paths){if(-not(Test-ShadowPreparationFile $Context.ProjectPath $path)){throw 'NEEDS_INPUT: Testpfad ist verknuepft oder geschuetzt.'}}
+            if(-not $paths.Count){throw "NEEDS_INPUT: No suitable test files for $id. Specify exact new test files in the proposal."}
+            if($paths.Count -gt 200){throw "NEEDS_INPUT: More than 200 test files for $id; configure project checks explicitly."}
+            foreach($path in $paths){if(-not(Test-ShadowPreparationFile $Context.ProjectPath $path)){throw 'NEEDS_INPUT: Test path is linked or protected.'}}
             if($candidate.framework -ceq 'pytest'){$definition.arguments+=@($paths)}else{foreach($path in $paths){$definition.arguments+=@('--file',$path)}}
         }
         $selected.Add([ordered]@{id=$id;origin=$candidate.origin;definition=$definition})
     }
     $manualIncomplete=@($Context.Candidates | Where-Object {$_.origin -ceq 'existing' -and -not $_.usable})
     foreach($old in $manualIncomplete){
-        if($readonly){$notes.Add("Alter unvollstaendiger Check '$($old.definition.name)' bleibt gespeichert; lesender Auftrag fuehrt ihn nicht aus.");continue}
-        if(-not @($selected | Where-Object {$_.origin -ceq 'detected' -and $_.definition.kind -cne 'static'}).Count){throw "NEEDS_INPUT: Fuer den vorhandenen unvollstaendigen Check $($old.definition.name) fehlt ein strukturierter Ersatz."}
-        $notes.Add("Alter Check '$($old.definition.name)' bleibt unveraendert gespeichert. Der unabhaengige Reviewer muss den gewaehlten strukturierten Ersatz gegen den Originalbefehl und dessen Zweck pruefen.")
+        if($readonly){$notes.Add("Legacy incomplete check '$($old.definition.name)' remains saved; the read-only task will not execute it.");continue}
+        if(-not @($selected | Where-Object {$_.origin -ceq 'detected' -and $_.definition.kind -cne 'static'}).Count){throw "NEEDS_INPUT: No structured replacement for existing incomplete check $($old.definition.name)."}
+        $notes.Add("Legacy check '$($old.definition.name)' remains saved unchanged. The independent reviewer must compare the selected structured replacement with the original command and its purpose.")
     }
     $runChecks=@($selected | ForEach-Object {$_.definition})
-    if(@($runChecks | ForEach-Object {$_.name} | Sort-Object -Unique).Count -ne $runChecks.Count){throw 'NEEDS_INPUT: Ausgewaehlte Checks haben kollidierende Namen.'}
-    if($runChecks.Count -gt 12){throw 'NEEDS_INPUT: Mehr als zwoelf Checks im Auftrag.'}
+    if(@($runChecks | ForEach-Object {$_.name} | Sort-Object -Unique).Count -ne $runChecks.Count){throw 'NEEDS_INPUT: Selected checks have conflicting names.'}
+    if($runChecks.Count -gt 12){throw 'NEEDS_INPUT: More than twelve checks in the task.'}
     $policy.schemaVersion=2
     foreach($field in @('writePaths','testWritePaths','acceptanceCriteria','changeTypes')){$policy[$field]=$Proposal[$field]}
     $policy.regressionCheck=''
     if($Proposal.workflow -ceq 'Bugfix'){
-        if(-not $Proposal.Contains('regressionCheckId')){throw 'NEEDS_INPUT: Bugfix benoetigt regressionCheckId.'}
+        if(-not $Proposal.Contains('regressionCheckId')){throw 'NEEDS_INPUT: Bugfix requires regressionCheckId.'}
         $regression=@($selected | Where-Object {$_.id -ceq $Proposal.regressionCheckId -and $_.definition.kind -cne 'static'})
-        if($regression.Count -ne 1){throw 'NEEDS_INPUT: regressionCheckId bezeichnet keinen ausgewaehlten Testcheck.'}
+        if($regression.Count -ne 1){throw 'NEEDS_INPUT: regressionCheckId does not identify a selected test check.'}
         $policy.regressionCheck=$regression[0].definition.name
     }
     $savedChecks=[Collections.Generic.List[object]]::new()
@@ -272,7 +272,7 @@ function New-ShadowPreparedPolicy {
                 # paths only when its saved full definition still has provenance.
                 $name=$item.definition.name
                 if($name -cnotin $generatedNames -or -not $previousAuto.Contains('checkHashes') -or -not $previousAuto.checkHashes.Contains($name) -or
-                    (Get-ShadowPreparationHash $matching[0]) -cne $previousAuto.checkHashes[$name]){throw "NEEDS_INPUT: Check '$name' wurde manuell definiert/geaendert und darf nicht ersetzt werden."}
+                    (Get-ShadowPreparationHash $matching[0]) -cne $previousAuto.checkHashes[$name]){throw "NEEDS_INPUT: Check '$name' was manually defined/changed and must not be replaced."}
                 $index=$savedChecks.IndexOf($matching[0]);$savedChecks[$index]=$item.definition
             }
         }else{$savedChecks.Add($item.definition);if($item.origin -ceq 'detected'){$newGenerated.Add($item.definition.name)}}
@@ -296,14 +296,14 @@ function Save-ShadowPreparedPolicy {
     [CmdletBinding()]
     param([Parameter(Mandatory)]$Context,[Parameter(Mandatory)]$Prepared)
     # Must be called only after the external independent preparation review.
-    if((Get-ShadowSourceFingerprint $Context.ProjectPath).Fingerprint -cne $Context.SourceFingerprint){throw 'NEEDS_INPUT: Projekt seit der Vorbereitung geaendert.'}
-    foreach($name in $Context.InputHashes.Keys){if((Get-FileHash -LiteralPath (Join-Path $Context.ProjectPath $name)).Hash -cne $Context.InputHashes[$name]){throw "NEEDS_INPUT: Projekteingabe seit der Vorbereitung geaendert: $name"}}
+    if((Get-ShadowSourceFingerprint $Context.ProjectPath).Fingerprint -cne $Context.SourceFingerprint){throw 'NEEDS_INPUT: Project changed since preparation.'}
+    foreach($name in $Context.InputHashes.Keys){if((Get-FileHash -LiteralPath (Join-Path $Context.ProjectPath $name)).Hash -cne $Context.InputHashes[$name]){throw "NEEDS_INPUT: Project input changed since preparation: $name"}}
     if($Context.ExistingHash){
-        if(-not(Test-Path -LiteralPath $Context.ChecksFile -PathType Leaf) -or (Get-FileHash -LiteralPath $Context.ChecksFile).Hash -cne $Context.ExistingHash){throw 'NEEDS_INPUT: checks.json wurde zwischenzeitlich geaendert.'}
+        if(-not(Test-Path -LiteralPath $Context.ChecksFile -PathType Leaf) -or (Get-FileHash -LiteralPath $Context.ChecksFile).Hash -cne $Context.ExistingHash){throw 'NEEDS_INPUT: checks.json changed in the meantime.'}
         $backup=Join-Path $Context.InstallRoot ('backups/task-preparation/'+[DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')+'-'+[guid]::NewGuid().ToString('N')+'.checks.json')
         [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($backup))
         [IO.File]::Copy($Context.ChecksFile,$backup,$false)
-    }elseif(Test-Path -LiteralPath $Context.ChecksFile){throw 'NEEDS_INPUT: checks.json wurde zwischenzeitlich angelegt.'}
+    }elseif(Test-Path -LiteralPath $Context.ChecksFile){throw 'NEEDS_INPUT: checks.json was created in the meantime.'}
     Write-ShadowUtf8File -Path $Context.ChecksFile -Text ($Prepared.Policy|ConvertTo-Json -Depth 80)
     return $Context.ChecksFile
 }

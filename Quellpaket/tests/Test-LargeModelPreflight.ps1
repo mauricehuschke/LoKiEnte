@@ -36,14 +36,14 @@ try{
         @{Partial=[long]10000000000;Exists=$true;Remaining=[long]0}
     )
     $drive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($root))
-    if($drive.AvailableFreeSpace -lt [long]18003506752){throw 'Mindestens 16,77 GiB freier Testlaufwerksplatz erforderlich; es werden keine grossen Dateien erstellt.'}
+    if($drive.AvailableFreeSpace -lt [long]18003506752){throw 'At least 16.77 GiB of free test-drive space required; no large files are created.'}
     foreach($case in $cases){
         $script:partialExists=$case.Exists;$script:partialBytes=$case.Partial;$script:messages.Clear()
         $failure=$null
         try{Install-ShadowSelectedModels -Definitions $definitions -LmsPath 'fixture' -InstallRoot $root}
         catch{$failure=$_.Exception.Message}
         if($failure -cne 'PREFLIGHT_COMPLETED'){throw "Preflight did not reach the download boundary: $failure"}
-        $expected="Zusaetzlicher Platzbedarf etwa: Download {0:N2} GiB; Modellkopien {1:N2} GiB." -f ($case.Remaining/1GB),([long]9001753376/1GB)
+        $expected="Approximate additional space: download {0:N2} GiB; model copies {1:N2} GiB." -f ($case.Remaining/1GB),([long]9001753376/1GB)
         if(-not $script:messages.Contains($expected)){throw "Incorrect exact space calculation for partial length $($case.Partial)."}
     }
     if(@(Get-ChildItem -LiteralPath $modelRoot -Force).Count -ne 0){throw 'Preflight unexpectedly wrote a model file'}

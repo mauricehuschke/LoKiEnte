@@ -108,18 +108,18 @@ try {
     Assert-BootstrapThrow { Install-BootstrapPayload -Root $badHashRoot } 'SHA256' 'Bad payload digest is rejected'
     Assert-BootstrapTest (-not (Test-Path -LiteralPath $badHashRoot)) 'Digest failure causes no extraction writes'
     Set-TestPayload @(@{ Path = '../escaped.txt'; Content = 'must not be written' })
-    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'traversal') } 'Pfad|Paket' 'Parent traversal is rejected'
+    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'traversal') } 'path|package' 'Parent traversal is rejected'
     Assert-BootstrapTest (-not (Test-Path -LiteralPath (Join-Path $testRoot 'traversal/escaped.txt'))) 'Traversal creates no outside file'
     $preflightRoot = Join-Path $testRoot 'preflight'
     Set-TestPayload @(@{ Path = 'valid-first.txt'; Content = 'must remain unwritten' }, @{ Path = '../bad-later.txt'; Content = 'invalid' })
-    Assert-BootstrapThrow { Install-BootstrapPayload -Root $preflightRoot } 'Pfad|Paket' 'Every archive entry is validated before first write'
+    Assert-BootstrapThrow { Install-BootstrapPayload -Root $preflightRoot } 'path|package' 'Every archive entry is validated before first write'
     Assert-BootstrapTest (-not (Test-Path -LiteralPath $preflightRoot)) 'Later invalid entry does not partially extract earlier files'
     Set-TestPayload @(@{ Path = 'same.txt'; Content = 'first' }, @{ Path = 'SAME.txt'; Content = 'second' })
-    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'duplicates') } 'Doppelter' 'Case-insensitive duplicate ZIP destinations are rejected'
+    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'duplicates') } 'Duplicate' 'Case-insensitive duplicate ZIP destinations are rejected'
     Set-TestPayload @(@{ Path = 'file.txt:stream'; Content = 'invalid alternate stream' })
-    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'ads') } 'Windows-Pfad' 'Windows alternate data stream paths are rejected'
+    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'ads') } 'Windows path' 'Windows alternate data stream paths are rejected'
     Set-TestPayload @(@{ Path = 'folder'; Content = 'file' }, @{ Path = 'folder/child.txt'; Content = 'child' })
-    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'collision') } 'Kollision' 'File/directory collisions are rejected before extraction'
+    Assert-BootstrapThrow { Install-BootstrapPayload -Root (Join-Path $testRoot 'collision') } 'conflict' 'File/directory collisions are rejected before extraction'
 
     # A pre-existing reparse point must not turn an owned relative path into an external write.
     $linkedRoot = Join-Path $testRoot 'linked'
@@ -129,13 +129,13 @@ try {
     $linkType = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
     $null = New-Item -ItemType $linkType -Path (Join-Path $linkedRoot 'app/nested') -Target $outsideRoot
     Set-TestPayload @(@{ Path = 'nested/external.txt'; Content = 'must not escape' })
-    Assert-BootstrapThrow { Install-BootstrapPayload -Root $linkedRoot } 'Reparse|Verknuepfung|symbol|junction' 'Existing directory reparse point is rejected'
+    Assert-BootstrapThrow { Install-BootstrapPayload -Root $linkedRoot } 'Reparse|link|symbol|junction' 'Existing directory reparse point is rejected'
     Assert-BootstrapTest (-not (Test-Path -LiteralPath (Join-Path $outsideRoot 'external.txt'))) 'Reparse-point rejection preserves external destination'
     $backupLinkedRoot = Join-Path $testRoot 'linked-backup'
     $null = [IO.Directory]::CreateDirectory($backupLinkedRoot)
     $null = New-Item -ItemType $linkType -Path (Join-Path $backupLinkedRoot 'backups') -Target $outsideRoot
     Set-TestPayload @(@{ Path = 'safe.txt'; Content = 'not yet written' })
-    Assert-BootstrapThrow { Install-BootstrapPayload -Root $backupLinkedRoot } 'Reparse|Verknuepfung|symbol|junction' 'Existing backup directory reparse point is rejected'
+    Assert-BootstrapThrow { Install-BootstrapPayload -Root $backupLinkedRoot } 'Reparse|link|symbol|junction' 'Existing backup directory reparse point is rejected'
     Assert-BootstrapTest (-not (Test-Path -LiteralPath (Join-Path $backupLinkedRoot 'app'))) 'Backup reparse failure occurs before app files are written'
 
     # Exercise the real in-memory dispatch and exit propagation without live CLIs/network.
@@ -172,7 +172,7 @@ try {
     $badAudit=& $pwshExecutable -NoLogo -NoProfile -File $auditHarness -InstallRoot $auditInstall -AuditOnly
     Assert-BootstrapTest ($LASTEXITCODE -eq 2 -and ($badAudit|ConvertFrom-Json).error -match 'SHA256') 'Invalid bundle produces structured audit failure before executing embedded code'
     $timedOut=$false
-    try{$null=Invoke-BootstrapProcess $pwshExecutable @('-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 30') -TimeoutSeconds 1}catch{$timedOut=$_.Exception.Message -match 'Zeitlimit'}
+    try{$null=Invoke-BootstrapProcess $pwshExecutable @('-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 30') -TimeoutSeconds 1}catch{$timedOut=$_.Exception.Message -match 'Timeout'}
     Assert-BootstrapTest $timedOut 'Bootstrap process timeout is bounded and explicit'
     $unboundedExit=Invoke-BootstrapProcess $pwshExecutable @('-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Milliseconds 200; exit 0') -TimeoutSeconds 0
     Assert-BootstrapTest ($unboundedExit -eq 0) 'Unbounded setup wait permits completion instead of killing the child immediately'

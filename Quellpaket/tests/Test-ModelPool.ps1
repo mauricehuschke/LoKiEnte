@@ -92,7 +92,7 @@ function Invoke-LrApi {
 }
 try {
     $script:hiddenOptionsSupported=$false
-    Throws-Pool {Configure-LocalModelPool -InstallRoot (Join-Path $root 'unsupported')} 'Ladeoptionen nicht bestaetigt' 'Missing actual hidden-flag support blocks setup before loading'
+    Throws-Pool {Configure-LocalModelPool -InstallRoot (Join-Path $root 'unsupported')} 'load options not confirmed' 'Missing actual hidden-flag support blocks setup before loading'
     Assert-Pool ($script:loadCalls -eq 0 -and $script:downloadCalls -eq 0 -and $script:inferenceCalls -eq 0) 'Rejected capability probe neither downloads nor loads models'
     $script:hiddenOptionsSupported=$true
     $pool=Configure-LocalModelPool -InstallRoot $root
@@ -140,14 +140,14 @@ try {
     $script:public=$false
     $saved=$script:loaded;$beforeUnloads=$script:unloadCalls
     $script:loaded=@([pscustomobject]@{deviceIdentifier=$null;path='foreign.gguf';identifier='foreign';status='idle';queued=0;contextLength=16384;parallel=1})
-    Throws-Pool {Switch-ShadowLocalModel -InstallRoot $root -Alias review} 'fremdes' 'Foreign idle model is preserved and blocks switching'
+    Throws-Pool {Switch-ShadowLocalModel -InstallRoot $root -Alias review} 'external' 'Foreign idle model is preserved and blocks switching'
     Assert-Pool ($script:unloadCalls -eq $beforeUnloads) 'No foreign model unload was attempted'
     $script:loaded=$saved;$script:loaded[0].status='processing'
-    Throws-Pool {Get-SmpOwnedLoaded -Pool $again -Owner (Get-SmpOwner $root) -LogDirectory 'mock' -IdleTimeoutSeconds 0} 'arbeitet noch' 'Busy owned instance is not treated as idle after a client closes'
+    Throws-Pool {Get-SmpOwnedLoaded -Pool $again -Owner (Get-SmpOwner $root) -LogDirectory 'mock' -IdleTimeoutSeconds 0} 'still working' 'Busy owned instance is not treated as idle after a client closes'
     Assert-Pool ($script:unloadCalls -eq $beforeUnloads) 'Busy model was never unloaded'
     $script:loaded[0].status='idle'
     $lock=Enter-SmpLock -InstallRoot $root
-    try{Throws-Pool {Enter-SmpLock -InstallRoot $root -TimeoutSeconds 0} 'anderer Prozess' 'FileShare.None prevents a second model controller'}finally{$lock.Dispose()}
+    try{Throws-Pool {Enter-SmpLock -InstallRoot $root -TimeoutSeconds 0} 'Another process' 'FileShare.None prevents a second model controller'}finally{$lock.Dispose()}
     $script:badRest=$true
     Throws-Pool {Switch-ShadowLocalModel -InstallRoot $root -Alias review} 'Simulated REST timeout' 'Verification failure after successful load remains an explicit error'
     $pending=@((Get-SmpOwner $root).Entries|Where-Object {$_.Origin -ceq 'pending-explicit-load'})
@@ -155,7 +155,7 @@ try {
     $afterFailureLoads=$script:loadCalls;$afterFailureUnloads=$script:unloadCalls
     $expectedPath=$script:loaded[0].path
     $script:loaded[0].path='foreign.gguf'
-    Throws-Pool {Switch-ShadowLocalModel -InstallRoot $root -Alias review} 'stimmt nicht' 'A pending identifier with a different path is never adopted'
+    Throws-Pool {Switch-ShadowLocalModel -InstallRoot $root -Alias review} 'does not match' 'A pending identifier with a different path is never adopted'
     Assert-Pool ($script:unloadCalls -eq $afterFailureUnloads) 'Mismatched pending instance remains untouched'
     $script:loaded[0].path=$expectedPath
     $recovered=Switch-ShadowLocalModel -InstallRoot $root -Alias review
@@ -169,7 +169,7 @@ try {
     $loadsBeforeStart=$script:loadCalls
     $started=Start-LocalModelPool -InstallRoot $root
     Assert-Pool ($started.Status -ceq 'Ready' -and $script:loadCalls -eq $loadsBeforeStart) 'Router startup does not force a deferred primary model to load'
-    Throws-Pool {Switch-ShadowLocalModel -InstallRoot $root -Alias coder-high} 'Modelltest' 'A deferred profile is not claimed verified until its test succeeds'
+    Throws-Pool {Switch-ShadowLocalModel -InstallRoot $root -Alias coder-high} 'model test' 'A deferred profile is not claimed verified until its test succeeds'
     $script:badSmoke=$false;$script:loaded=@()
     $optRoot=Join-Path $root 'offload-opt-in'
     $optPool=Configure-LocalModelPool -InstallRoot $optRoot -AllowPartialGpuOffload
@@ -212,9 +212,9 @@ try {
     $deferredHigh=@($deferredPool.Profiles|Where-Object {$_.Alias -ceq 'coder-high'})[0]
     Assert-Pool ($deferredPool.Status -ceq 'Ready' -and $deferredPool.VerificationStatus -ceq 'Partial' -and
         $deferredHigh.VerificationState -ceq 'Deferred' -and $deferredHigh.SmokeTests.Chat -ceq 'NotRun' -and
-        $script:downloaded.Contains($script:noFitPath) -and $deferredHigh.VerificationMessage -notmatch 'abgelehnt') 'Insufficient memory defers the model without a load attempt by default'
+        $script:downloaded.Contains($script:noFitPath) -and $deferredHigh.VerificationMessage -notmatch 'rejected') 'Insufficient memory defers the model without a load attempt by default'
     $deferredCatalog=Get-ShadowPoolCatalog $deferredPool
-    Assert-Pool ($deferredCatalog['coder-high'].name -match '\[NOCH NICHT GEPRUEFT\]$') 'The unverified model remains visible with an explicit status label'
+    Assert-Pool ($deferredCatalog['coder-high'].name -match '\[NOT YET VERIFIED\]$') 'The unverified model remains visible with an explicit status label'
     $script:rejectNoFit=$false;$script:noFitPath=''
     $recoveredHigh=Switch-ShadowLocalModel -InstallRoot $deferredRoot -Alias coder-high
     $afterRecovery=Get-Content -LiteralPath (Join-Path $deferredRoot 'runtime/model-pool.json') -Raw|ConvertFrom-Json

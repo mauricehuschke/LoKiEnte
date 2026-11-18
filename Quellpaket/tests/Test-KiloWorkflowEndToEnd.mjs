@@ -15,7 +15,7 @@ const task='Fix app.cjs so that the function returns two. Add an independent reg
 let runId,state,checks=0;
 try{
   const initial=await tools.startTool.execute({task},context);
-  runId=/Auftrag: `([a-f0-9-]{36})`/.exec(initial)?.[1];
+  runId=/Task: `([a-f0-9-]{36})`/.exec(initial)?.[1];
   assert.ok(runId,initial);assert.match(initial,/QUEUED/);checks++;
   const job=path.join(root,'workflow-jobs',runId);
   const request=await readJson(path.join(job,'request.json'));
@@ -46,7 +46,7 @@ try{
   const visible=state.phaseSummary??state.events;
   assert.ok(expected.every(role=>visible.some(event=>event.role===role)),JSON.stringify(visible));
   for(const role of expected)assert.equal(visible.find(event=>event.role===role).model,calls.find(call=>call.role===role).model,'Visible model differs for '+role);checks++;
-  assert.match(await fs.readFile(path.join(request.stateDirectory,'LOKI-STATUS.md'),'utf8'),/VERIFIED/);assert.match(await tools.detailsTool.execute({runId},context),/Pruefergebnis/);checks++;
+  assert.match(await fs.readFile(path.join(request.stateDirectory,'LOKI-STATUS.md'),'utf8'),/VERIFIED/);assert.match(await tools.detailsTool.execute({runId},context),/Verification result/);checks++;
   await assert.rejects(fs.stat(path.join(root,'workflow-jobs','locks',lockName(project))),{code:'ENOENT'});
   assert.ok(['loki_start','loki_status','loki_details'].every(permission=>permissions.includes(permission)));checks++;
   console.log(JSON.stringify({suite:'Kilo chat to real reviewed workflow',passed:true,checks,limitations:'Synthetic Kilo/model responses; actual worker, runner, Git and Node red/green assertions. No GUI/model inference.'}));

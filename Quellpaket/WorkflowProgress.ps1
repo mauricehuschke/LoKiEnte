@@ -7,15 +7,15 @@ function Initialize-ShadowWorkflowProgress {
         $path=[IO.Path]::GetFullPath($ProgressFile)
         $jobs=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'workflow-jobs')).TrimEnd('\','/')
         if(-not $path.StartsWith($jobs+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or
-           [IO.Path]::GetFileName($path) -cne 'events.jsonl'){throw 'ProgressFile muss events.jsonl in einem lokalen Workflowjob sein.'}
+           [IO.Path]::GetFileName($path) -cne 'events.jsonl'){throw 'ProgressFile must be events.jsonl in a local workflow job.'}
         $cursor=[IO.DirectoryInfo]::new([IO.Path]::GetDirectoryName($path))
         while($cursor -and $cursor.FullName.Length -ge $jobs.Length){
-            if($cursor.Exists -and ($cursor.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Verknuepfung im Fortschrittspfad.'}
+            if($cursor.Exists -and ($cursor.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Link in progress path.'}
             $cursor=$cursor.Parent
         }
         if(Test-Path -LiteralPath $path){
             $item=Get-Item -LiteralPath $path -Force
-            if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Ungueltige Fortschrittsdatei.'}
+            if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Invalid progress file.'}
         }
         $script:ShadowWorkflowProgressPath=$path
     }
@@ -39,13 +39,13 @@ function Write-ShadowAgentProgress {
     $session=if($event.Contains('sessionID')){[string]$event.sessionID}else{''}
     if($event.type -ceq 'tool_use' -and $event.Contains('part') -and $event.part -is [Collections.IDictionary]){
         $tool=if($event.part.Contains('tool')){[string]$event.part.tool}else{'tool'}
-        $state='tool';$message='Werkzeug aktiv'
+        $state='tool';$message='Tool active'
         if($event.part.Contains('state') -and $event.part.state -is [Collections.IDictionary] -and $event.part.state.Contains('status')){
-            $message='Werkzeug: '+[string]$event.part.state.status
+            $message='Tool: '+[string]$event.part.state.status
         }
         Write-ShadowWorkflowProgress -Phase $Phase -Role $Role -Model $Model -State $state -Message $message -SessionId $session -Tool $tool
     }elseif($event.type -cin @('step_start','step_finish','error','text')){
-        $message=switch -CaseSensitive ($event.type){'step_start'{'Agent arbeitet'} 'step_finish'{'Agentenschritt abgeschlossen'} 'error'{'Agent meldet Fehler'} 'text'{'Agentenantwort eingegangen'}}
+        $message=switch -CaseSensitive ($event.type){'step_start'{'Agent working'} 'step_finish'{'Agent step completed'} 'error'{'Agent reports an error'} 'text'{'Agent response received'}}
         Write-ShadowWorkflowProgress -Phase $Phase -Role $Role -Model $Model -State 'activity' -Message $message -SessionId $session
     }
 }

@@ -56,7 +56,7 @@ function Test-LrModelInference {
 try {
     $arguments=@{StateRoot=$root;ModelKey='local/model';ContextLength=16384;Port=1234;DownloadModel=$false;LmsPath='synthetic';ApiTokenEnvironmentVariable=''}
     $blocked=$false
-    try{$null=Configure-LocalRuntime @arguments}catch{$blocked=$_.Exception.Message -match 'Kein gepruefter Speicherfit'}
+    try{$null=Configure-LocalRuntime @arguments}catch{$blocked=$_.Exception.Message -match 'No verified memory fit'}
     if(-not $blocked -or $script:loadAttempts){throw 'Strict single-model mode attempted a load despite insufficient memory.'}
     $arguments.AllowUnfitAttempt=$true
     $result=Configure-LocalRuntime @arguments

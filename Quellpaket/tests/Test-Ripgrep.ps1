@@ -20,15 +20,15 @@ $script:downloads=0
 function Get-ShadowRipgrepArchive {param($Url) $script:downloads++;return ,$script:archiveBytes}
 try{
     $missing=Join-Path $root 'missing'
-    Assert-RgThrow {Assert-ShadowRipgrepReady $missing} 'Ripgrep fehlt' 'Missing ripgrep is an explicit startup failure'
-    Assert-RgThrow {Install-ShadowRipgrep $missing} 'ungueltige SHA256' 'Unverified archive is rejected'
+    Assert-RgThrow {Assert-ShadowRipgrepReady $missing} 'Ripgrep missing' 'Missing ripgrep is an explicit startup failure'
+    Assert-RgThrow {Install-ShadowRipgrep $missing} 'invalid SHA256' 'Unverified archive is rejected'
     Assert-Rg (-not(Test-Path -LiteralPath (Get-ShadowRipgrepInfo $missing).Path)) 'Unverified archive writes no executable'
     $foreign=Join-Path $root 'foreign'
     $foreignPath=(Get-ShadowRipgrepInfo $foreign).Path
     [void][IO.Directory]::CreateDirectory((Split-Path -Parent $foreignPath))
     [IO.File]::WriteAllText($foreignPath,'existing user file')
     $before=$script:downloads
-    Assert-RgThrow {Install-ShadowRipgrep $foreign} 'unbekannte Pruefsumme' 'Unknown existing executable is rejected'
+    Assert-RgThrow {Install-ShadowRipgrep $foreign} 'unknown checksum' 'Unknown existing executable is rejected'
     Assert-Rg ([IO.File]::ReadAllText($foreignPath) -ceq 'existing user file' -and $script:downloads -eq $before) 'Unknown executable is preserved without downloading or executing it'
     if($VerifiedArchivePath){
         $script:archiveBytes=[IO.File]::ReadAllBytes($VerifiedArchivePath)

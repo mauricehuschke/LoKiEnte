@@ -30,11 +30,11 @@ try{
     Write-Fixture $wrapper ('@echo off'+[Environment]::NewLine+'"%~dp0..\Code.exe" "%~dp0..\69047191fc\resources\app\out\cli.js" %*')
     Assert-Code ((Resolve-ShadowCodeCli $code) -ceq $active) 'Wrapper-selected version wins over stale classic CLI'
     Write-Fixture $wrapper '"%~dp0..\Code.exe" "%~dp0..\other-version\resources\app\out\cli.js" %*'
-    Assert-CodeThrow {Resolve-ShadowCodeCli $code} 'fehlt.*other-version' 'Missing active version is not silently replaced by another CLI'
+    Assert-CodeThrow {Resolve-ShadowCodeCli $code} 'missing.*other-version' 'Missing active version is not silently replaced by another CLI'
     Write-Fixture $wrapper '"%~dp0..\Code.exe" "%~dp0..\..\outside\resources\app\out\cli.js" %*'
-    Assert-CodeThrow {Resolve-ShadowCodeCli $code} 'nicht eindeutig' 'Parent traversal is rejected'
+    Assert-CodeThrow {Resolve-ShadowCodeCli $code} 'not unique|not.*uniquely|ambiguous' 'Parent traversal is rejected'
     Write-Fixture $wrapper ('"%~dp0..\Code.exe" "%~dp0..\resources\app\out\cli.js" %*'+[Environment]::NewLine+'"%~dp0..\Code.exe" "%~dp0..\69047191fc\resources\app\out\cli.js" %*')
-    Assert-CodeThrow {Resolve-ShadowCodeCli $code} 'nicht eindeutig' 'Multiple wrapper entries are rejected'
+    Assert-CodeThrow {Resolve-ShadowCodeCli $code} 'not unique|not.*uniquely|ambiguous' 'Multiple wrapper entries are rejected'
     Write-Fixture $wrapper '"%~dp0..\Code.exe" "%~dp0..\69047191fc\resources\app\out\cli.js" %*'
     $script:invoked=$null
     $script:cliOutput='ok'
@@ -62,14 +62,14 @@ try{
         $script:invoked.arguments -contains '--list-extensions' -and $script:invoked.arguments -contains '--show-versions' -and
         $script:invoked.arguments -notcontains '--locate-extension') 'Select CLI-reported extension version in isolated root without unsupported location switch'
     $script:cliOutput='kilocode.kilo-code@7.8.27'+"`n"+'kilocode.kilo-code@7.8.26'
-    Assert-CodeThrow {Get-ShadowBundledKilo -CodePath $code -InstallRoot $installRoot} 'keine eindeutige' 'Ambiguous installed versions fail explicitly'
+    Assert-CodeThrow {Get-ShadowBundledKilo -CodePath $code -InstallRoot $installRoot} 'not report a unique' 'Ambiguous installed versions fail explicitly'
     $script:cliOutput='kilocode.kilo-code@7.8.27'
     $duplicate=Join-Path $extensionRoot 'kilocode.kilo-code-duplicate'
     Write-Fixture (Join-Path $duplicate 'package.json') '{"publisher":"kilocode","name":"kilo-code","version":"7.8.27"}'
-    Assert-CodeThrow {Get-ShadowBundledKilo -CodePath $code -InstallRoot $installRoot} 'nicht eindeutig' 'Duplicate matching manifests are rejected'
+    Assert-CodeThrow {Get-ShadowBundledKilo -CodePath $code -InstallRoot $installRoot} 'not unique|not.*uniquely|ambiguous' 'Duplicate matching manifests are rejected'
     Remove-Item -LiteralPath $duplicate -Recurse -Force
     Remove-Item -LiteralPath (Join-Path $ext 'bin\kilo.exe')
-    Assert-CodeThrow {Get-ShadowBundledKilo -CodePath $code -InstallRoot $installRoot} 'erwartete aktuelle CLI' 'Missing bundled binary fails explicitly'
+    Assert-CodeThrow {Get-ShadowBundledKilo -CodePath $code -InstallRoot $installRoot} 'expected current CLI' 'Missing bundled binary fails explicitly'
     $tokens=$null;$errors=$null
     $setupAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'Setup.ps1'),[ref]$tokens,[ref]$errors)
     if($errors.Count){throw 'Setup parser errors'}
@@ -115,7 +115,7 @@ try{
     Assert-Code ($result.kiloVsCodeExtensionVersion -ceq '7.8.31' -and $script:installs.Count -eq 0) 'Newer installed extension is retained for subsequent compatibility checks'
     $result=Invoke-ExtensionSection -Version '7.8.31' -Approved '7.9.0'
     Assert-Code ($result.kiloVsCodeExtensionVersion -ceq '7.9.0' -and $script:installs[0] -ceq 'kilocode.kilo-code@7.9.0') 'Explicitly approved newer target is installed exactly'
-    Assert-CodeThrow {Get-ShadowKiloExtensionVersion -Output "kilocode.kilo-code@7.8.28`nkilocode.kilo-code@7.8.30"} 'Mehrere' 'Ambiguous extension versions are rejected'
-    Assert-CodeThrow {Get-ShadowKiloExtensionVersion -Output 'kilocode.kilo-code'} 'Versionsnummer' 'An installed extension without a version is not treated as missing'
+    Assert-CodeThrow {Get-ShadowKiloExtensionVersion -Output "kilocode.kilo-code@7.8.28`nkilocode.kilo-code@7.8.30"} 'Multiple' 'Ambiguous extension versions are rejected'
+    Assert-CodeThrow {Get-ShadowKiloExtensionVersion -Output 'kilocode.kilo-code'} 'version number' 'An installed extension without a version is not treated as missing'
     [pscustomobject]@{suite='VS Code CLI resolution';passed=$true;checks=$count}|ConvertTo-Json
 }finally{if(Test-Path -LiteralPath $root){Remove-Item -LiteralPath $root -Recurse -Force}}

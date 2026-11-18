@@ -15,12 +15,12 @@ try {
 } catch {
     $code=if($_.Exception.Data['ShadowResourceFitFailure']){'resource_fit'}elseif($_.Exception.Data['ShadowModelVerificationFailure']){'model_unverified'}else{'controller_rejected'}
     $message=if($code -eq 'resource_fit'){
-        'Modell aktuell nicht ladbar: Speicher freigeben und erneut versuchen. Die Modelldatei bleibt erhalten.'
+        'Model cannot currently load: free memory and retry. The model file is preserved.'
     }elseif($code -eq 'model_unverified'){
-        'Modell geladen, aber der Chat-/Werkzeugtest ist fehlgeschlagen. Lokale Modell- und LM-Studio-Protokolle pruefen.'
-    }else{'Der lokale Modellwechsel wurde abgelehnt. Modellpool und lokale Protokolle pruefen.'}
+        'Model loaded, but the chat/tool test failed. Check local model and LM Studio logs.'
+    }else{'Local model switch rejected. Check model pool and local logs.'}
     $result=@{Status='Error';Alias=$Alias;Code=$code;Message=$message}
     try{[IO.File]::WriteAllText($ResultPath,($result|ConvertTo-Json -Depth 10 -Compress),[Text.UTF8Encoding]::new($false))}catch{}
-    Write-Error -Message 'Lokaler Modellwechsel fehlgeschlagen. Kontrollbericht pruefen.' -ErrorAction Continue
+    Write-Error -Message 'Local model switch failed. Check the control report.' -ErrorAction Continue
     exit 1
 }

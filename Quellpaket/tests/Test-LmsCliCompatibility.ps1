@@ -18,7 +18,7 @@ try{
     Assert-Cli ($probe.ExitCode -eq 1 -and @(Get-LrMissingLoadOptions $help $probe).Count -eq 0) 'Real expected-error process can prove hidden option handling'
     Assert-Cli (@(Get-LrMissingLoadOptions ($help.Replace('--parallel','--parallel-extra')) $probe) -contains '--parallel') 'Hidden-flag proof does not excuse a missing visible capability'
     $failed=$false
-    try{$null=Invoke-LrNative -FilePath $engine -Arguments $arguments -LogDirectory $root}catch{$failed=$_.Exception.Message -match 'fehlgeschlagen'}
+    try{$null=Invoke-LrNative -FilePath $engine -Arguments $arguments -LogDirectory $root}catch{$failed=$_.Exception.Message -match 'failed'}
     Assert-Cli $failed 'Ordinary native commands still fail on nonzero exit'
     $script:json='[]'
     function Invoke-LrNative {
@@ -33,7 +33,7 @@ try{
         Assert-Cli ($models.Count -eq 2 -and $models[1].identifier -ceq 'two') "$command enumerates actual model objects"
         foreach($invalid in @('{}','null','[null]','[{"identifier":"one"},42]')){
             $script:json=$invalid;$failed=$false
-            try{$null=Invoke-LrJson -LmsPath synthetic -Arguments @($command,'--json') -LogDirectory $root}catch{$failed=$_.Exception.Message -match 'unerwartete Struktur'}
+            try{$null=Invoke-LrJson -LmsPath synthetic -Arguments @($command,'--json') -LogDirectory $root}catch{$failed=$_.Exception.Message -match 'unexpected structure'}
             Assert-Cli $failed "$command rejects invalid list shape"
         }
     }

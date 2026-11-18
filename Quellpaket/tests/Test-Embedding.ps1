@@ -14,6 +14,12 @@ function Throws-Embedding([scriptblock]$Action,[string]$Pattern,[string]$Message
     $failure=$null;try{& $Action|Out-Null}catch{$failure=$_.Exception.Message}
     Assert-Embedding ([bool]$failure -and $failure -match $Pattern) $Message
 }
+$script:realApi=(Get-Command Invoke-LrApi).ScriptBlock
+$script:authStatus=0
+function Invoke-RestMethod {
+    $response=[Net.Http.HttpResponseMessage]::new([Net.HttpStatusCode]$script:authStatus)
+    throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Synthetic response body must not leak',$response)
+}
 $definition=Get-ShadowEmbeddingDefinition
 $pool=[pscustomobject]@{
     SchemaVersion=2;Status='Ready';OwnerId=('a'*24);PrimaryAlias='coder';LmsPath='fixture'
@@ -62,6 +68,7 @@ function Invoke-LrNative {
 function Invoke-LrApi {
     param($Uri,$Headers,$Method,$Body,$TimeoutSeconds)
     if($Uri -cne 'http://127.0.0.1:1234/v1/embeddings' -or $Body.encoding_format -cne 'base64'){throw 'Unexpected embedding request'}
+    if($script:authStatus){return & $script:realApi -Uri $Uri -Headers $Headers -Method $Method -Body $Body -TimeoutSeconds $TimeoutSeconds}
     $vector=@(for($i=0;$i -lt 768;$i++){if($script:badVector){0.0}else{0.25}})
     if($script:base64){
         $bytes=[byte[]]::new(3072)
@@ -72,14 +79,14 @@ function Invoke-LrApi {
 }
 try{
     $script:badFile=$true
-    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'Embeddingdatei' 'A changed embedding file is not loaded'
+    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'Embedding file' 'A changed embedding file is not loaded'
     Assert-Embedding ($script:loads -eq 0) 'Invalid file caused no model load'
     $script:badFile=$false;$script:freeRam=3GB
-    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'RAM-Fit' 'RAM reserve blocks loading'
+    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'RAM fit' 'RAM reserve blocks loading'
     Assert-Embedding ($script:loads -eq 0) 'Insufficient RAM caused no model load'
     $script:rejectNoFit=$true
     $deferred=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
-    Assert-Embedding ($deferred.Status -ceq 'Deferred' -and $deferred.SmokeTest -ceq 'NotRun' -and $script:loads -eq 0 -and $deferred.Message -notmatch 'abgelehnt') 'Insufficient RAM defers the embedding without a load attempt'
+    Assert-Embedding ($deferred.Status -ceq 'Deferred' -and $deferred.SmokeTest -ceq 'NotRun' -and $script:loads -eq 0 -and $deferred.Message -notmatch 'rejected') 'Insufficient RAM defers the embedding without a load attempt'
     $pool | Add-Member -NotePropertyName AllowUnfitAttempt -NotePropertyValue $true
     $script:rejectNoFit=$false
     $forced=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
@@ -90,7 +97,7 @@ try{
     $again=Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
     Assert-Embedding ($again.InstanceId -ceq $result.InstanceId -and $script:loads -eq 1) 'Owned embedding instance is reused'
     $script:loaded+=@($script:loaded[1])
-    Throws-Embedding {Get-SmpOwnedLoaded -Pool $pool -Owner (Get-SmpOwner $root) -LogDirectory 'fixture'} 'Mehrere Instanzen' 'Duplicate embedding instance identifiers are rejected'
+    Throws-Embedding {Get-SmpOwnedLoaded -Pool $pool -Owner (Get-SmpOwner $root) -LogDirectory 'fixture'} 'Multiple instances' 'Duplicate embedding instance identifiers are rejected'
     $script:loaded=@($script:loaded[0],$script:loaded[1])
     $recoveryOwner=Get-SmpOwner $root
     $pending=@($recoveryOwner.Entries|Where-Object {$_.InstanceId -ceq $result.InstanceId})[0]
@@ -105,15 +112,22 @@ try{
     $script:loaded[1].status='idle'
     $script:base64=$true
     Assert-Embedding ((Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition).Status -ceq 'Ready') 'Base64 float vectors are validated'
+    foreach($status in @(401,403)){
+        $script:authStatus=$status;$authFailure=$null
+        try{$null=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition}catch{$authFailure=$_.Exception}
+        Assert-Embedding ($null -ne $authFailure -and $authFailure.Data['ShadowAuthenticationFailure'] -eq $true -and -not $authFailure.Data['ShadowEmbeddingVerificationFailure']) "HTTP $status must remain a blocking authentication error"
+        Assert-Embedding ($authFailure.Message.StartsWith('LM Studio API denied access.') -and -not $authFailure.Message.Contains('Synthetic response body')) 'Authentication failure is English and does not expose response content'
+    }
+    $script:authStatus=0
     $script:badVector=$true
-    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'Nullvektor' 'Invalid inference does not report ready'
+    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'zero vector' 'Invalid inference does not report ready'
     $failedTest=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
-    Assert-Embedding ($failedTest.Status -ceq 'Deferred' -and $failedTest.SmokeTest -ceq 'Failed' -and $failedTest.Message -match 'Nullvektor') 'An embedding test failure remains an explicit nonblocking warning'
+    Assert-Embedding ($failedTest.Status -ceq 'Deferred' -and $failedTest.SmokeTest -ceq 'Failed' -and $failedTest.Message -match 'zero vector') 'An embedding test failure remains an explicit nonblocking warning'
     $script:badVector=$false;$script:duplicateIndex=$true
-    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'Vektorindizes' 'Duplicate vector indices are rejected'
+    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'vector indices' 'Duplicate vector indices are rejected'
     $script:duplicateIndex=$false
     $script:loaded[1].path='foreign.gguf'
-    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'fremdes' 'Changed embedding identity is not adopted'
+    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'external' 'Changed embedding identity is not adopted'
     $script:loaded[1].path=$definition.ExpectedPath
     $entry=Join-Path $root 'tooling/lancedb/node_modules/@lancedb/lancedb/dist/index.js'
     [void][IO.Directory]::CreateDirectory((Split-Path -Parent $entry));[IO.File]::WriteAllText($entry,'fixture')

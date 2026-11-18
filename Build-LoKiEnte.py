@@ -39,7 +39,11 @@ def main():
         "WorkflowProgress.ps1", "KiloWorkflowTools.mjs", "WorkflowJob.mjs",
         "Run-ProjectCheck.mjs", "AcceptancePolicy.ps1", "AgentTemplates.ps1",
         "New-WelcomeTestProject.ps1", "welcome-example/package.json",
-        "welcome-example/discount.cjs", "welcome-example/README.md",
+        "welcome-example/discount.cjs", "welcome-example/README.md", "welcome-example/README.de.md",
+        "README.de.md", "WORKFLOW.md", "WORKFLOW.de.md", "VALIDATION.de.md",
+        "templates/LOCAL-AI-RULES.md", "templates/LOCAL-AI-RULES.de.md",
+        "templates/START_HERE.md", "templates/START_HERE.de.md",
+        "templates/task.md", "templates/task.de.md",
     }
     if required - files.keys():
         parser.error(f"Missing source files: {sorted(required - files.keys())}")

@@ -72,7 +72,7 @@ function Read-Host {param($Prompt) return '0'}
 function Assert-ShadowRipgrepReady {param($InstallRoot) throw 'Runtime was reached after cancel'}
 '@)
     $result=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile','-File',(Join-Path $app 'Start-LocalAI.ps1'),'-InstallRoot',$app) -AllowFailure -Quiet -TimeoutSeconds 30
-    Assert-Selection ($result.ExitCode -eq 0 -and $result.StdOut -like '*Start abgebrochen*') 'Launcher cancellation reached runtime or failed'
+    Assert-Selection ($result.ExitCode -eq 0 -and $result.StdOut -like '*Startup cancelled*') 'Launcher cancellation reached runtime or failed'
     $result=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile','-File',(Join-Path $app 'Start-LocalAI.ps1'),'-InstallRoot',$app,'-ProjectPath',$missing,'-PauseOnError') -AllowFailure -Quiet -TimeoutSeconds 30
     Assert-Selection ($result.ExitCode -eq 1 -and $result.StdErr -notlike '*Runtime was reached*') 'Explicit invalid path did not fail before runtime'
     [pscustomobject]@{suite='Project selection and launcher cancellation';passed=$true;checks=$script:count}|ConvertTo-Json

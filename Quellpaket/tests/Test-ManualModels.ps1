@@ -32,12 +32,12 @@ function Get-ManualFailure {
     }catch{return $_.Exception.Message}
 }
 $message=Get-ManualFailure -Fast
-Assert-Models ($message -match 'MANUELLE AKTION ERFORDERLICH' -and $message -match 'denselben Parametern\s+erneut starten' -and $message -match 'nicht automatisch') 'All missing models stop with manual restart instructions'
+Assert-Models ($message -match 'MANUAL ACTION REQUIRED' -and $message -match 'same parameters\s+again' -and $message -match 'not.*automatically') 'All missing models stop with manual restart instructions'
 $formatted=$message -replace "`r`n","`n"
 Assert-Models ($formatted -match '(?m)^  1\. \[coder-high\] .+$' -and $formatted -match '(?m)^  2\. \[coder-fast\] .+$' -and
     $formatted -match '(?m)^  3\. \[review\] .+$' -and $formatted -match '(?m)^  4\. \[fast\] .+$' -and
-    ([regex]::Matches($formatted,'(?m)^     Datei:  .+$')).Count -eq 4 -and
-    ([regex]::Matches($formatted,'(?m)^     Quelle:$')).Count -eq 4 -and $formatted -match '(?m)^Naechste Schritte:$') 'Manual-action formatter separates model names, paths, URLs and next steps'
+    ([regex]::Matches($formatted,'(?m)^     File:   .+$')).Count -eq 4 -and
+    ([regex]::Matches($formatted,'(?m)^     Source:$')).Count -eq 4 -and $formatted -match '(?m)^Next steps:$') 'Manual-action formatter separates model names, paths, URLs and next steps'
 foreach($item in $profiles){
     Assert-Models ($message.Contains($item.Definition.ExpectedPath) -and $message.Contains($item.Definition.DownloadUrl)) "Exact filename and URL appear for $($item.Alias)"
 }
@@ -57,7 +57,7 @@ Assert-Models ($message.Contains('my/custom-model') -and $message -match 'lms ls
 $script:available=@([pscustomobject]@{path='custom/path';modelKey='my/custom-model'})
 Assert-Models ((Get-ManualFailure -Mode Single -Key 'my/custom-model') -ceq '') 'Existing custom key continues'
 $script:available=@([pscustomobject]@{path='one';modelKey='my/custom-model'},[pscustomobject]@{path='two';modelKey='my/custom-model'})
-Assert-Models ((Get-ManualFailure -Mode Single -Key 'my/custom-model') -match 'Mehrere exakt') 'Ambiguous models remain explicit errors'
+Assert-Models ((Get-ManualFailure -Mode Single -Key 'my/custom-model') -match 'Multiple exact') 'Ambiguous models remain explicit errors'
 $main=@($ast.EndBlock.Statements|Where-Object {$_ -is [Management.Automation.Language.TryStatementAst]})[0]
 $statements=@($main.Body.Statements)
 $start=-1
@@ -94,7 +94,7 @@ function Write-ShadowManagedFile {param($Path,$Content,$BackupRoot) [IO.File]::W
     $harnessPath=Join-Path $root 'harness.ps1'
     [IO.File]::WriteAllText($harnessPath,$harness)
     $result=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root) -AllowFailure -Quiet -TimeoutSeconds 30
-    Assert-Models ($result.ExitCode -eq 1 -and $result.StdOut -match 'MANUELLE AKTION ERFORDERLICH' -and
+    Assert-Models ($result.ExitCode -eq 1 -and $result.StdOut -match 'MANUAL ACTION REQUIRED' -and
         [string]::IsNullOrWhiteSpace($result.StdErr)) 'Actual setup displays manual action on stdout, not the red error stream, and exits nonzero'
     Assert-Models ($result.StdOut -match 'my/custom-model' -and $result.StdOut -notmatch 'Write-Error|Invoke-SetupRequest') 'Explicit missing custom model remains a readable manual action'
     $report=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw|ConvertFrom-Json
@@ -103,6 +103,6 @@ function Write-ShadowManagedFile {param($Path,$Content,$BackupRoot) [IO.File]::W
     Assert-Models (-not(Test-Path -LiteralPath (Join-Path $root 'unexpected'))) 'No router stop or model action occurs before manual step'
     $failure=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root,'-Scenario','error') -AllowFailure -Quiet -TimeoutSeconds 30
     Assert-Models ($failure.ExitCode -eq 1 -and $failure.StdErr -match 'Synthetic model-list failure' -and
-        $failure.StdOut -notmatch 'MANUELLE AKTION ERFORDERLICH') 'Real errors remain on stderr and are not disguised as manual actions'
+        $failure.StdOut -notmatch 'MANUAL ACTION REQUIRED') 'Real errors remain on stderr and are not disguised as manual actions'
     [pscustomobject]@{suite='Manual model downloads';passed=$true;checks=$count}|ConvertTo-Json
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}

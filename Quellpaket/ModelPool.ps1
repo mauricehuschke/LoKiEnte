@@ -19,7 +19,7 @@ function Enter-SmpLock {
     while($true){
         try{return [IO.File]::Open($path,[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)}
         catch [IO.IOException]{
-            if($watch.Elapsed.TotalSeconds -ge $TimeoutSeconds){throw 'Ein anderer Prozess verwaltet gerade den Modellpool. Kein paralleler Modellwechsel ausgefuehrt.'}
+            if($watch.Elapsed.TotalSeconds -ge $TimeoutSeconds){throw 'Another process is managing the model pool. No parallel model switch performed.'}
             Start-Sleep -Milliseconds 250
         }
     }
@@ -31,16 +31,16 @@ function Get-SmpOwner {
     if(Test-Path -LiteralPath $path){
         $owner=Get-Content -LiteralPath $path -Raw|ConvertFrom-Json
         if((Get-LrProperty $owner 'SchemaVersion') -ne 1 -or (Get-LrProperty $owner 'OwnerId') -notmatch '^[a-f0-9]{24}$'){
-            throw 'Unbekannte Modell-Eigentuemerdatei. Bestehende Instanzen bleiben erhalten.'
+            throw 'Unknown model ownership file. Existing instances are preserved.'
         }
         if($null -eq $owner.PSObject.Properties['Entries'] -or $owner.Entries -isnot [array]){
-            throw 'Modell-Eigentuemerdatei enthaelt keine gueltige Eintragsliste.'
+            throw 'Model ownership file has no valid entries list.'
         }
         $ids=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach($entry in $owner.Entries){
             if((Get-LrProperty $entry 'Verified') -isnot [bool] -or -not(Get-LrProperty $entry 'InstanceId') -or
                -not(Get-LrProperty $entry 'ModelPath') -or -not $ids.Add([string]$entry.InstanceId)){
-                throw 'Modell-Eigentuemerdatei enthaelt unvollstaendige oder doppelte Eintraege.'
+                throw 'Model ownership file contains incomplete or duplicate entries.'
             }
         }
         return $owner
@@ -75,10 +75,10 @@ function Save-SmpOwnership {
 function Restore-SmpPendingOwnership {
     param([string]$InstallRoot,$Pool,$Owner,[string]$LogDirectory)
     $embeddingPending=@($Owner.Entries|Where-Object { (Get-LrProperty $_ 'Origin') -ceq 'pending-cpu-embedding' -and $_.Verified -eq $false })
-    if($embeddingPending.Count -gt 1){throw 'Mehrdeutige ausstehende Embeddinginstanzen. Keine Instanz wird uebernommen.'}
+    if($embeddingPending.Count -gt 1){throw 'Ambiguous pending embedding instances. No instance will be adopted.'}
     if($embeddingPending.Count){
         $entry=$embeddingPending[0]
-        if($entry.InstanceId -cne ('shadow-'+$Owner.OwnerId+'-embedding')){throw 'Unbekannter Embedding-Ladeauftrag. Keine Instanz wird uebernommen.'}
+        if($entry.InstanceId -cne ('shadow-'+$Owner.OwnerId+'-embedding')){throw 'Unknown embedding load request. No instance will be adopted.'}
         $instances=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $LogDirectory)
         $matches=@($instances|Where-Object {(Get-LrProperty $_ 'identifier') -ceq $entry.InstanceId})
         if($matches.Count){
@@ -86,7 +86,7 @@ function Restore-SmpPendingOwnership {
                (Get-LrProperty $matches[0] 'path') -cne $entry.ModelPath -or
                $null -ne (Get-LrProperty $matches[0] 'deviceIdentifier' '__unknown__') -or
                [int](Get-LrProperty $matches[0] 'contextLength' 0) -ne 2048){
-                throw 'Ausstehende Embeddinginstanz stimmt nicht mit dem Ladeauftrag ueberein. Sie bleibt unveraendert.'
+                throw 'Pending embedding instance does not match its load request. It remains unchanged.'
             }
             $entry.Verified=$true
             $entry.Origin='verified-cpu-embedding'
@@ -100,60 +100,60 @@ function Restore-SmpPendingOwnership {
     $loaded=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $LogDirectory)
     foreach($entry in $pending){
         if($entry.InstanceId -cnotmatch ('^shadow-'+[regex]::Escape($Owner.OwnerId)+'-(coder|coder-high|coder-fast|review|fast)$')){
-            throw 'Unbekannter ausstehender Ladeauftrag. Keine Modellinstanz wird uebernommen.'
+            throw 'Unknown pending load request. No model instance will be adopted.'
         }
         $matches=@($loaded|Where-Object { (Get-LrProperty $_ 'identifier') -ceq $entry.InstanceId })
         if(-not $matches.Count){continue}
         if($matches.Count -ne 1 -or (Get-LrProperty $matches[0] 'path') -cne $entry.ModelPath -or
            $null -ne (Get-LrProperty $matches[0] 'deviceIdentifier' '__unknown__')){
-            throw 'Ausstehender Ladeauftrag stimmt nicht mit der lokalen Instanz ueberein. Sie bleibt unveraendert.'
+            throw 'Pending load request does not match the local instance. It remains unchanged.'
         }
         $variant=[string](Get-LrProperty $entry 'SelectedVariant')
         $expected=[string](Get-LrProperty $entry 'ExpectedPath')
         if($variant){
             if(-not $expected -or (Get-LrProperty $matches[0] 'selectedVariant') -cne $variant){
-                throw 'Ausstehender Ladeauftrag stimmt nicht mit der gespeicherten Modellvariante ueberein. Instanz bleibt unveraendert.'
+                throw 'Pending load request does not match the saved model variant. Instance remains unchanged.'
             }
             Assert-LrSelectedModel -LmsPath $Pool.LmsPath -LogDirectory $LogDirectory -ExpectedPath $expected -ModelPath $entry.ModelPath
         }
         # Ownership proves identity, not readiness. The ordinary idle/config checks still run.
         Save-SmpOwnership -InstallRoot $InstallRoot -Owner $Owner -InstanceId $entry.InstanceId -ModelPath $entry.ModelPath -ExpectedPath $expected -SelectedVariant $variant -GpuOffload ([string](Get-LrProperty $entry 'GpuOffload'))
-        Write-ShadowMessage "Eigenen Ladeauftrag $($entry.InstanceId) wiedererkannt. Modellbereitschaft wird erneut geprueft." 'WARN'
+        Write-ShadowMessage "Recognized owned load request $($entry.InstanceId). Model readiness will be checked again." 'WARN'
     }
 }
 
 function Assert-SmpPool {
     param($Pool,[switch]$RequireReady)
-    if((Get-LrProperty $Pool 'SchemaVersion') -ne 2){throw 'Unbekanntes Modellpool-Schema. Provisionierung erneut ausfuehren.'}
-    if($RequireReady -and (Get-LrProperty $Pool 'Status') -cne 'Ready'){throw 'Modellpool wurde noch nicht vollstaendig geprueft. Provisionierung zuerst abschliessen.'}
+    if((Get-LrProperty $Pool 'SchemaVersion') -ne 2){throw 'Unknown model pool schema. Rerun provisioning.'}
+    if($RequireReady -and (Get-LrProperty $Pool 'Status') -cne 'Ready'){throw 'Model pool has not been fully verified. Complete provisioning first.'}
     $allowOffload=Get-LrProperty $Pool 'AllowPartialGpuOffload' $false
-    if($allowOffload -isnot [bool]){throw 'Ungueltige CPU-Auslagerungsoption im Modellpool.'}
+    if($allowOffload -isnot [bool]){throw 'Invalid CPU offload option in model pool.'}
     $endpoint=[Uri]$Pool.BackendApiBaseUrl
     if(-not $endpoint.IsLoopback -or $endpoint.Scheme -ne 'http' -or $endpoint.AbsolutePath.TrimEnd('/') -cne '/v1' -or $endpoint.UserInfo -or $endpoint.Query -or $endpoint.Fragment){
-        throw 'Modellpool verwendet keinen eindeutigen lokalen LM-Studio-Endpunkt.'
+        throw 'Model pool does not use an unambiguous local LM Studio endpoint.'
     }
     $router=[Uri]$Pool.RouterApiBaseUrl
     if(-not $router.IsLoopback -or $router.Scheme -ne 'http' -or $router.AbsolutePath.TrimEnd('/') -cne '/v1' -or
        $router.UserInfo -or $router.Query -or $router.Fragment -or $router.Port -lt 1024 -or $router.Port -eq $endpoint.Port){
-        throw 'Modellpool verwendet keinen eindeutigen lokalen Router-Endpunkt mit getrenntem Port.'
+        throw 'Model pool does not use an unambiguous local router endpoint with a separate port.'
     }
     $aliases=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     $ids=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach($profile in @($Pool.Profiles)){
         if($profile.Alias -notin @('coder','coder-high','coder-fast','review','fast') -or -not $aliases.Add([string]$profile.Alias) -or -not $ids.Add([string]$profile.InstanceId)){
-            throw 'Mehrdeutige oder unbekannte Modellpool-Rolle.'
+            throw 'Ambiguous or unknown model pool role.'
         }
-        if(-not $profile.ModelPath -or [int]$profile.ContextLength -lt 8192 -or [int]$profile.ContextLength -gt 65536){throw 'Unvollstaendiges Modellprofil.'}
+        if(-not $profile.ModelPath -or [int]$profile.ContextLength -lt 8192 -or [int]$profile.ContextLength -gt 65536){throw 'Incomplete model profile.'}
     }
-    if(-not $aliases.Contains('review')){throw 'Modellpool braucht ein Reviewprofil.'}
+    if(-not $aliases.Contains('review')){throw 'Model pool requires a review profile.'}
     if($aliases.Contains('coder')){
-        if($aliases.Contains('coder-high') -or $aliases.Contains('coder-fast')){throw 'Alter und neuer Coder-Pool duerfen nicht vermischt werden.'}
+        if($aliases.Contains('coder-high') -or $aliases.Contains('coder-fast')){throw 'Legacy and new coder pools must not be mixed.'}
     }elseif(-not $aliases.Contains('coder-high') -or -not $aliases.Contains('coder-fast')){
-        throw 'Modellpool braucht coder-high und coder-fast.'
+        throw 'Model pool requires coder-high and coder-fast.'
     }
     $primary=[string](Get-LrProperty $Pool 'PrimaryAlias' $(if($aliases.Contains('coder')){'coder'}else{'coder-high'}))
     if($primary -cnotin @('coder','coder-high') -or -not $aliases.Contains($primary)){
-        throw 'Das Hauptmodell des Modellpools ist ungueltig.'
+        throw 'The primary model of the model pool is invalid.'
     }
 }
 
@@ -162,9 +162,9 @@ function Ensure-SmpServer {
     $server=Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('server','status','--json') -LogDirectory $LogDirectory
     $port=([Uri]$Pool.BackendApiBaseUrl).Port
     if([bool](Get-LrProperty $server 'running' $false)){
-        if([int](Get-LrProperty $server 'port' 0) -ne $port){throw 'LM Studio laeuft auf einem anderen Port. Bestehenden Server erhalten; Provisionierung erneut ausfuehren.'}
+        if([int](Get-LrProperty $server 'port' 0) -ne $port){throw 'LM Studio is running on another port. Preserve the existing server; rerun provisioning.'}
     } else {
-        if(@(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue).Count){throw "Port $port ist durch einen anderen Dienst belegt."}
+        if(@(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue).Count){throw "Port $port is occupied by another service."}
         $null=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments @('server','start','--port',"$port",'--bind','127.0.0.1') -LogDirectory $LogDirectory
     }
     Assert-LrLoopbackListener -Port $port
@@ -177,27 +177,27 @@ function Get-SmpOwnedLoaded {
         $loaded=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $LogDirectory)
         $embeddingId='shadow-'+$Owner.OwnerId+'-embedding'
         if(@($loaded|Where-Object {(Get-LrProperty $_ 'identifier') -ceq $embeddingId}).Count -gt 1){
-            throw 'Mehrere Instanzen verwenden die verwaltete Embeddingkennung. Keine Instanz wird veraendert.'
+            throw 'Multiple instances use the managed embedding identifier. No instance will be changed.'
         }
         $busy=$false
         foreach($item in $loaded){
             if($null -ne (Get-LrProperty $item 'deviceIdentifier' '__unknown__')){
-                throw 'Eine entfernte oder nicht eindeutig lokale Modellinstanz ist geladen. Sie wird nicht veraendert.'
+                throw 'A remote or not unambiguously local model instance is loaded. It will not be changed.'
             }
             $owned=@($Owner.Entries|Where-Object {
                 $_.Verified -eq $true -and $_.InstanceId -ceq (Get-LrProperty $item 'identifier') -and $_.ModelPath -ceq (Get-LrProperty $item 'path')
             })
-            if($owned.Count -ne 1){throw 'Ein fremdes oder nicht verifiziert verwaltetes Modell ist geladen. Es wird nicht entladen. Bestehende Modellarbeit beenden und bewusst selbst entladen.'}
+            if($owned.Count -ne 1){throw 'An external or unverified managed model is loaded. It will not be unloaded. Finish existing model work and unload it explicitly yourself.'}
             if((Get-LrProperty $owned[0] 'Origin') -ceq 'verified-cpu-embedding'){
                 if((Get-LrProperty $item 'type') -cne 'embedding' -or
                    (Get-LrProperty $item 'identifier') -cne ('shadow-'+$Owner.OwnerId+'-embedding')){
-                    throw 'Die verwaltete Embeddinginstanz ist nicht eindeutig. Sie bleibt unveraendert.'
+                    throw 'The managed embedding instance is not unique. It remains unchanged.'
                 }
                 continue
             }
             $ownedVariant=[string](Get-LrProperty $owned[0] 'SelectedVariant')
             if($ownedVariant -and (Get-LrProperty $item 'selectedVariant') -cne $ownedVariant){
-                throw 'Die geladene Variante stimmt nicht mit dem Eigentumsnachweis ueberein. Die Instanz bleibt unveraendert.'
+                throw 'The loaded variant does not match the ownership record. The instance remains unchanged.'
             }
             $status=[string](Get-LrProperty $item 'status' '__unknown__')
             $queued=[int](Get-LrProperty $item 'queued' 0)
@@ -209,7 +209,7 @@ function Get-SmpOwnedLoaded {
                 -not @($Owner.Entries|Where-Object { $_.InstanceId -ceq $id -and (Get-LrProperty $_ 'Origin') -ceq 'verified-cpu-embedding' }).Count
             })
         }
-        if($watch.Elapsed.TotalSeconds -ge $IdleTimeoutSeconds){throw 'Verwaltetes Modell arbeitet noch oder sein Leerlauf ist nicht nachweisbar. Kein Modell wurde entladen.'}
+        if($watch.Elapsed.TotalSeconds -ge $IdleTimeoutSeconds){throw 'Managed model is still working or cannot be verified as idle. No model was unloaded.'}
         Start-Sleep -Milliseconds 500
     }
 }
@@ -219,13 +219,13 @@ function Remove-SmpOwnedInstance {
     $loaded=@(Get-SmpOwnedLoaded -Pool $Pool -Owner $Owner -LogDirectory $LogDirectory)
     $target=@($loaded|Where-Object { (Get-LrProperty $_ 'identifier') -ceq $InstanceId })
     if($target.Count -eq 0){return}
-    if($target.Count -ne 1){throw 'Zu entladende Modellinstanz ist nicht eindeutig.'}
+    if($target.Count -ne 1){throw 'Model instance to unload is not unique.'}
     $headers=Get-LrApiHeaders -ApiTokenEnvironmentVariable $Pool.ApiTokenEnvironmentVariable
     $root=$Pool.BackendApiBaseUrl -replace '/v1/?$',''
     $response=Invoke-LrApi -Uri "$root/api/v1/models/unload" -Headers $headers -Method POST -Body @{instance_id=$InstanceId} -TimeoutSeconds 120
-    if((Get-LrProperty $response 'instance_id') -cne $InstanceId){throw 'LM Studio bestaetigte das gezielte Entladen nicht eindeutig.'}
+    if((Get-LrProperty $response 'instance_id') -cne $InstanceId){throw 'LM Studio did not unambiguously confirm the targeted unload.'}
     $after=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $LogDirectory)
-    if(@($after|Where-Object { (Get-LrProperty $_ 'identifier') -ceq $InstanceId }).Count){throw 'Modellinstanz bleibt nach dem Entladen sichtbar.'}
+    if(@($after|Where-Object { (Get-LrProperty $_ 'identifier') -ceq $InstanceId }).Count){throw 'Model instance remains visible after unloading.'}
 }
 
 function Test-SmpLoadedProfile {
@@ -233,7 +233,7 @@ function Test-SmpLoadedProfile {
     Assert-LrLoopbackListener -Port ([Uri]$Pool.BackendApiBaseUrl).Port
     $ps=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $LogDirectory)
     if(@($ps|Where-Object {(Get-LrProperty $_ 'identifier') -ceq ('shadow-'+$Owner.OwnerId+'-embedding')}).Count -gt 1){
-        throw 'Mehrere Instanzen verwenden die verwaltete Embeddingkennung. Keine Instanz wird veraendert.'
+        throw 'Multiple instances use the managed embedding identifier. No instance will be changed.'
     }
     $ps=@($ps|Where-Object {
         $item=$_
@@ -248,9 +248,9 @@ function Test-SmpLoadedProfile {
         (Get-LrProperty $_ 'identifier') -ceq $Profile.InstanceId -and (Get-LrProperty $_ 'path') -ceq $Profile.ModelPath -and
         $null -eq (Get-LrProperty $_ 'deviceIdentifier' '__unknown__')
     })
-    if($matching.Count -ne 1 -or $ps.Count -ne 1 -or [int](Get-LrProperty $matching[0] 'parallel' 0) -ne 1){throw 'Exakte lokale Modellinstanz und einzelner Inferenz-Slot sind nicht nachweisbar.'}
+    if($matching.Count -ne 1 -or $ps.Count -ne 1 -or [int](Get-LrProperty $matching[0] 'parallel' 0) -ne 1){throw 'Cannot verify the exact local model instance and single inference slot.'}
     $variant=[string](Get-LrProperty $Profile 'SelectedVariant')
-    if($variant -and (Get-LrProperty $matching[0] 'selectedVariant') -cne $variant){throw 'Geladene Modellvariante stimmt nicht mit dem geprueften Profil ueberein.'}
+    if($variant -and (Get-LrProperty $matching[0] 'selectedVariant') -cne $variant){throw 'Loaded model variant does not match the verified profile.'}
     if($variant){Assert-LrSelectedModel -LmsPath $Pool.LmsPath -LogDirectory $LogDirectory -ExpectedPath $Profile.ExpectedPath -ModelPath $Profile.ModelPath}
     $root=$Pool.BackendApiBaseUrl -replace '/v1/?$',''
     $catalog=Invoke-LrApi -Uri "$root/api/v1/models" -Headers (Get-LrApiHeaders $Pool.ApiTokenEnvironmentVariable) -TimeoutSeconds 60
@@ -259,10 +259,10 @@ function Test-SmpLoadedProfile {
             if((Get-LrProperty $instance 'id') -ceq $Profile.InstanceId){$instance}
         }
     })
-    if($instances.Count -ne 1){throw 'Geladene Modellinstanz ist ueber REST nicht eindeutig nachweisbar.'}
+    if($instances.Count -ne 1){throw 'Loaded model instance cannot be uniquely verified through REST.'}
     $config=Get-LrProperty $instances[0] 'config'
     if([int](Get-LrProperty $config 'context_length' 0) -ne [int]$Profile.ContextLength -or [int](Get-LrProperty $config 'parallel' 0) -ne 1){
-        throw 'Tatsaechlicher Modellkontext oder Parallelitaet weicht vom geprueften Profil ab.'
+        throw 'Actual model context or concurrency differs from the verified profile.'
     }
     return [pscustomobject]@{Status='Ready';Alias=$Profile.Alias;ModelId=$Profile.InstanceId;InstanceId=$Profile.InstanceId;ContextLength=[int]$Profile.ContextLength;Parallel=1}
 }
@@ -270,7 +270,7 @@ function Test-SmpLoadedProfile {
 function Set-SmpActiveProfile {
     param([string]$InstallRoot,$Pool,$Owner,[string]$Alias,[string]$LogDirectory,[switch]$AllowContextFallback,[switch]$AllowUnfitAttempt)
     $profiles=@($Pool.Profiles|Where-Object { $_.Alias -ceq $Alias })
-    if($profiles.Count -ne 1){throw "Unbekannter Modellalias: $Alias"}
+    if($profiles.Count -ne 1){throw "Unknown model alias: $Alias"}
     $profile=$profiles[0]
     $expectedPath=[string](Get-LrProperty $profile 'ExpectedPath')
     if($expectedPath){Assert-LrSelectedModel -LmsPath $Pool.LmsPath -LogDirectory $LogDirectory -ExpectedPath $expectedPath -ModelPath $profile.ModelPath}
@@ -314,34 +314,34 @@ function Set-SmpActiveProfile {
     if(-not $fit){
         $freeGpu=[math]::Round($hardware.Gpu.FreeBytes/1GB,2)
         $freeRam=[math]::Round($hardware.FreeRamBytes/1GB,2)
-        $fitMessage="Kein gepruefter Speicherfit fuer $Alias. Zuletzt frei: VRAM $freeGpu GiB, RAM $freeRam GiB; Reserven: 1 GiB VRAM und 3 GiB RAM. Letzte Schaetzung: $gpuBytes Bytes GPU, $totalBytes Bytes gesamt. LM-Studio-Schaetzungen: $LogDirectory."
+        $fitMessage="No verified memory fit for $Alias. Last available: VRAM $freeGpu GiB, RAM $freeRam GiB; reserves: 1 GiB VRAM and 3 GiB RAM. Last estimate: $gpuBytes bytes GPU, $totalBytes bytes total. LM Studio estimates: $LogDirectory."
         if(-not $AllowUnfitAttempt){
             $error=[InvalidOperationException]::new($fitMessage)
             $error.Data['ShadowResourceFitFailure']=$true
             throw $error
         }
         $fit=if($guardrailCandidate){$guardrailCandidate}else{$lastCandidate}
-        if(-not $fit){throw 'Keine auswertbare LM-Studio-Speicherschaetzung vorhanden.'}
+        if(-not $fit){throw 'No usable LM Studio memory estimate available.'}
         $fit.ReserveOverride=$true
-        Write-Warning "$fitMessage Ladeversuch ohne LoKiEnte-Reserve; LM-Studio-Schutzregeln bleiben aktiv."
+        Write-Warning "$fitMessage Attempting load without LoKiEnte reserve; LM Studio safeguards remain active."
     }
     $profile.ContextLength=[int]$fit.ContextLength
     $profile.OutputLimit=[math]::Min(8192,[int]($profile.ContextLength/4))
     $profile.Estimate=$fit
     if(@(Get-SmpOwnedLoaded -Pool $Pool -Owner $Owner -LogDirectory $LogDirectory).Count){
-        throw 'Waehrend der Speicherschaetzung wurde eine Modellinstanz geladen. Kein weiterer Ladevorgang gestartet.'
+        throw 'A model instance was loaded during memory estimation. No further load started.'
     }
     if($expectedPath){Assert-LrSelectedModel -LmsPath $Pool.LmsPath -LogDirectory $LogDirectory -ExpectedPath $expectedPath -ModelPath $profile.ModelPath}
     $variant=[string](Get-LrProperty $profile 'SelectedVariant')
     Save-SmpOwnership -InstallRoot $InstallRoot -Owner $Owner -InstanceId $profile.InstanceId -ModelPath $profile.ModelPath -ExpectedPath $expectedPath -SelectedVariant $variant -GpuOffload $fit.GpuOffload -Pending
-    Write-Host "Lade verwaltetes Modell $Alias mit $($profile.ContextLength) Tokens und GPU-Offload $($fit.GpuOffload) ..."
+    Write-Host "Loading managed model $Alias with $($profile.ContextLength) tokens and GPU offload $($fit.GpuOffload) ..."
     $loadArguments=@('load',$profile.ModelPath,'--exact','--local','--context-length',"$($profile.ContextLength)",'--parallel','1','--gpu',$fit.GpuOffload,'--identifier',$profile.InstanceId,'--yes')
     if($fit.ReserveOverride){
         $load=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments $loadArguments -LogDirectory $LogDirectory -TimeoutSeconds 900 -AllowFailure
         $loadExit=Get-LrProperty $load 'ExitCode'
-        if($loadExit -isnot [int] -and $loadExit -isnot [long]){throw 'LM Studio lieferte keinen auswertbaren Exitcode fuer den Ladeversuch.'}
+        if($loadExit -isnot [int] -and $loadExit -isnot [long]){throw 'LM Studio returned no usable exit code for the load attempt.'}
         if($loadExit -ne 0){
-            $error=[InvalidOperationException]::new("$fitMessage LM Studio hat den Ladeversuch abgelehnt (Exitcode $($load.ExitCode)); Modell bleibt heruntergeladen. Details: $($load.LogPath)")
+            $error=[InvalidOperationException]::new("$fitMessage LM Studio rejected the load attempt (exit code $($load.ExitCode)); model remains downloaded. Details: $($load.LogPath)")
             $error.Data['ShadowResourceFitFailure']=$true
             throw $error
         }
@@ -377,13 +377,13 @@ function Invoke-SmpProfileCheck {
         $Profile.SmokeTests=[pscustomobject]@{Chat='NotRun';ToolCall='NotRun';ToolResultRoundTrip='NotRun'}
         $Profile.VerificationState='Deferred'
         $Profile.VerificationMessage=$_.Exception.Message
-        Write-Warning "Modell $($Profile.Alias) bleibt heruntergeladen und noch ungeprueft: $($Profile.VerificationMessage)"
+        Write-Warning "Model $($Profile.Alias) remains downloaded and unverified: $($Profile.VerificationMessage)"
         return
     }
     try {
         $Profile.SmokeTests=Test-LrModelInference -ApiBaseUrl $Pool.BackendApiBaseUrl -ModelId $Profile.InstanceId -Headers (Get-LrApiHeaders $Pool.ApiTokenEnvironmentVariable)
         foreach($key in @('Chat','ToolCall','ToolResultRoundTrip')){
-            if((Get-LrProperty $Profile.SmokeTests $key) -cne 'Passed'){throw "Modelltest $key wurde nicht bestanden."}
+            if((Get-LrProperty $Profile.SmokeTests $key) -cne 'Passed'){throw "Model test $key failed."}
         }
         $Profile.VerificationState='Verified'
         $Profile.VerificationMessage=''
@@ -391,7 +391,7 @@ function Invoke-SmpProfileCheck {
         $Profile.SmokeTests=[pscustomobject]@{Chat='NotVerified';ToolCall='NotVerified';ToolResultRoundTrip='NotVerified'}
         $Profile.VerificationState='Deferred'
         $Profile.VerificationMessage=$_.Exception.Message
-        Write-Warning "Modell $($Profile.Alias) bleibt heruntergeladen; der Modelltest ist nicht bestanden: $($Profile.VerificationMessage)"
+        Write-Warning "Model $($Profile.Alias) remains downloaded; model test failed: $($Profile.VerificationMessage)"
     }
 }
 
@@ -411,8 +411,8 @@ function Configure-LocalModelPool {
         [string]$ApiTokenEnvironmentVariable='LOKIENTE_LM_API_KEY',
         [string]$LegacyModelKey
     )
-    if(-not $IsWindows){throw 'Der Modellpool ist fuer Windows mit NVIDIA-GPU vorgesehen.'}
-    if($LegacyModelKey){throw 'Ein explizites LegacyModelKey gehoert zum Einmodellprofil. Im Mehrmodellprofil werden die geprueften Katalogdateien verwendet.'}
+    if(-not $IsWindows){throw 'The model pool is designed for Windows with an NVIDIA GPU.'}
+    if($LegacyModelKey){throw 'An explicit LegacyModelKey belongs to the single-model profile. Multi-model profiles use the verified catalog files.'}
     $lock=Enter-SmpLock -InstallRoot $InstallRoot
     try {
         $owner=Get-SmpOwner -InstallRoot $InstallRoot
@@ -423,7 +423,7 @@ function Configure-LocalModelPool {
         $definitions=if($SelectedDefinitions){@($SelectedDefinitions)}else{@(Get-SmpModelDefinitions -Hardware $hardware -IncludeFastModel:$IncludeFastModel)}
         $server=Invoke-LrJson -LmsPath $lms -Arguments @('server','status','--json') -LogDirectory $logs
         if([bool](Get-LrProperty $server 'running' $false)){$Port=[int](Get-LrProperty $server 'port' 0)}
-        if($Port -lt 1024 -or $Port -eq $RouterPort){throw 'Backend- und Routerport muessen verschiedene gueltige Ports sein.'}
+        if($Port -lt 1024 -or $Port -eq $RouterPort){throw 'Backend and router ports must be different valid ports.'}
         $primary=if(@($definitions|Where-Object {$_.Alias -ceq 'coder'}).Count){'coder'}else{'coder-high'}
         $pool=[pscustomobject]@{
             SchemaVersion=2;Status='Provisioning';OwnerId=$owner.OwnerId;PrimaryAlias=$primary
@@ -441,11 +441,11 @@ function Configure-LocalModelPool {
             $models=@(Get-LrDownloadedModels -LmsPath $lms -LogDirectory $logs)
             $model=Find-LrModel -Models $models -Profile $item.Definition
             if(-not $model){
-                if(-not $DownloadModel){throw "Modell $($item.Name) fehlt; Modelldownload wurde deaktiviert."}
-                Write-Host "Lade exakte Modelldatei fuer $($item.Alias): $($item.Name) ..."
+                if(-not $DownloadModel){throw "Model $($item.Name) is missing; model downloads are disabled."}
+                Write-Host "Downloading exact model file for $($item.Alias): $($item.Name) ..."
                 $null=Invoke-LrNative -FilePath $lms -Arguments @('get',$item.Definition.DownloadUrl,'--gguf','--yes') -LogDirectory $logs -TimeoutSeconds 14400
                 $model=Find-LrModel -Models @(Get-LrDownloadedModels -LmsPath $lms -LogDirectory $logs) -Profile $item.Definition
-                if(-not $model){throw 'Heruntergeladenes Modell wurde lokal nicht exakt wiedergefunden.'}
+                if(-not $model){throw 'Could not locate an exact local match for the downloaded model.'}
             }
             $pool.Profiles+=@([pscustomobject]@{
                 Alias=$item.Alias;Name=$item.Name;RouteId=('shadow-'+$item.Alias);InstanceId=('shadow-'+$owner.OwnerId+'-'+$item.Alias)
@@ -482,7 +482,7 @@ function Configure-LocalModelPool {
                 $primaryProfile.SmokeTests=[pscustomobject]@{Chat='NotRun';ToolCall='NotRun';ToolResultRoundTrip='NotRun'}
                 $primaryProfile.VerificationState='Deferred'
                 $primaryProfile.VerificationMessage=$_.Exception.Message
-                Write-Warning "Hauptmodell bleibt heruntergeladen und noch ungeprueft: $($primaryProfile.VerificationMessage)"
+                Write-Warning "Primary model remains downloaded and unverified: $($primaryProfile.VerificationMessage)"
             }
         }
         $pool.ContextLength=$common;$pool.Status='Ready';$pool.CheckedAtUtc=[DateTime]::UtcNow.ToString('o')
@@ -501,11 +501,11 @@ function Switch-ShadowLocalModel {
         $pool=Get-Content -LiteralPath (Join-Path $InstallRoot 'runtime/model-pool.json') -Raw|ConvertFrom-Json
         Assert-SmpPool -Pool $pool -RequireReady
         $owner=Get-SmpOwner -InstallRoot $InstallRoot
-        if($pool.OwnerId -cne $owner.OwnerId){throw 'Modellpool und Eigentumsnachweis gehoeren nicht zusammen.'}
+        if($pool.OwnerId -cne $owner.OwnerId){throw 'Model pool and ownership record do not match.'}
         $logs=Join-Path $InstallRoot 'runtime/pool-logs'
         Ensure-SmpServer -Pool $pool -LogDirectory $logs
         $profiles=@($pool.Profiles|Where-Object {$_.Alias -ceq $Alias})
-        if($profiles.Count -ne 1){throw "Unbekannter oder mehrdeutiger Modellalias: $Alias"}
+        if($profiles.Count -ne 1){throw "Unknown or ambiguous model alias: $Alias"}
         $profile=$profiles[0]
         try {
             $result=Set-SmpActiveProfile -InstallRoot $InstallRoot -Pool $pool -Owner $owner -Alias $Alias -LogDirectory $logs -AllowUnfitAttempt:(Get-LrProperty $pool 'AllowUnfitAttempt' $false)
@@ -523,7 +523,7 @@ function Switch-ShadowLocalModel {
             try {
                 $tests=Test-LrModelInference -ApiBaseUrl $pool.BackendApiBaseUrl -ModelId $profile.InstanceId -Headers (Get-LrApiHeaders $pool.ApiTokenEnvironmentVariable)
                 foreach($key in @('Chat','ToolCall','ToolResultRoundTrip')){
-                    if((Get-LrProperty $tests $key) -cne 'Passed'){throw "Modelltest $key wurde nicht bestanden."}
+                    if((Get-LrProperty $tests $key) -cne 'Passed'){throw "Model test $key failed."}
                 }
                 $profile.SmokeTests=$tests
                 $profile.VerificationState='Verified'
@@ -532,14 +532,14 @@ function Switch-ShadowLocalModel {
                 $profile.SmokeTests=[pscustomobject]@{Chat='NotVerified';ToolCall='NotVerified';ToolResultRoundTrip='NotVerified'}
                 $profile.VerificationMessage=$_.Exception.Message
                 Write-SmpJson -Path (Join-Path $InstallRoot 'runtime/model-pool.json') -Value $pool -InstallRoot $InstallRoot
-                $error=[InvalidOperationException]::new("Modell $Alias wurde geladen, aber der Modelltest ist nicht bestanden: $($_.Exception.Message)")
+                $error=[InvalidOperationException]::new("Model $Alias loaded, but the model test failed: $($_.Exception.Message)")
                 $error.Data['ShadowModelVerificationFailure']=$true
                 throw $error
             }
         }
         foreach($key in @('Chat','ToolCall','ToolResultRoundTrip')){
             if((Get-LrProperty $profile.SmokeTests $key) -cne 'Passed'){
-                $error=[InvalidOperationException]::new("Modell $Alias hat keinen nachweislich bestandenen Modelltest.")
+                $error=[InvalidOperationException]::new("Model $Alias has no verifiably passed model test.")
                 $error.Data['ShadowModelVerificationFailure']=$true
                 throw $error
             }
@@ -560,7 +560,7 @@ function Start-LocalModelPool {
     $lock=Enter-SmpLock -InstallRoot $InstallRoot
     try {
         $owner=Get-SmpOwner -InstallRoot $InstallRoot
-        if($owner.OwnerId -cne $pool.OwnerId){throw 'Modellpool und Eigentumsnachweis gehoeren nicht zusammen.'}
+        if($owner.OwnerId -cne $pool.OwnerId){throw 'Model pool and ownership record do not match.'}
         $logs=Join-Path $InstallRoot 'runtime/pool-logs'
         Ensure-SmpServer -Pool $pool -LogDirectory $logs
         Restore-SmpPendingOwnership -InstallRoot $InstallRoot -Pool $pool -Owner $owner -LogDirectory $logs
@@ -576,16 +576,16 @@ function Start-ShadowEmbeddingModel {
     $lock=Enter-SmpLock -InstallRoot $InstallRoot
     try {
         $owner=Get-SmpOwner -InstallRoot $InstallRoot
-        if($owner.OwnerId -cne $Pool.OwnerId){throw 'Modellpool und Eigentumsnachweis gehoeren nicht zusammen.'}
+        if($owner.OwnerId -cne $Pool.OwnerId){throw 'Model pool and ownership record do not match.'}
         $logs=Join-Path $InstallRoot 'runtime/pool-logs'
         Ensure-SmpServer -Pool $Pool -LogDirectory $logs
         Restore-SmpPendingOwnership -InstallRoot $InstallRoot -Pool $Pool -Owner $owner -LogDirectory $logs
         $model=Find-LrModel -Models @(Get-LrDownloadedModels -LmsPath $Pool.LmsPath -LogDirectory $logs -Type embedding) -Profile $Definition
-        if(-not $model){throw 'Das gepruefte lokale Embeddingmodell ist in LM Studio nicht registriert.'}
+        if(-not $model){throw 'The verified local embedding model is not registered in LM Studio.'}
         $file=$Definition.Files[0]
         $modelFile=Join-Path (Join-Path (Resolve-ShadowModelDirectory) $Definition.Repository.Replace('/','\')) $file.Name
         if(-not(Test-ShadowModelFile -Path $modelFile -Size $file.Size -Sha256 $file.Sha256)){
-            throw 'Embeddingdatei stimmt nicht mit dem geprueften Katalog ueberein. Sie bleibt unveraendert.'
+            throw 'Embedding file does not match the verified catalog. It remains unchanged.'
         }
         $path=[string](Get-LrProperty $model 'path')
         $id='shadow-'+$owner.OwnerId+'-embedding'
@@ -593,7 +593,7 @@ function Start-ShadowEmbeddingModel {
         $entries=@($owner.Entries|Where-Object {$_.InstanceId -ceq $id})
         if($entries.Count -gt 1 -or ($entries.Count -eq 1 -and ($entries[0].ModelPath -cne $path -or
            (Get-LrProperty $entries[0] 'Origin') -cnotin @('verified-cpu-embedding','pending-cpu-embedding')))){
-            throw 'Embedding-Eigentuemerdatei stimmt nicht mit dem lokalen Modell ueberein. Keine Instanz wird veraendert.'
+            throw 'Embedding ownership file does not match the local model. No instance will be changed.'
         }
         $loaded=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $logs)
         $instances=@($loaded|Where-Object {(Get-LrProperty $_ 'identifier') -ceq $id})
@@ -606,25 +606,25 @@ function Start-ShadowEmbeddingModel {
             if($text -notmatch 'This model may be loaded based on your resource guardrails settings\.' -or $text -match 'Confidence:\s*LOW' -or
                $total -gt ($hardware.FreeRamBytes-3GB)){
                 if(-not $AllowUnfitAttempt){
-                    $error=[InvalidOperationException]::new('Kein gepruefter RAM-Fit fuer das CPU-Embeddingmodell mit 3 GiB Reserve. Keine weitere Instanz wurde geladen.')
+                    $error=[InvalidOperationException]::new('No verified RAM fit for the CPU embedding model with 3 GiB reserve. No further instance was loaded.')
                     $error.Data['ShadowResourceFitFailure']=$true
                     throw $error
                 }
                 $reserveOverride=$true
-                Write-Warning 'Kein gepruefter RAM-Fit fuer das CPU-Embeddingmodell. Ladeversuch ohne LoKiEnte-Reserve; LM-Studio-Schutzregeln bleiben aktiv.'
+                Write-Warning 'No verified RAM fit for the CPU embedding model. Attempting load without LoKiEnte reserve; LM Studio safeguards remain active.'
             }
             $owner.Entries=@($owner.Entries|Where-Object {$_.InstanceId -cne $id})+@(
                 [pscustomobject]@{InstanceId=$id;ModelPath=$path;Verified=$false;Origin='pending-cpu-embedding';ExpectedPath=$Definition.ExpectedPath;SelectedVariant='';GpuOffload='off'}
             )
             Write-SmpJson -Path (Join-Path $InstallRoot 'runtime/model-ownership.json') -Value $owner -InstallRoot $InstallRoot
-            Write-Host 'Lade das lokale Embeddingmodell ausschliesslich auf der CPU ...'
+            Write-Host 'Loading the local embedding model exclusively on the CPU ...'
             $loadArguments=@('load',$path,'--exact','--local','--context-length','2048','--gpu','off','--identifier',$id,'--yes')
             if($reserveOverride){
                 $load=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments $loadArguments -LogDirectory $logs -TimeoutSeconds 900 -AllowFailure
                 $loadExit=Get-LrProperty $load 'ExitCode'
-                if($loadExit -isnot [int] -and $loadExit -isnot [long]){throw 'LM Studio lieferte keinen auswertbaren Exitcode fuer den Embedding-Ladeversuch.'}
+                if($loadExit -isnot [int] -and $loadExit -isnot [long]){throw 'LM Studio returned no usable exit code for the embedding load attempt.'}
                 if($loadExit -ne 0){
-                    $error=[InvalidOperationException]::new("Kein gepruefter RAM-Fit fuer das CPU-Embeddingmodell; LM Studio hat den Ladeversuch abgelehnt (Exitcode $loadExit). Details: $($load.LogPath)")
+                    $error=[InvalidOperationException]::new("No verified RAM fit for the CPU embedding model; LM Studio rejected the load attempt (exit code $loadExit). Details: $($load.LogPath)")
                     $error.Data['ShadowResourceFitFailure']=$true
                     throw $error
                 }
@@ -638,7 +638,7 @@ function Start-ShadowEmbeddingModel {
         if($instances.Count -ne 1 -or (Get-LrProperty $instances[0] 'type') -cne 'embedding' -or
            (Get-LrProperty $instances[0] 'path') -cne $path -or $null -ne (Get-LrProperty $instances[0] 'deviceIdentifier' '__unknown__') -or
            [int](Get-LrProperty $instances[0] 'contextLength' 0) -ne 2048){
-            throw 'Geladene Embeddinginstanz ist nicht eindeutig verifiziert. Sie bleibt unveraendert.'
+            throw 'Loaded embedding instance is not uniquely verified. It remains unchanged.'
         }
         try {
             $headers=Get-LrApiHeaders -ApiTokenEnvironmentVariable $Pool.ApiTokenEnvironmentVariable
@@ -646,31 +646,31 @@ function Start-ShadowEmbeddingModel {
                 model=$id;input=@('local embedding test','local source search');encoding_format='base64'
             } -TimeoutSeconds 60
             $data=@(Get-LrProperty $response 'data' @())
-            if($data.Count -ne 2){throw 'Embedding-Smoke-Test lieferte nicht zwei Vektoren.'}
+            if($data.Count -ne 2){throw 'Embedding smoke test did not return two vectors.'}
             $indexes=[Collections.Generic.HashSet[int]]::new()
             foreach($item in $data){
                 $index=Get-LrProperty $item 'index'
-                if($index -isnot [int] -and $index -isnot [long]){throw 'Embedding-Smoke-Test lieferte keinen gueltigen Vektorindex.'}
-                if($index -notin @(0,1) -or -not $indexes.Add([int]$index)){throw 'Embedding-Smoke-Test lieferte doppelte oder ungueltige Vektorindizes.'}
+                if($index -isnot [int] -and $index -isnot [long]){throw 'Embedding smoke test returned no valid vector index.'}
+                if($index -notin @(0,1) -or -not $indexes.Add([int]$index)){throw 'Embedding smoke test returned duplicate or invalid vector indices.'}
                 $vector=Get-LrProperty $item 'embedding'
                 if($vector -is [string]){
-                    try{$bytes=[Convert]::FromBase64String($vector)}catch{throw 'Embedding-Smoke-Test lieferte ungueltiges Base64.'}
-                    if($bytes.Length -ne 3072){throw 'Embedding-Smoke-Test lieferte eine unerwartete Vektordimension.'}
+                    try{$bytes=[Convert]::FromBase64String($vector)}catch{throw 'Embedding smoke test returned invalid Base64.'}
+                    if($bytes.Length -ne 3072){throw 'Embedding smoke test returned an unexpected vector dimension.'}
                     $vector=@(for($i=0;$i -lt $bytes.Length;$i+=4){[BitConverter]::ToSingle($bytes,$i)})
                 }elseif($vector -is [array]){
-                    if($vector.Count -ne 768){throw 'Embedding-Smoke-Test lieferte eine unerwartete Vektordimension.'}
-                }else{throw 'Embedding-Smoke-Test lieferte kein Vektorarray.'}
+                    if($vector.Count -ne 768){throw 'Embedding smoke test returned an unexpected vector dimension.'}
+                }else{throw 'Embedding smoke test did not return a vector array.'}
                 $nonzero=$false
                 foreach($value in $vector){
-                    if($value -isnot [int] -and $value -isnot [long] -and $value -isnot [float] -and $value -isnot [double] -and $value -isnot [decimal]){throw 'Embedding-Smoke-Test lieferte einen ungueltigen Vektorwert.'}
-                    if(-not [double]::IsFinite([double]$value)){throw 'Embedding-Smoke-Test lieferte einen ungueltigen Vektorwert.'}
+                    if($value -isnot [int] -and $value -isnot [long] -and $value -isnot [float] -and $value -isnot [double] -and $value -isnot [decimal]){throw 'Embedding smoke test returned an invalid vector value.'}
+                    if(-not [double]::IsFinite([double]$value)){throw 'Embedding smoke test returned an invalid vector value.'}
                     if([double]$value -ne 0){$nonzero=$true}
                 }
-                if(-not $nonzero){throw 'Embedding-Smoke-Test lieferte einen Nullvektor.'}
+                if(-not $nonzero){throw 'Embedding smoke test returned a zero vector.'}
             }
         } catch {
-            if($_.Exception.Message -match '^LM-Studio-API verweigert den Zugriff'){throw}
-            $error=[InvalidOperationException]::new("Embedding-Smoke-Test fehlgeschlagen: $($_.Exception.Message)")
+            if($_.Exception.Data['ShadowAuthenticationFailure']){throw}
+            $error=[InvalidOperationException]::new("Embedding smoke test failed: $($_.Exception.Message)")
             $error.Data['ShadowEmbeddingVerificationFailure']=$true
             throw $error
         }
@@ -684,7 +684,7 @@ function Initialize-ShadowEmbeddingModel {
         return Start-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $Pool -Definition $Definition -AllowUnfitAttempt:(Get-LrProperty $Pool 'AllowUnfitAttempt' $false)
     } catch {
         if(-not $_.Exception.Data['ShadowResourceFitFailure'] -and -not $_.Exception.Data['ShadowEmbeddingVerificationFailure']){throw}
-        Write-Warning "Lokale Indexierung ist noch nicht betriebsbereit: $($_.Exception.Message) Modell bleibt heruntergeladen."
+        Write-Warning "Local indexing is not ready yet: $($_.Exception.Message) Model remains downloaded."
         $smoke=if($_.Exception.Data['ShadowEmbeddingVerificationFailure']){'Failed'}else{'NotRun'}
         return [pscustomobject]@{Status='Deferred';InstanceId=('shadow-'+$Pool.OwnerId+'-embedding');ModelPath=$Definition.ExpectedPath;Dimension=768;Device='CPU';SmokeTest=$smoke;Message=$_.Exception.Message}
     }

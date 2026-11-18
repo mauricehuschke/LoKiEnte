@@ -13,10 +13,10 @@ try{
     $projectFile=Join-Path $project 'user.txt'
     [IO.File]::WriteAllText($projectFile,'existing project')
     $entry=New-ShadowWorkspace -Root $managed -Project $project -PwshPath (Get-Process -Id $PID).Path
-    $guide=Join-Path (Split-Path -Parent $entry.task) 'ANLEITUNG.md'
+    $guide=Join-Path (Split-Path -Parent $entry.task) 'GUIDE.md'
     if(-not(Test-Path -LiteralPath $guide -PathType Leaf)){throw 'Workspace guide was not created'}
     $content=[IO.File]::ReadAllText($guide)
-    foreach($required in @('task.md','checks.json','Terminal > Aufgabe ausfuehren','VERIFIED','Benutzerrechten','loki_start','loki_status','LOKI-STATUS.md','Vorbereitungsreview')){
+    foreach($required in @('task.md','checks.json','Terminal > Run Task','VERIFIED','user permissions','loki_start','loki_status','LOKI-STATUS.md','preparation review')){
         if(-not $content.Contains($required)){throw "Guide is missing: $required"}
     }
     $workspace=Get-Content -LiteralPath $entry.workspace -Raw|ConvertFrom-Json
@@ -24,7 +24,7 @@ try{
         if($task.args[2] -cne '-ExecutionPolicy' -or $task.args[3] -cne 'Bypass'){throw 'VS Code task lacks a process-local execution policy'}
         if($task.args -notcontains '-AutoPrepare'){throw 'Managed workflow task does not prepare criteria and checks automatically'}
     }
-    $auto=@($workspace.tasks.tasks|Where-Object {$_.label -ceq 'Local AI: Auftrag automatisch mit Pruefung'})
+    $auto=@($workspace.tasks.tasks|Where-Object {$_.label -ceq 'Local AI: Automatic task with verification'})
     if($auto.Count -ne 1 -or $auto[0].args -notcontains 'Auto'){throw 'Automatic workflow selection task missing'}
     $fastTasks=@($workspace.tasks.tasks|Where-Object {$_.label -match '\(Coder Fast\)'})
     if($fastTasks.Count -ne 3 -or @($fastTasks|Where-Object {$_.args -notcontains '-CoderProfile' -or $_.args -notcontains 'Fast'}).Count){
@@ -61,7 +61,7 @@ try{
         throw 'Managed workspace task was not updated or custom settings were lost'
     }
     $currentGuide=Join-Path (Split-Path -Parent $entry.task) 'LOKI-WORKFLOW.md'
-    if(-not(Test-Path -LiteralPath $currentGuide) -or [IO.File]::ReadAllText($currentGuide) -cne [IO.File]::ReadAllText((Join-Path $SourceRoot 'WORKFLOW.md'))){throw 'Managed current guide missing or stale'}
+    if(-not(Test-Path -LiteralPath $currentGuide) -or [IO.File]::ReadAllText($currentGuide) -cne [IO.File]::ReadAllText((Join-Path $SourceRoot 'WORKFLOW.md')).Replace('(WORKFLOW.de.md)','(LOKI-WORKFLOW.de.md)')){throw 'Managed current guide missing or stale'}
     $newEntry=@($updated.Entries | Where-Object {$_.project -ceq $new})[0]
     $fresh=Get-Content -LiteralPath $newEntry.checks -Raw | ConvertFrom-Json
     if($fresh.schemaVersion -ne 2 -or $fresh.testWritePaths.Count -or $fresh.acceptanceCriteria.Count -or $fresh.changeTypes.Count){throw 'Fresh workspace does not have safe v2 defaults'}

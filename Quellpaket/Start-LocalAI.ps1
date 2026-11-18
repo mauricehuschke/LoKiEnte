@@ -24,18 +24,18 @@ function Get-ShadowVsCodeLaunchArguments {
         '--disable-extension','GitHub.copilot-chat','--new-window',$OpenPath)
 }
 try {
-    if(-not $IsWindows){throw 'Dieser Launcher ist fuer Windows vorgesehen.'}
+    if(-not $IsWindows){throw 'This launcher is designed for Windows.'}
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
     $ProjectPath=Select-ShadowProject -InstallRoot $InstallRoot -ProjectPath $ProjectPath
     if(-not $ProjectPath){
-        Write-Host 'Start abgebrochen. Keine Modellumgebung gestartet.'
+        Write-Host 'Startup cancelled. No model environment started.'
         return
     }
     $null=Assert-ShadowRipgrepReady -InstallRoot $InstallRoot
     $runtimeFile=Join-Path $InstallRoot 'runtime/runtime-state.json'
     $toolchainFile=Join-Path $InstallRoot 'toolchain.json'
     foreach($path in @($toolchainFile)){
-        if(-not(Test-Path -LiteralPath $path)){throw "Einrichtung fehlt: $path. Provisionierung zuerst abschliessen."}
+        if(-not(Test-Path -LiteralPath $path)){throw "Installation missing: $path. Complete provisioning first."}
     }
     $chain=Get-Content -LiteralPath $toolchainFile -Raw|ConvertFrom-Json -AsHashtable
     if($chain.ContainsKey('modelMode') -and $chain.modelMode -eq 'Dual'){
@@ -47,8 +47,8 @@ try {
     }else{
         $state=Get-Content -LiteralPath $runtimeFile -Raw|ConvertFrom-Json
         $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -LmsPath $state.LmsPath -ModelKey $state.ModelPath -ContextLength $state.ContextLength -Port $state.Port -DownloadModel $false -ApiTokenEnvironmentVariable $state.ApiTokenEnvironmentVariable -AllowUnfitAttempt:($chain.ContainsKey('allowUnfitAttempt') -and $chain.allowUnfitAttempt -eq $true)
-        if($runtime.Status -cnotin @('Ready','Deferred')){throw 'Lokaler Modellstatus ist unbekannt.'}
-        $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOCH NICHT GEPRUEFT]'}else{'LoKiEnte local - verified workflow'}
+        if($runtime.Status -cnotin @('Ready','Deferred')){throw 'Local model status is unknown.'}
+        $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOT YET VERIFIED]'}else{'LoKiEnte local - verified workflow'}
         $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
     }
     if($ProjectPath) {
@@ -56,8 +56,8 @@ try {
         Register-ShadowWorkspaces -Root $InstallRoot -Entries @($entry)
         $openPath=$entry.workspace
         $workingDirectory=$entry.project
-        Write-ShadowMessage "Auftrag: $($entry.task)"
-        Write-ShadowMessage "Projektpruefungen: $($entry.checks)"
+        Write-ShadowMessage "Task: $($entry.task)"
+        Write-ShadowMessage "Project checks: $($entry.checks)"
     } else {
         $openPath=Join-Path $InstallRoot 'welcome'
         $workingDirectory=$InstallRoot
@@ -82,13 +82,13 @@ try {
     $process=[Diagnostics.Process]::Start($start)
     $process.Dispose()
     if($ProjectPath -and $chain.modelMode -eq 'Dual'){
-        Write-ShadowMessage 'Indexierung: In Kilo fuer dieses Projekt freigeben; sensible Dateien zuvor in .gitignore oder .kilocodeignore ausschliessen. Status Complete abwarten.'
+        Write-ShadowMessage 'Indexing: enable it in Kilo for this project; first exclude sensitive files in .gitignore or .kilocodeignore. Wait for Complete status.'
     }
-    Write-ShadowMessage 'VS Code mit dem lokalen Profil gestartet. Bereits offene Fenster dieses Profils nach Konfigurationsaenderungen vollstaendig schliessen und erneut starten.' 'OK'
+    Write-ShadowMessage 'VS Code started with the local profile. After configuration changes, fully close existing windows of this profile and restart.' 'OK'
 } catch {
     Write-Error -Message $_.Exception.Message -ErrorAction Continue
     if($PauseOnError){
-        try { $null=Read-Host 'Zum Schliessen Enter druecken' } catch {}
+        try { $null=Read-Host 'Press Enter to close' } catch {}
     }
     exit 1
 }

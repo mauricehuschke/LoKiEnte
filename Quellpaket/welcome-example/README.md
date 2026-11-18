@@ -1,46 +1,46 @@
-# Welcome: Kilo-Workflow ausprobieren
+# Welcome: try the Kilo workflow
 
-Dieses eigenstaendige Git-Testprojekt enthaelt nur kuenstliche Beispieldaten.
-Keine Pakete installieren: Node.js, node:test und node:assert/strict genuegen.
-Die Provisionierung erstellt einmalig einen lokalen Anfangscommit. Es gibt
-keinen Remote; spaetere Aenderungen werden nicht automatisch committet.
+[Deutsch](README.de.md)
 
-## Test starten
+This standalone Git test project contains only synthetic data. Do not install
+packages: Node.js, node:test and node:assert/strict are sufficient. Provisioning
+creates a local initial commit once. There is no remote; later changes are not
+committed automatically.
 
-Desktopverknuepfung oeffnen und dieses workflow-test-Projekt auswaehlen.
-Im Kilo-Agenten shadow-chat den folgenden Auftrag unveraendert eingeben:
+## Start the test
 
-> Behebe den Fehler in discountedPrice in discount.cjs. Die Funktion soll den
-> verbleibenden Preis in ganzen Cent nach dem Rabatt liefern:
-> (10000, 20) ergibt 8000, (10000, 0) ergibt 10000, (10000, 100) ergibt 0
-> und (999, 10) ergibt 899. Negative Preise und Rabatte ausserhalb 0 bis 100
-> muessen einen RangeError ausloesen. Verwende den Bugfix-Workflow.
-> Leite Akzeptanzkriterien und checks.json automatisch ab. Lass den Testautor
-> aussagekraeftige node:test-Tests in tests/discount.test.cjs schreiben und
-> unabhaengig pruefen. Weise den Fehler vor dem Fix mit wirklich
-> fehlgeschlagenen Tests nach. Aendere danach ausschliesslich discount.cjs.
-> Behalte die eingefrorenen Tests bei und fuehre Code-Review und Validierung
-> durch. Zeige Rollen, Modelle, Phasen und Ergebnisse bis zum Endstatus.
-> Keine Dependencies, Netzwerkzugriffe, Commits oder Pushes.
+Open the desktop shortcut and select this workflow-test project. Enter the
+following task unchanged in the Kilo shadow-chat agent:
 
-Erwartet: Vorbereitung -> Vorbereitungsreview -> Architektur -> Testautor ->
-Testreview -> rote Ausgangstests -> Implementierung -> gruene Tests ->
-Code-Review -> Validierung. Nur ein passender VERIFIED-Bericht ist Erfolg.
-checks.json entsteht im verwalteten Auftragsordner. Dort stehen auch
-LOKI-STATUS.md und die Anleitung. Bei Rueckfragen/Fehlern die Details ansehen.
-Dieser Test prueft den vollstaendigen Basisablauf. Security- und
-Integrationsspezialisten werden bei entsprechenden Aenderungsarten verlangt;
-die reine Rechenfunktion benoetigt sie nicht.
+> Fix the bug in discountedPrice in discount.cjs. The function must return the
+> remaining price in whole cents after applying the discount:
+> (10000, 20) returns 8000, (10000, 0) returns 10000, (10000, 100) returns 0,
+> and (999, 10) returns 899. Negative prices and discounts outside 0 through 100
+> must throw RangeError. Use the Bugfix workflow. Derive acceptance criteria and
+> checks.json automatically. Have the test author write meaningful node:test tests
+> in tests/discount.test.cjs and have them independently reviewed. Demonstrate the
+> bug with actually failing tests before fixing it. Then change only discount.cjs.
+> Preserve the frozen tests and perform code review and validation. Show roles,
+> models, phases and results until the task reaches a final status. No dependencies, network access,
+> commits or pushes.
 
-## Wiederholen
+Expected: preparation -> preparation review -> architecture -> test author ->
+test review -> failing baseline tests -> implementation -> passing tests ->
+code review -> validation. Only a matching VERIFIED report means success.
+checks.json is created in the managed task directory, alongside LOKI-STATUS.md
+and the guide. Inspect details for questions or failures. This test exercises
+the complete basic workflow. Security/integration specialists are required for
+the corresponding change types; this pure calculation does not need them.
 
-Updates erhalten deinen bearbeiteten Teststand. Fuer einen frischen Versuch
-in PowerShell 7 ausfuehren (bei anderem Installationsort den Pfad anpassen):
+## Repeat
+
+Updates preserve the modified example. For a fresh attempt, run in PowerShell 7
+(adjust the path for a different installation):
 
 ```powershell
 & 'D:\LoKi\app\New-WelcomeTestProject.ps1' -InstallRoot 'D:\LoKi' -NewExample
 ```
 
-Danach den neu registrierten workflow-test-Ordner im Launcher auswaehlen.
-Es wird kein vorhandenes Projekt zurueckgesetzt. Die Tests laufen weiterhin
-mit deinem Windows-Konto; das Beispiel ist keine Betriebssystem-Sandbox.
+Then select the newly registered workflow-test directory in the launcher.
+No existing project is reset. Tests still run under your Windows account;
+the example is not an OS sandbox.

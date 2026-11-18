@@ -48,6 +48,7 @@ function Write-ShadowManagedFile {param($Path,$Content,$BackupRoot) [void][IO.Di
 function Write-ShadowMessage {param($Message,$Level) Write-Host $Message}
 '@
     $harness+="`n"+$startCommand.Extent.Text+"`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
+    Copy-Item -LiteralPath (Join-Path $SourceRoot 'templates') -Destination (Join-Path $root 'templates') -Recurse
     $harnessPath=Join-Path $root 'harness.ps1'
     [IO.File]::WriteAllText($harnessPath,$harness)
     foreach($scenario in @('success','deferred','single-deferred','reserve','failure')){
@@ -58,7 +59,7 @@ function Write-ShadowMessage {param($Message,$Level) Write-Host $Message}
         $calls=@(Get-Content -LiteralPath (Join-Path $install 'search-tests.txt'))
         if($calls.Count -ne 2 -or $calls[0] -cne 'cli-fixture' -or $calls[1] -cne 'gui-fixture'){throw 'Setup did not test both Kilo entry points'}
         if($scenario -eq 'success' -and ($result.ExitCode -ne 0 -or $report.status -cne 'PROVISIONED' -or
-            $report.steps -notcontains 'Dateisuche in Kilo CLI und VS-Code-Erweiterung geprueft')){throw 'Successful search was not included in the provisioning report'}
+            $report.steps -notcontains 'File search verified in Kilo CLI and VS Code extension')){throw 'Successful search was not included in the provisioning report'}
         if($scenario -in @('deferred','single-deferred') -and ($result.ExitCode -ne 0 -or $report.status -cne 'PROVISIONED_WITH_WARNINGS' -or
             $report.warnings -notcontains 'Synthetic unverified model')){throw 'Deferred models should complete provisioning with an explicit warning'}
         if($scenario -eq 'reserve' -and ($result.ExitCode -ne 0 -or $report.status -cne 'PROVISIONED_WITH_WARNINGS' -or

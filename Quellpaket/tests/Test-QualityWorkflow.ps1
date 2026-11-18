@@ -44,7 +44,7 @@ const generated=mode==='auto-generated',checkName=generated?'loki-node-test':'un
 let text=JSON.stringify({summary:'Return two, preserve architecture.',changeTypes:['other']});
 if(role==='shadow-preparer'){
  if(process.env.LOKI_WORKFLOW_CHILD!=='1'||config.agent[role].permission.loki_start!=='deny')process.exit(5);
- text=JSON.stringify(mode==='prep-needs-input'?{needsInput:'Welches Verhalten ist gewuenscht?'}:{workflow:'Bugfix',acceptanceCriteria:[{id:'AC-1',description:'App returns two'}],changeTypes:['other'],writePaths:['app.cjs'],testWritePaths:['tests/app.test.cjs'],checkIds:[generated?'loki-node-test':'existing:unit'],regressionCheckId:generated?'loki-node-test':'existing:unit'});
+ text=JSON.stringify(mode==='prep-needs-input'?{needsInput:'What behavior is expected?'}:{workflow:'Bugfix',acceptanceCriteria:[{id:'AC-1',description:'App returns two'}],changeTypes:['other'],writePaths:['app.cjs'],testWritePaths:['tests/app.test.cjs'],checkIds:[generated?'loki-node-test':'existing:unit'],regressionCheckId:generated?'loki-node-test':'existing:unit'});
  if(mode==='prep-outside')fs.writeFileSync(path.join(project,'app.cjs'),'module.exports=()=>3;');
 }
 if(role==='shadow-test'){
@@ -91,7 +91,7 @@ process.stdout.write(JSON.stringify({type:'text',sessionID:mode==='reused-sessio
         $extra=@();if($Auto){$extra=@('-AutoPrepare','-RequestId','11111111-2222-4333-8444-555555555555')}
         $script:calls=Join-Path $root ('calls-'+[guid]::NewGuid().ToString('N')+'.jsonl')
         $result=Invoke-ShadowNative -FilePath $pwsh -ArgumentList (@('-NoProfile','-NonInteractive','-File',(Join-Path $SourceRoot 'Invoke-ReviewedTask.ps1'),'-InstallRoot',$root,'-ProjectPath',$project,'-TaskFile',$task,'-ChecksFile',$checks,'-Workflow',$Workflow,'-CoderProfile',$Profile,'-MaxCorrectionRounds',[string]$Corrections,'-KiloExecutable',$node,'-KiloArgumentPrefix',$fake)+$extra) -Environment @{SHADOW_TEST_CALLS=$script:calls;SHADOW_TEST_MODE=$Mode;SHADOW_TEST_SECRET='synthetic'} -AllowFailure -Quiet -TimeoutSeconds 180
-        $path=($result.StdOut -split '\r?\n' | Where-Object {$_ -like 'Pruefbericht: *'}) -replace '^Pruefbericht: ',''
+        $path=($result.StdOut -split '\r?\n' | Where-Object {$_ -like 'Verification report: *'}) -replace '^Verification report: ',''
         if(-not $path){throw "Fixture did not emit receipt: $($result.StdOut) $($result.StdErr)"}
         $receipt=Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
         if($receipt.status -ceq 'VERIFIED' -and $result.ExitCode -ne 0){throw 'VERIFIED with failing exit'}
@@ -114,12 +114,12 @@ process.stdout.write(JSON.stringify({type:'text',sessionID:mode==='reused-sessio
     Assert-True ($receipt.status -ceq 'VERIFIED' -and $receipt.rounds[0].specialists.security.Valid -and $receipt.rounds[0].specialists.integration.Valid) 'Reviewer escalation ignored'
     foreach($mode in @('security-fail','integration-fail')){
         $receipt=Invoke-FixtureRun -Mode $mode -Types @('security','ui') -Kind integration
-        Assert-True ($receipt.status -ceq 'NOT_VERIFIED' -and $receipt.rounds[0].reasons -match 'Pflichtpruefung') "$mode did not block"
+        Assert-True ($receipt.status -ceq 'NOT_VERIFIED' -and $receipt.rounds[0].reasons -match 'Required verification') "$mode did not block"
     }
-    $receipt=Invoke-FixtureRun -Types @('ui');Assert-True ($receipt.error -match 'integration-Check') 'Missing integration allowed'
+    $receipt=Invoke-FixtureRun -Types @('ui');Assert-True ($receipt.error -match 'integration check') 'Missing integration allowed'
     foreach($mode in @('author-outside','implement-test-edit','implement-outside')){
         $receipt=Invoke-FixtureRun -Mode $mode
-        Assert-True ($receipt.error -match 'ausserhalb des erlaubten Schreibumfangs|Testdatei geaendert') "$mode not rejected: $($receipt.error)"
+        Assert-True ($receipt.error -match 'outside the allowed write scope|Test file changed') "$mode not rejected: $($receipt.error)"
         if(Test-Path -LiteralPath (Join-Path $project 'outside.txt')){Remove-Item -LiteralPath (Join-Path $project 'outside.txt')}
     }
     foreach($mode in @('test-review-fail','missing-criterion','reused-session')){
@@ -131,10 +131,10 @@ process.stdout.write(JSON.stringify({type:'text',sessionID:mode==='reused-sessio
         $receipt=Invoke-FixtureRun -ReportMode $mode
         Assert-True ($receipt.status -ceq 'NOT_VERIFIED' -and $receipt.rounds[0].reasons.Count -gt 0) "$mode passed"
     }
-    $receipt=Invoke-FixtureRun -AlreadyFixed;Assert-True ($receipt.error -match 'nicht wie geplant reproduziert') 'Already green baseline accepted'
+    $receipt=Invoke-FixtureRun -AlreadyFixed;Assert-True ($receipt.error -match 'not reproduced as planned') 'Already green baseline accepted'
     $receipt=Invoke-FixtureRun -NoCriteria;Assert-True ($receipt.error -match 'acceptanceCriteria' -and -not(Test-Path -LiteralPath $script:calls)) 'Missing criteria accepted'
     $lock=Enter-ShadowProjectRun $project
-    try{$receipt=Invoke-FixtureRun;Assert-True ($receipt.error -match 'gesperrt' -and -not(Test-Path -LiteralPath $script:calls)) 'Concurrent run accepted'}finally{$lock.Dispose()}
+    try{$receipt=Invoke-FixtureRun;Assert-True ($receipt.error -match 'locked' -and -not(Test-Path -LiteralPath $script:calls)) 'Concurrent run accepted'}finally{$lock.Dispose()}
     }
     $receipt=Invoke-FixtureRun -Workflow Feature
     Assert-True ($receipt.status -ceq 'VERIFIED') "Feature failed: $($receipt.error)"

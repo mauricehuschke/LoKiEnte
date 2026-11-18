@@ -1,542 +1,501 @@
-## LoKiEnte-Logo und anbieterneutrale Benennung — Paket 2026.11.18.21
+# Provisioning package validation
 
-39 eigenständige PowerShell-/Node-Testsuiten bestanden. Dazu gehören der
-Bootstrap einschließlich Windows PowerShell 5.1, Welcome-Projekt, Modell- und
-Updateprüfungen sowie der Kilo-Chat-zu-Runner-Ablauf mit synthetischen Modellantworten.
-Der gespeicherte Name der API-Token-Umgebungsvariable bleibt beim Update erhalten.
+[Deutsch](VALIDATION.de.md)
 
-Der neue Windows-Test `tests/Test-LauncherIcon.ps1` prüft acht Aspekte: ICO-Größen,
-Windows-Dekodierung, gespeicherte Verknüpfungseigenschaften, Neuanlage,
-Wiederholungsupdate und Sicherung/Umbenennung passender alter Verknüpfungen.
-Eine Verknüpfung mit abweichendem Zielaufruf bleibt erhalten. Alle Verknüpfungen
-werden in temporären Testordnern erzeugt; der echte Desktop wird nicht verändert.
-Sechs Prüfungen bestätigen außerdem den Erhalt eigener VS-Code-Einstellungen,
-Sicherungen und angepasster Terminalprofile bei der Umbenennung des verwalteten Profils.
-Zusätzlich wurden die PNG-Frames aller sieben ICO-Größen und die bytegenaue
-Übereinstimmung der eingebetteten Nutzlast mit dem Quellpaket geprüft.
+This document preserves the validation history and its original limitations.
+Older sections describe the behavior and evidence of their stated release, not
+necessarily the current defaults. Current usage is documented in [README.md](README.md).
 
-Aktuelle Dateien, Bilddateien, entpackte Nutzlast und historische Inhalte wurden
-mit Gitleaks und ergänzenden Prüfungen auf private Identifikatoren untersucht.
-Keine Zugangsdaten oder privaten Identifikatoren im aktuellen Dateistand gefunden.
-Eine Dateiprüfung ersetzt keine Prüfung der Autorenmetadaten der Git-Historie.
+## English defaults and German documentation — package 2026.11.18.22
 
-Der Projekttitel und sichtbare Meldungen verwenden LoKiEnte. Anbieterbezogene
-Hardwareannahmen wurden aus der Beschreibung entfernt; technische Kennungen und
-vorhandene Installationspfade bleiben für Updates kompatibel. Das Paket ist für
-Windows x64 mit dem bestehenden NVIDIA-Prüfpfad ausgelegt, kein Linux-/macOS-Installer.
-Eine echte Neuinstallation und Modellinferenz auf zusätzlicher Hardware sind
-durch diese Regressionstests nicht belegt.
+40 independent PowerShell/Node suites passed after the language update. The complete
+quality workflow passed all 54 checks; bootstrap passed 42, including the Windows
+PowerShell 5.1 handoff. Agent responses and GPU/LM Studio boundaries remain synthetic;
+these results do not replace target-machine installation, inference or GUI acceptance.
 
-## Gesamtprüfung — Paket 2026.11.18.20
+`tests/Test-Localization.ps1` adds 28 checks covering English defaults, German
+companions, deployed language links, legacy task/folder migration, preservation of
+custom tasks/settings/folders/guides, and Welcome README migration with backups.
+Only an unchanged bundled German Welcome README is replaced by English. Customized
+guides, example code and Git HEAD remain unchanged; missing German companions are added.
 
-Der erneute Pakettest umfasst alle eigenständigen vorhandenen PowerShell- und
-Node-Testsuiten, einschließlich Bootstrap/Windows PowerShell 5.1, Modellwahl,
-Speichergrenzen, Router, Abhängigkeiten, Kilo-Konfiguration, vollständigem
-Qualitätsworkflow und Chat-zu-Runner-Ablauf. Test-CoderWorkflow ist ein Alias
-derselben QualityWorkflow-Suite und wird nicht doppelt gezählt.
+The active agent configuration references only the English rules. German rules and
+task/Welcome templates remain readable alongside them. Provisioning menus, messages,
+diagnostics and workflow status are English; native operating-system and third-party
+output can still follow their own locale. No runtime language switch was added.
 
-Ergebnis: 38 eigenständige Testsuiten bestanden. Ein veralteter Testharness
-für die Ripgrep-Setup-Integration wurde um die neuen Setup-Grenzen ergänzt
-und erfolgreich wiederholt; die echten Registry-/Welcome-Abläufe besitzen
-eigene Tests. Der vollständige Qualitätsworkflow bestand alle 54 Prüfungen.
+Authentication failures now carry a language-independent error marker. The 24-check
+embedding suite includes HTTP 401/403 through the actual API wrapper and verifies
+that authentication remains a blocking error without exposing response content.
+The concurrent-file-publication regression checks the native I/O exception type
+instead of a localized Windows message. Model selection passed 28 checks.
 
-Zusätzlich geprüft: Erhalt eigener VS-Code-Einstellungen und Terminalprofile
-bei Aktualisierung der verwalteten Vorgaben (4 Prüfungen), Starthelfer mit
-explizitem Updateziel und literal erhaltenen Pfaden (4), Welcome-Erstellung,
-Wiederholung nach simuliertem Git-Fehler und Erhalt bearbeiteter Beispiele (14).
-Welcome veröffentlicht erst ein vollständig initialisiertes Git-Repository.
-Git-Umleitungen stoppen bereits vor Dateischreibvorgängen. Fehlgeschlagene
-Aufbauten bleiben als getrennte Diagnoseordner erhalten und blockieren keinen
-neuen Versuch am normalen Ziel.
+Additional validation: 65 PowerShell files and 9 Node files parsed successfully;
+the Python builder parsed; all 16 public provisioning parameters are documented.
+All 20 Markdown files form 10 adjacent language pairs; local links and six JSON
+examples passed validation. Non-string PowerShell token changes are confined to
+template loading, bilingual migration and the authentication marker.
 
-Eigene Checks, Aufgaben und nicht verwaltete Einstellungen bleiben erhalten.
-Verwaltete Agentenkonfiguration, LoKiEnte-Tasks und festgelegte Profileinstellungen
-werden bewusst auf den Paketstand gebracht; Vorzustände werden gesichert.
-Nicht erreichbare Projekte bleiben registriert und werden als Warnung gemeldet.
-Freigegebene Abhängigkeiten werden aktualisiert, neuere Versionen nicht
-automatisch heruntergestuft.
+The rebuilt standalone installer contains 86 files, compared byte-for-byte with
+the source package, with matching SHA-256. Gitleaks and supplementary scans of
+current files and the decoded payload found no credentials or private identifiers.
+This statement covers file content, not a rewrite of historical Git author metadata.
 
-Die Installer-ZIP-Nutzlast wird samt SHA-256 mit jeder Quelldatei verglichen.
-Die frühere separate ZIP ist archiviert und wird vom Installer nicht benutzt.
-Modelle/Installationen/Benutzerprojekte wurden für diesen Test nicht verändert:
-Installations- und Modellgrenzen sind simuliert, Git/Node/PowerShell und lokale
-HTTP-Testprozesse laufen tatsächlich. Echte GPU-/GUI-Abnahme erfolgt auf dem
-Windows-PC mit dem Welcome-Auftrag.
+## LoKiEnte logo and vendor-neutral naming — package 2026.11.18.21
 
-## Automatische Aufträge und sichtbarer Ablauf — Paket 2026.11.18.18
+39 independent PowerShell/Node test suites passed, covering bootstrap including
+Windows PowerShell 5.1, Welcome, models, updates and the Kilo-chat-to-runner path
+with synthetic model responses. Updates retain the saved API-token environment
+variable name.
 
-Neue bzw. erweiterte Prüfungen:
+The new Windows `tests/Test-LauncherIcon.ps1` covers eight aspects: ICO sizes,
+Windows decoding, saved shortcut properties, creation, repeated updates and
+backup/renaming of matching old shortcuts. A shortcut with different launch
+arguments remains. All shortcuts are created in temporary directories; the real
+desktop is not modified. Six further checks confirm preservation of custom VS Code
+settings, backups and customized terminal profiles when renaming the managed profile.
+The PNG frames of all seven ICO sizes and exact byte equality between embedded
+payload and source package were also checked.
 
-- `tests/Test-TaskPreparation.ps1`: echte temporäre Git-Projekte; Kandidatenerkennung
-  ohne Ausführen von Projektwerkzeugen; neue und bestehende Prüfkataloge,
-  auftragsspezifische Erneuerung, Sicherungen, Erhalt eigener Felder/Befehle,
-  manuelle Provenienzkonflikte, dauerhafte Grenzen und konkurrierende Änderungen.
-- `node tests/Test-TaskPreparation.mjs`: echter Node-Testlauf mit JUnit-Bericht,
-  feste Argumente, Pfadgrenzen, fehlende Frameworks, Jest-Assertion-Konvertierung
-  und exakte Playwright-Dateifilter unter Windows und normalisierten Pfaden.
-- `node tests/Test-WorkflowTools.mjs`: lokale Kilo-Werkzeuge und Hintergrundaufträge;
-  Projektbindung, Statusausgabe, Prozessgrenzen, Abbruch und Fehlerpfade.
-- `tests/Test-KiloWorkflowEndToEnd.ps1`: direkter Werkzeugauftrag durch Bridge,
-  Hintergrundprozess und echten Runner bis zu automatischer Konfiguration,
-  acht getrennten Agentenrollen und echten roten/grünen Node-Testberichten.
-  Die Agentenantworten sind synthetisch; geprüft wird die vollständige Verdrahtung.
-- `tests/Test-WorkspaceGuide.ps1`: neue und bestehende Registrierungen erhalten
-  automatische Tasks und aktuelle Anleitung; eigene Aufgaben, Befehle und
-  persönliche Auftragsdateien bleiben erhalten.
-- `tests/Test-QualityWorkflow.ps1`: bestehende Qualitätsgates bleiben die Grundlage
-  für Testautoren, eingefrorene Tests und unabhängige Abnahme. Synthetische
-  Agentenantworten testen Kontrolllogik, keine Modellqualität.
-- `tests/Test-WorkflowProgress.ps1`: echte Ausgabe vor Prozessende, gleichzeitiges
-  Lesen von stderr, Zeitlimit, Prozessende bei Callbackfehler und begrenzte Events.
-- `tests/Test-KiloWorkflowDiscovery.ps1`: Werkzeugregistrierung, Schemas und
-  rollenabhängige Rechte ohne Modellinferenz; Fehler bleiben geschlossen.
-- `tests/Test-KiloToolImportPreflight.ps1`: fremde Customtools und veränderte oder
-  verknüpfte Shims werden vor dem Import erkannt, ohne Benutzerdateien anzufassen.
+Current files, images, extracted payload and historical content were inspected with
+Gitleaks and additional private-identifier checks. No credentials or private
+identifiers were found in the current files. A file-content scan does not replace
+inspection of Git-history author metadata.
 
-Für diese Paketversion bestanden die folgenden Prüfgruppen:
+The title and visible messages use LoKiEnte. Vendor-specific hardware assumptions
+were removed from descriptions; technical identifiers and existing paths remain
+update-compatible. The package targets Windows x64 with its existing NVIDIA checks;
+it is not a Linux/macOS installer. These regressions do not establish a fresh
+installation or real model inference on additional hardware.
 
-| Suite | Bestanden |
+## Full package review — package 2026.11.18.20
+
+The rerun covered all independent existing PowerShell and Node suites: bootstrap/
+Windows PowerShell 5.1, selection, memory limits, router, dependencies, Kilo
+configuration, complete quality workflow and chat-to-runner integration.
+`Test-CoderWorkflow` aliases QualityWorkflow and is not counted twice.
+
+Result: 38 independent suites passed. An outdated ripgrep setup harness was extended
+for the new setup boundaries and rerun successfully; real registry/Welcome paths
+have their own tests. The complete quality workflow passed all 54 checks.
+
+Additional checks covered custom VS Code settings/terminal profiles during managed
+updates (4), launch helpers with an explicit update target and literal paths (4),
+and Welcome creation/retry after a simulated Git failure/preservation of edited
+examples (14). Welcome publishes only a fully initialized Git repository. Git
+redirections stop before file writes. Failed initializations remain in separate
+diagnostic directories and do not block retrying the normal destination.
+
+Custom checks, tasks and unmanaged settings remain. Managed agent configuration,
+LoKiEnte tasks and designated profile settings are intentionally updated to the
+package version, with backups. Unreachable projects remain registered and produce
+warnings. Approved dependencies are updated; newer versions are not downgraded.
+
+The installer ZIP payload and SHA-256 are compared against every source file. The
+former separate ZIP is archived and not used by the installer. Models, installations
+and user projects were not changed for these tests. Installation/model boundaries
+are simulated; Git, Node, PowerShell and local HTTP processes actually run. Real
+GPU/GUI acceptance uses the Welcome request on the target Windows PC.
+
+## Automatic tasks and visible workflow — package 2026.11.18.18
+
+New or extended checks:
+
+- `tests/Test-TaskPreparation.ps1`: real temporary Git projects; candidate detection
+  without executing project tools; new/existing check catalogues, task-specific
+  renewal, backups, custom fields/commands, manual provenance conflicts, persistent
+  boundaries and concurrent edits.
+- `node tests/Test-TaskPreparation.mjs`: a real Node test producing JUnit, fixed
+  arguments, path boundaries, missing frameworks, Jest assertion conversion and
+  exact Playwright file filters for Windows and normalized paths.
+- `node tests/Test-WorkflowTools.mjs`: local Kilo tools/background jobs; project
+  binding, status, process boundaries, cancellation and failure paths.
+- `tests/Test-KiloWorkflowEndToEnd.ps1`: tool request through bridge, background
+  process and real runner through automatic configuration, eight separate agent
+  roles and real red/green Node reports. Agent responses are synthetic; this tests
+  the complete wiring.
+- `tests/Test-WorkspaceGuide.ps1`: automatic tasks/current guides for new and
+  existing registrations; preservation of custom tasks, commands and task files.
+- `tests/Test-QualityWorkflow.ps1`: test authors, frozen tests and independent
+  acceptance gates. Synthetic agent responses test control logic, not model quality.
+- `tests/Test-WorkflowProgress.ps1`: output before process exit, simultaneous stderr
+  reading, timeout, termination after callback failure and bounded events.
+- `tests/Test-KiloWorkflowDiscovery.ps1`: tool registration, schemas and role-based
+  permissions without inference; failures remain closed.
+- `tests/Test-KiloToolImportPreflight.ps1`: detect foreign custom tools and altered/
+  linked shims before import without modifying user files.
+
+The following groups passed for this version:
+
+| Suite | Passed |
 |---|---:|
-| Vollständiger Qualitätsworkflow mit automatischer Vorbereitung | 54 |
-| Vorbereitung / feste Frameworkadapter | 27 / 11 |
-| Chatwerkzeuge und Worker / vollständiger Bridge-Runner-Ablauf | 12 / 14 |
-| Fortschrittsstream / Kilo-Registry / Importvorprüfung | 9 / 13 / 18 |
-| Akzeptanzvertrag und strukturierte Testberichte | 27 |
-| Workspace- und Projektmigration | 12 |
-| Kilo-Metadaten / Startbefehle | 17 / 5 |
-| Projektauswahl / Setup-Integration | 14 / 3 |
-| Bootstrap einschließlich Windows PowerShell 5.1 und Junction-Prüfung | 42 |
-
-PowerShell-/Node-Syntaxprüfungen bestanden ebenfalls. Die offizielle Kilo-CLI
-7.8.30 lud die vier Werkzeuge mit der erzeugten Konfiguration: im Hauptchat
-verfügbar, beim Implementierer gesperrt. Auch die vollständige effektive
-Konfiguration wurde ohne Inferenz geprüft. Der unabhängige Code-Review fand
-einen Doppelworker-Sperrfehler und verlorene Modellangaben im Status; beide
-wurden korrigiert und durch Regressionen abgesichert.
-
-Ältere Zahlen weiter unten beziehen sich auf damalige Stände.
-Der vollständige Bridge-/Runner-End-to-End-Test bestand mit 14 Prüfgruppen.
-Die lokalen Frameworkadapter sind ohne Download testbar. Der Node-Lauf verwendet
-echte Assertions; Jest wird hier mit repräsentativen Assertion-Berichten geprüft,
-Vitest/Playwright/pytest benötigen zusätzlich den tatsächlichen Projektlauf.
-
-Zielabnahme nach erneuter Provisionierung auf dem Windows-PC:
-
-1. Ein neues und ein bestehendes registriertes Git-Projekt über den Launcher
-   öffnen; eigene VS-Code-Tasks und vorhandene Checks auf Erhalt kontrollieren.
-2. Einen kleinen Auftrag direkt in `shadow-chat` eingeben, ohne `task.md` oder
-   `checks.json` zu bearbeiten. `loki_start`, Vorbereitung und unabhängigen
-   Vorbereitungsreview sowie die anschließenden Qualitätsphasen beobachten.
-3. `loki_status` und `LOKI-STATUS.md` auf reale Agentenrollen, Rollenmodelle und
-   Phasen prüfen. `loki_details` muss auf den passenden Bericht verweisen. Externe
-   Runnerphasen werden nicht als native Task-Kindersitzungen vorausgesetzt.
-4. Einen zweiten Auftrag stellen: neue Kriterien und Dateipfade, erhaltene eigene
-   Checks und gesicherter Vorzustand müssen nachvollziehbar sein.
-5. In einem getrennten Probeauftrag einen fehlenden Testadapter bzw. unklaren
-   Auftrag verwenden: konkretes `NEEDS_INPUT`, keine schreibende Umsetzung.
-6. Einen laufenden Probeauftrag ausdrücklich abbrechen und `CANCELLED` abwarten;
-   nach dem Abbruch bleiben eventuelle Quelländerungen zur Diff-Prüfung bestehen.
-   `WORKER_UNRESPONSIVE` hingegen bestätigt kein Prozessende: nach 30 Sekunden
-   ohne Start bzw. 120 Sekunden ohne Heartbeat Polling beenden, Protokolle und
-   Prozesse prüfen und die bestehende Sperre nicht ungeprüft entfernen.
-
-Diese Schritte ersetzen weder fachliche Abnahme noch den ersten Test mit den
-realen Modellen, der installierten Kilo-Erweiterung und der Zielhardware.
-
-## Qualitätsworkflow — Paket 2026.11.18.17
-
-Neue ausführbare Prüfungen:
-
-- `tests/Test-AcceptancePolicy.ps1`: feste Kriterien, konkrete Fallzuordnung,
-  JSON/JUnit, echte Node-JUnit-Ausgabe, leere/übersprungene/fehlende Fälle,
-  unerwartete Ausgangsfehler, doppelte IDs und XML-Entitäten.
-- `tests/Test-QualityWorkflow.ps1` (auch über `Test-CoderWorkflow.ps1`): tatsächliche
-  Git-Repositories, getrennte Prozesse und echte Assertions vor/nach Umsetzung;
-  Agentenantworten sind kontrollierte synthetische Daten. Prüft Testautor, Testreview,
-  High/Fast, Schreibgrenzen, Einfrieren der Tests, frische Sitzungen, feste Kriterien,
-  Security-/Integrationspflicht, nachträgliche Risikoeinstufung und ungültige Berichte.
-- `tests/Test-WorkspaceGuide.ps1`: neue und vorhandene Arbeitsbereiche, Migration,
-  Erhalt eigener Befehle und wiederholbare Aktualisierung der Anwenderanleitung.
-
-Die Modelle und der echte VS-Code-/Kilo-Ablauf werden dadurch nicht simuliert
-zu einem Hardware-Abnahmenachweis. Nach Provisionierung einen kleinen Auftrag
-mit den realen Modellen auf dem Windows-PC ausführen. Die unten folgenden
-Abschnitte dokumentieren frühere Teststände und ihre damaligen Grenzen.
-
-## Provisionierung und Updates — Paket 2026.11.17.16
-
-Die Tests für Workspace-Migration decken einen frisch registrierten Ordner,
-das Aktualisieren einer bestehenden Registrierung, eigene Einstellungen und
-Aufgaben sowie den Erhalt einer vorübergehend nicht erreichbaren Registrierung
-ab. Die Versionstests verwenden simulierte WinGet- und npm-Aufrufe und prüfen
-genaue Identität, Freigabe, Verifikation und den Erhalt bereits neuerer Versionen.
-Die reale Installation und der erste Kilo-Lauf auf dem Windows-PC sind eigene
-Abnahmeschritte.
-
-## Qualitätsprüfungen — Paket 2026.11.17.15
-
-Die Windows-Tests prüfen den Auftrag mit echtem Git, PowerShell und getrennten
-Prozessen. Die Agentenantworten sind synthetisch. Abgedeckt sind unter anderem
-Sperrkonflikt, Schreibumfang, fehlende Weitergabe eines Testgeheimnisses per
-Umgebungsvariable und ein vor dem Fix fehlschlagender, danach grüner Check.
-Die Modelltests verwenden simulierte Speicherwerte und LM-Studio-Antworten.
-Der Router-Lebenszyklus prüft den Prozessstart und die Wiederverwendung nach
-einer Änderung der Speicherschätzung über echtes Loopback-HTTP.
-
-## Semantische Suche auf dem Windows-PC abnehmen
-
-1. Im Installationsordner mit PowerShell 7 `./app/New-ShadowIndexProbe.ps1`
-   ausführen. Das Skript legt ausschließlich künstliche Testdateien unter
-   `diagnostics` an und zeigt den Ordnerpfad sowie erwartete Treffer an.
-2. Den Ordner über die Desktopverknüpfung öffnen, lokale Indexierung in Kilo
-   für ihn aktivieren und auf **Complete** warten.
-3. Im Kilo-Chat um die exklusive Verwendung von `semantic_search` für
-   „When should we order more stock?“ bitten. In der Werkzeugausgabe muss
-   `stock.ts` mit dem angezeigten positiven Marker enthalten sein. Ein reiner
-   Chat-Text oder ein Treffer per Dateisuche zählt nicht als Nachweis.
-4. Mit demselben Werkzeug nacheinander nach „lunar telescope green comet“ und
-   „desert weather station wind speed“ suchen. Die zwei ignorierten Dateien
-   und deren Marker dürfen in keiner Werkzeugausgabe stehen. Vergleiche mit
-   den Angaben aus PowerShell, ohne die Marker in den Chat zu kopieren.
-5. Wenn Ausschlüsse fehlschlagen, reale Projekte mit sensiblen Dateien noch
-   nicht indexieren. Die Ignore-Regeln und den für das Projekt verwendeten
-   Index überprüfen und die Probe mit einem neuen Testordner wiederholen.
-
-Der Provisionierungsbericht belegt den Embedding-Endpunkt. Die Such- und
-Ausschlussprobe muss in der tatsächlich installierten Kilo-Oberfläche erfolgen.
-
-## Startmenue — Paket 2026.11.17.14
-
-Der Launcher bietet vor dem Modellstart bekannte Projekte, die Eingabe eines
-weiteren vorhandenen Projektordners und Abbrechen an. Explizites -ProjectPath
-bleibt ohne Menue verwendbar. Der Desktop-Shortcut setzt -PauseOnError.
-
-Unter Windows mit PowerShell 7 wurden fuer diese Aenderung ausgefuehrt:
-- tests/Test-ProjectSelection.ps1: 14 bestandene Pruefungen, einschliesslich
-  Registrierung/Wiederwahl, Unicode und Sonderzeichen, ungueltigen Eingaben,
-  nicht erreichbaren Ordnern, Erhalt der Projektdateien und Launcher-Abbruch.
-- tests/Test-StartCommand.ps1: 5 bestandene Pruefungen.
-- tests/Test-WorkspaceGuide.ps1: 4 bestandene Pruefungen.
-- tests/Test-Bootstrap.ps1: 39 bestandene Pruefungen einschliesslich nativer
-  Windows-Junctions und des Audit-Handoffs unter Windows PowerShell 5.1.
-
-Die Launcher-Abbruchtests verwenden inerte Laufzeitmodule. Sie starten keine
-Modelle und kein VS Code. Desktopverknuepfung, GPU und der vollstaendige Start
-auf dem Windows-PC muessen nach der erneuten Provisionierung geprueft werden.
-Die historischen Pruefberichte weiter unten ersetzen diese Zielmaschinenpruefung nicht.
-# Prüfbericht zum Provisionierungspaket
-
-## Speicherfit als Warnung: 2026.11.17.13
-
-Ein nicht nachgewiesener LoKiEnte-Speicherfit führt zu einem ausdrücklich
-angezeigten Ladeversuch, ohne die Schutzregeln von LM Studio zu deaktivieren.
-Wird dieser Versuch abgelehnt, bleiben Modelldateien erhalten und die
-Provisionierung endet mit `PROVISIONED_WITH_WARNINGS` und Exitcode 0.
-Ungeprüfte Profile werden nicht als bestandene Modelltests ausgegeben.
-Ein späterer Modellaufruf versucht Laden und Tests erneut.
-
-Lokale Regressionen simulieren zu wenig Speicher, erfolgreiche und abgelehnte
-Ladeversuche, spätere Wiederherstellung, Routerfehler, Single-Modus und das
-CPU-Embeddingmodell. Tatsächlicher Speicherbedarf und LM-Studio-Verhalten auf
-dem Windows-PC sind damit nicht nachgewiesen.
-
-## Kilo-Erweiterung 7.8.30: 2026.11.17.12
-
-Das VS-Code-Backend 7.8.30 wurde isoliert mit den vier Modellkennzeichnungen
-und den LoKiEnte-Agenten geprüft. Es indexierte eine synthetische Python-Datei
-mit LanceDB 0.26.2 und einem simulierten lokalen Embedding-Endpunkt bis
-`Complete`. Die separat installierte Kilo CLI 7.8.27 bestand die Prüfung
-der wirksamen Konfiguration und Agenten. Die Dateisuche und Dateiauflistung
-des VS-Code-Backends 7.8.30 bestanden mit geprüftem Windows-ripgrep.
-Die reale LM-Studio-Inferenz und
-Indexierung auf dem Windows-PC bleiben gesondert zu prüfen.
-
-## Getrennte Codingprofile: 2026.11.17.11
-
-Coder High und Coder Fast sind getrennt wählbare Routerprofile. Sichtbare
-Modellnamen enthalten die Rolle und den tatsächlichen Modellnamen; die
-Aufgabenvariante Coder Fast behält den unabhängigen Review und die Validierung.
-Der Embedding-Endpunkt und der lokale Index bleiben von der Auswahl getrennt.
-Das Kilo-7.8.28-Backend lieferte in einem isolierten Test alle vier
-rollenmarkierten Modellnamen über seine Provider-API; die auswählbaren
-eingebauten Agenten fehlten in der Agentenliste. Interne Hilfsagenten bleiben
-erhalten. Weitere Tests prüfen die Pool-Migration, den Routerwechsel und den
-echten Review-Ablauf mit synthetischen Modellantworten. Die UI und LM Studio
-auf dem Windows-PC bleiben gesondert zu prüfen.
-
-## Lokale CPU-Embeddings und Index-Konfiguration: 2026.11.17.10
-
-`Test-Embedding.ps1` prüft mit simulierten LM-Studio-Grenzen Besitznachweise,
-RAM-Reserve, den CPU-Ladeauftrag, Wiederverwendung, Vektorantworten und
-Loopback-Konfiguration. Der unveränderte Pool-Lebenszyklus wurde erneut getestet.
-LanceDB 0.26.2 wurde in einem isolierten Testverzeichnis installiert und das
-native Modul geladen. Die wirksame Konfiguration wurde zusätzlich mit dem
-VS-Code-Backend von Kilo 7.8.28 in einem isolierten Profil ausgelesen.
-Auch die separate Kilo CLI 7.8.27 bestand die Konfigurationsprüfung.
-Dasselbe Backend indexierte eine synthetische Python-Datei mit LanceDB und einem
-simulierten lokalen Embedding-Endpunkt bis Status `Complete`. Eine echte
-Indexierung und Modellinferenz auf dem Windows-PC sind damit nicht belegt.
-
-## LoKiEnte-Fenster und Copilot: 2026.11.17.9
-
-Der Launcher übergibt beim Öffnen eines neuen isolierten VS-Code-Fensters
-`--disable-extension` für beide GitHub-Copilot-Erweiterungen. Dies verändert
-keine anderen VS-Code-Profile oder bereits offenen Fenster. Der Argumenttest
-prüft die IDs, den neuen Fensterstart und die isolierten Verzeichnisse; die
-wirksame Deaktivierung muss im Zielsystem überprüft werden. Diese Änderung
-aktiviert keine semantische Indexierung und behebt kein nachgewiesenes
-Reasoning-Problem.
-
-## Kilo-Dateisuche und Projektanleitung: 2026.11.17.8
-
-Das offizielle Windows-x64-Archiv von ripgrep 15.1.0 und die darin enthaltene
-`rg.exe` werden getrennt mit festgehaltenen SHA-256-Werten geprüft. Das Setup
-installiert sie ausschließlich in den isolierten Kilo-Cache und führt echte
-Kilo-Grep- und Dateiauflistungstests für die separate CLI und das mit der
-VS-Code-Erweiterung gelieferte Backend aus. Eine vorhandene unbekannte Datei
-wird nicht überschrieben.
-
-Lokal wurden das offizielle Archiv, die ausführbare Datei und Kilo CLI 7.8.27
-mit echtem nativen Windows-Binary und npm-Einstieg gegen eine synthetische
-Projektdatei geprüft. Die Erweiterung 7.8.28 wurde hier nicht ausgeführt;
-das Setup prüft sie auf dem Zielsystem selbst. `Test-WorkspaceGuide.ps1`
-prüft die neue Anleitung und die unveränderte Wiederverwendung vorhandener
-Aufträge, Checks und Anleitungen.
-
-## Startbefehl für PowerShell 7: 2026.11.17.7
-
-Der nach dem Setup angezeigte Startbefehl verwendet die ermittelte PowerShell 7,
-`-ExecutionPolicy Bypass` für den gestarteten Prozess und die tatsächlichen
-registrierten Projektpfade. Ohne Projekt wird ein Platzhalter ausgegeben.
-Auch die erzeugte Desktop-Verknüpfung erhält die prozesslokale Option;
-erzwungene Gruppenrichtlinien werden nicht verändert. `Test-StartCommand.ps1`
-prüft mehrere Projekte, den Platzhalter und einen echten Unterprozess unter
-eingeschränkter Ausführungsrichtlinie mit Leerzeichen, Apostrophen und
-PowerShell-Sonderzeichen in Argumenten.
-
-## Zitierte Smoke-Test-Antwort: 2026.11.17.6
-
-Auf dem Windows-PC lieferte das Modell nach einem korrekten Tool-Aufruf die
-Quittung als `"LOCAL_TOOL_OK"` statt als unzitierte Zeichenfolge. Chat- und
-Tool-Rückantwort akzeptieren jetzt genau den erwarteten Text mit oder ohne
-äußere doppelte Anführungszeichen und optionalen äußeren Leerraum. Zusätzliche
-Erklärungen, falsche Werte, falsche Groß-/Kleinschreibung und ungültige
-Tool-Aufrufe bleiben Fehler. Der HTTP-Regressionstest prüft beide zulässigen
-Formen und weiterhin die Ablehnung von Zusatztext und falschen Tool-Antworten.
-
-## Tool-Auswahl im Smoke-Test: 2026.11.17.5
-
-LM Studio auf dem Windows-PC lehnte ein Objekt als `tool_choice` mit HTTP 400
-ab und bestätigte die unterstützten Zeichenfolgen `none`, `auto`, `required`.
-Ein anschließender echter Test mit `required` lieferte `report_value(17)` und
-mit `none` die erwartete Tool-Rückantwort. Der Smoke-Test verwendet nun
-`required`; er prüft weiterhin Toolname, eindeutige ID, den Wert 17 und die
-abschließende Rückantwort. Ein lokaler HTTP-Regressionstest prüft die tatsächliche
-JSON-Anfrage und lehnt falsche Antworten weiterhin ab.
-
-## Große Modelldateien: 2026.11.17.4
-
-Die Speicherplatzberechnung verwendet 64-Bit-Ganzzahlen für Dateigröße,
-Teilfortschritt und Nullgrenze. `Test-LargeModelPreflight.ps1` prüft den
-echten Installationsvorlauf mit der 9.001.753.376 Byte großen
-Qwen3-14B-Datei, sowohl ohne als auch mit einem simulierten 3,5-GB-Teildownload.
-Die geprüften Zahlen werden ausgegeben; es werden keine großen Dateien angelegt
-oder geladen.
-
-## Modellwahl und additive Downloads: 2026.11.17.3
-
-Der Katalog enthält fünf feste GGUF-Varianten und ihre benötigten Projektoren.
-Repository-Revision, Dateigröße und SHA-256 aller acht Dateien wurden gegen
-öffentliche Hugging-Face-Metadaten der jeweiligen Revision geprüft. Vorschläge
-beruhen auf freien Ressourcen und konservativen Dateigrößen-Heuristiken, nicht
-auf gemessener Modellqualität oder einem garantierten Speicherfit.
-
-`Test-ModelSelection.ps1` prüft Rollenwahl und bestätigte Wiederanläufe,
-Hardwareänderung, realistische Speicherwerte, opt-out, Netzwerkfehler,
-Fortsetzung von Teildateien, Integritätsfehler und den Schutz vorhandener
-Dateien einschließlich eines konkurrierenden Zielzugriffs und Junctions.
-`Test-SelectionIntegration.ps1` führt den echten Setup-Zweig isoliert aus;
-`Test-ModelPool.ps1` prüft die Weitergabe anderer Modelle und einen Modellwechsel
-ohne Dateilöschung. Ein echter HTTPS-Range-Wiederanlauf wurde mit einer 1.756 Byte
-großen öffentlichen Datei geprüft. Das ist kein Langzeit- oder Geschwindigkeitstest
-und keine echte LM-Studio-Registrierung eines neuen GGUF-Modells.
-
-Der Bootstrap wartet ohne Gesamtzeitlimit auf das Setup. Eine vom Setup-Kind
-gehaltene zusätzliche Sperre schützt vor einem zweiten Lauf, auch wenn der
-Starter beendet wurde. Der Audit prüft gespeicherte Auswahlen oder zeigt
-unverbindliche neue Vorschläge und bleibt ohne Downloads/Modellwechsel.
-
-## Optionale CPU-Auslagerung: 2026.11.17.2
-
-`Test-PartialGpuOffload.ps1` prüft die explizite Aktivierung, Reihenfolge und
-Persistenz der GPU-Strategie, unveränderte Standardwerte, Kontextfallback,
-GPU-/RAM-Reserven, Guardrails und Übereinstimmung der geschätzten und tatsächlich
-angeforderten GPU-Option. LM-Studio- und GPU-Grenzen werden simuliert; reale
-Leistung, CPU-Auslagerung und Inferenz bleiben auf dem Windows-PC zu prüfen.
-
-## Modellvarianten in LM Studio: 2026.11.17.1
-
-CLI-Commit 43d4b26 meldet Modell-IDs als `path` und Dateipfade in
-`indexedModelIdentifier` der Variantenliste. Anhand der vom Windows-PC gelieferten
-Ausgabe prüft `Test-ModelVariants.ps1` die Zuordnung aller drei exakten Dateien,
-die Erhaltung älterer Dateipfade und Abbrüche bei geänderten, fehlenden oder
-mehrdeutigen Varianten. Der Audit testet die gleiche Zuordnung unter PS5.1/PS7.
-Vor und nach dem Laden werden die lokale Datei und ausgewählte Variante erneut
-geprüft; ausstehende Eigentumsnachweise bewahren die Variantenidentität.
-GPU-/LM-Studio-Grenzen werden simuliert; keine reale Inferenz wurde hier
-durch das Paket durchgeführt.
-
-## Manuelle Handlungsanweisungen: 2026.11.16.10
-
-Fehlende Modelle und ein erforderlicher LM-Studio-Erststart werden als
-strukturierte Handlungsanweisung auf stdout ausgegeben, nicht als rote
-Fehlermeldung. Der Bericht bleibt `INCOMPLETE`, enthält die Kennung
-`manualAction`, und der Exitcode bleibt 1. Tatsächliche Fehler gehen weiterhin
-an stderr. Die ausführbaren Setup-Harnesses prüfen getrennte Zeilen für jedes
-Modell, Datei, Quelle und nächste Schritte, vollständige Berichtsdaten,
-Exitcode und Fehlerkanäle.
-
-## Manuelle Modelldownloads: 2026.11.16.9
-
-Das normale Setup prüft vor Router-/Modellaktionen alle ausgewählten lokalen
-Modelldateien. Fehlen Modelle, nennt der kontrollierte Abbruch ausschließlich
-die noch fehlenden exakten Dateien mit Quelle und verlangt den manuellen
-Download in LM Studio sowie den erneuten Start mit denselben Parametern.
-Das Setup ruft den Modellpool bzw. die Einzelmodellroutine mit deaktiviertem
-Download auf. `-SkipModelDownload` bleibt als kompatibler Schalter gültig.
-Der Auditbericht listet fehlende Profildateien einschließlich Quellen auf.
-
-`Test-ManualModels.ps1` testet Dual mit und ohne optionales Modell,
-teilweise und vollständig vorhandene Modelle, Einzelmodell und `ModelKey`,
-Fehler bei mehrdeutigen Modellen sowie den echten Setup-Abbruch mit
-`INCOMPLETE`-Bericht vor Router- oder Modellaktionen. Die LM-Studio- und
-GPU-Grenzen werden simuliert; keine Modelle werden heruntergeladen.
-
-## VS-Code-CLI-Pfad: 2026.11.16.8
-
-Windows VS Code 1.146.0 verweist in seiner mitgelieferten `bin\code.cmd` auf
-einen versionsabhängigen Unterordner. Der Resolver liest nur den erwarteten
-einzelnen Aufruf aus dieser Datei, führt das Batch-Skript nicht aus und
-verwendet exakt den dort angegebenen `cli.js` mit dem zugehörigen `Code.exe`.
-Ältere nicht versionierte Layouts und Installationen ohne Batch-Datei mit
-klassischem CLI-Pfad bleiben unterstützt; unbekannte oder mehrdeutige Pfade
-werden explizit abgelehnt.
-
-Der tatsächliche CLI-Aufruf `--version` wurde lokal gegen die installierte
-VS-Code-Version 1.146.0 durchgeführt. Tests prüfen daneben synthetische alte
-und neue Layouts, eine fehlerhafte/mehrdeutige Batch-Datei, fehlende CLI-Dateien,
-die Argumentweitergabe und die zusätzliche lesende Audit-Prüfung. Es wurden
-keine Erweiterungen installiert und keine persönliche VS-Code-Konfiguration
-geändert.
-Bei derselben Version wurde außerdem festgestellt, dass `--locate-extension`
-keinen Pfad zurückgibt. Die Suche nach der gebündelten Kilo-CLI verwendet nun
-die explizit mit `--list-extensions --show-versions` gemeldete Version und
-prüft passende Paketmanifeste im isolierten Erweiterungsordner. Mehrdeutige
-Treffer und fehlende Binärdateien werden abgelehnt.
-
-## Auswahl bei vorhandenem Ziel: 2026.11.16.7
-
-Das Startmenü erkennt eine gültige Ziel-Paketkennung und empfiehlt das
-Fortsetzen mit Option 1, ohne einen vollständigen Umzug oder eine abgeschlossene
-Provisionierung zu behaupten. Option 3 prüft vor der Bestätigung Paketkennungen
-und bestehende Dateinamen; Konflikte führen zurück zur Auswahl, nicht zu
-Zusammenführung oder Überschreiben. Der Kopiervorgang prüft Konflikte weiterhin
-selbst vor der Veröffentlichung, auch wenn sie erst nach dem Menü entstehen.
-
-## Kilo-Hilfeausgabe: 2026.11.16.6
-
-Auf dem Windows-PC lieferte `kilo run --help` bei umgeleiteter Ausgabe
-Exitcode 0, eine leere stdout und die vollständige Hilfe auf stderr. Das Setup
-wertet beide Kanäle aus, ohne den erforderlichen erfolgreichen Exitcode und
-die Optionsprüfung aufzugeben. `Test-KiloHelp.ps1` testet stdout, stderr,
-gemischte Ausgabe, fehlende Optionen, nicht erfolgreiche Exitcodes und die
-Wiederverwendung einer bereits installierten CLI ohne erneuten npm-Aufruf.
-Zudem wird ein echter lokaler Unterprozess mit Hilfe auf stderr ausgeführt.
-
-## NTFS-Kopierprüfung: 2026.11.16.5
-
-Ein echter NTFS-Hardlink reproduziert den Fehlalarm: Nach einem Schreibzugriff
-über einen zweiten Dateinamen kann die Verzeichnisauflistung noch alte Größe
-und Änderungszeit melden, während der direkte Dateizugriff aktuelle Daten liefert.
-Die Kopierprüfung aktualisiert die Metadaten deshalb vor der Bestandsaufnahme
-und beim anschließenden Vergleich.
-
-`Test-InstallationLocation.ps1` ergänzt vier Prüfungen: erfolgreiche Kopie
-trotz zuvor veralteter NTFS-Verzeichnisdaten, identische Dateiinhalte, weiterhin
-abgelehnte tatsächliche Änderungen mit konkreter Pfadangabe sowie Aufräumen
-der Zwischenkopie ohne Veränderung vorhandener Zieldateien oder Zurücksetzen
-der Quelldaten. Die Prüfung verwendet echte temporäre NTFS-Hardlinks; tatsächliche
-Quelländerungen werden gezielt vor der Abschlusskontrolle ausgelöst.
-
-## CLI-Kompatibilität und leere Modelllisten: 2026.11.16.4
-
-Die Herstellerquelle für CLI-Commit `43d4b26` bestätigt, dass `--exact` und
-`--local` vorhanden, aber aus der Hilfe ausgeblendet sind. Die Prüfung verwendet
-deshalb gegebenenfalls den kontrollierten Fehler eines Aufrufs ohne Modellpfad,
-zusätzlich abgesichert mit `--estimate-only`. Die Schutzoptionen werden nicht
-aus den tatsächlichen Ladebefehlen entfernt.
-
-- `Test-Audit.ps1`: 41 Prüfungen jeweils unter Windows PowerShell 5.1 und PS7,
-  einschließlich versteckter/fehlender Optionen, unerwartetem Probe-Erfolg,
-  korrekten Anzahlen bei null/einem/zwei Modellen und Ablehnung falscher JSON-Formen.
-- `Test-LmsCliCompatibility.ps1`: 16 Prüfungen für native Exitcodes, erwartete
-  Fehler, Modelllisten und unveränderte Serverstatus-Objekte.
-- `Test-ModelPool.ps1`: 30 Prüfungen; erfolgreiche Einrichtung mit versteckten
-  Optionen und Abbruch vor Downloads/Inferenz bei tatsächlich fehlender Unterstützung.
-
-CLI-Ausgaben und GPU-/LM-Studio-Grenzen werden simuliert; native
-PowerShell-Unterprozesse, JSON-Konvertierung und Dateizugriffe sind real.
-Die aktualisierte Version muss auf dem Windows-PC erneut mit `-AuditOnly`
-geprüft werden. Es wurde hier kein reales Modell geladen.
-
-## Verzeichnisauswahl und Kopie: 2026.11.16.3
-
-`Test-InstallationLocation.ps1` prüft unter PS7 und Windows PowerShell 5.1:
-PS1-Ordner statt Terminal-Arbeitsverzeichnis, Zielauswahl, Bestätigung ausschließlich
-mit `y`, keine Schreib-/Installationsaktionen vor Bestätigung, nichtinteraktive
-Abbrüche sowie Audit ohne Nachfrage. Kopiertests prüfen unveränderte Quelldateien,
-Anwendungseinstellungen und Modellzustände, angepasste verwaltete Pfade, erhaltene
-JSON-Arrayformen, Sperren/aktive Prozesse, Konflikte, Verknüpfungen und Rücknahme
-teilweise veröffentlichter Kopien. Alle Kopien verwenden temporäre Testdaten.
-
-Aus dem gewählten Stammverzeichnis:
+| Complete quality workflow with automatic preparation | 54 |
+| Preparation / fixed framework adapters | 27 / 11 |
+| Chat tools and worker / complete bridge-runner workflow | 12 / 14 |
+| Progress stream / Kilo registry / import preflight | 9 / 13 / 18 |
+| Acceptance contract and structured reports | 27 |
+| Workspace/project migration | 12 |
+| Kilo metadata / launch commands | 17 / 5 |
+| Project selection / setup integration | 14 / 3 |
+| Bootstrap including Windows PowerShell 5.1 and junction checks | 42 |
+
+PowerShell/Node syntax checks passed too. Official Kilo CLI 7.8.30 loaded all four
+tools with the generated configuration: available to main chat, denied to the
+implementer. Complete effective configuration was checked without inference. An
+independent code review found a duplicate-worker locking defect and missing model
+information in status; both were corrected and covered by regressions.
+
+Older counts below refer to earlier revisions. The complete bridge/runner test
+passed 14 groups. Local framework adapters are testable without downloads. The Node
+run uses real assertions; Jest is checked with representative assertion reports.
+Vitest, Playwright and pytest additionally require a real project run.
+
+Target-machine acceptance after reprovisioning:
+
+1. Open a new and an existing registered Git project through the launcher; verify
+   preservation of custom VS Code tasks and checks.
+2. Enter a small request directly in `shadow-chat` without editing `task.md` or
+   `checks.json`. Observe `loki_start`, preparation, independent preparation review
+   and subsequent quality phases.
+3. Check actual agent roles, requested role models and phases in `loki_status` and
+   `LOKI-STATUS.md`. `loki_details` must refer to the matching report. External
+   runner phases are not assumed to appear as native task-child sessions.
+4. Submit a second request: new criteria/file paths, preserved custom checks and
+   backed-up previous state must be inspectable.
+5. In a separate trial, use an unclear request or missing test adapter: expect
+   specific `NEEDS_INPUT` and no writing implementation phase.
+6. Explicitly cancel an active trial and wait for `CANCELLED`. Source changes remain
+   for diff review. `WORKER_UNRESPONSIVE` does not establish termination: after
+   30 seconds without startup or 120 seconds without heartbeat, stop polling,
+   inspect logs/processes and do not remove the lock without verification.
+
+These steps do not replace functional acceptance or testing with real models,
+the installed Kilo extension and target hardware.
+
+## Quality workflow — package 2026.11.18.17
+
+New executable checks:
+
+- `tests/Test-AcceptancePolicy.ps1`: fixed criteria, concrete case mappings, JSON/
+  JUnit, real Node JUnit, empty/skipped/missing cases, unexpected baseline failures,
+  duplicate IDs and XML entities.
+- `tests/Test-QualityWorkflow.ps1`, also accessible through `Test-CoderWorkflow.ps1`:
+  real repositories/processes/assertions before and after implementation; controlled
+  synthetic agent responses. Covers test author/review, High/Fast, write boundaries,
+  frozen tests, fresh sessions, fixed criteria, mandatory security/integration,
+  later risk escalation and invalid reports.
+- `tests/Test-WorkspaceGuide.ps1`: new/existing workspaces, migration, custom
+  commands and repeatable guide updates.
+
+These tests do not turn simulated model/GUI behavior into hardware acceptance.
+Run a small task with real models after provisioning. Following sections record
+earlier test states and their original limits.
+
+## Provisioning and updates — package 2026.11.17.16
+
+Workspace migration tests cover a new directory, an existing registration, custom
+settings/tasks and a temporarily unreachable registration. Version tests simulate
+WinGet/npm and verify exact identity, approval, verification and preservation of
+already newer releases. Real installation and the first Kilo run remain separate
+acceptance steps on the Windows PC.
+
+## Quality checks — package 2026.11.17.15
+
+Windows tests use real Git, PowerShell and separate processes with synthetic agent
+responses. They cover lock conflicts, write scope, no forwarding of a test secret
+through an environment variable, and a check that fails before the fix and passes
+afterwards. Model tests simulate memory and LM Studio responses. Router lifecycle
+checks startup/reuse after a changed memory estimate over real loopback HTTP.
+
+## Accept semantic search on the Windows PC
+
+1. From the installation root in PowerShell 7, run `./app/New-ShadowIndexProbe.ps1`.
+   It creates synthetic files only, under `diagnostics`, and prints the directory
+   plus expected matches.
+2. Open the directory through the desktop shortcut, enable local indexing for it
+   in Kilo and wait for **Complete**.
+3. Ask Kilo to use only `semantic_search` for “When should we order more stock?”
+   Tool output must include `stock.ts` and the printed positive marker. A chat
+   assertion or ordinary file-search match is not evidence.
+4. Use the same tool separately for “lunar telescope green comet” and “desert weather
+   station wind speed”. Neither ignored file nor its marker may appear in any tool
+   output. Compare with PowerShell's output without copying markers into chat.
+5. If exclusions fail, do not yet index real projects with sensitive files. Inspect
+   ignore rules/the project's actual index and repeat with a new probe directory.
+
+The provisioning report establishes the embedding endpoint. Search/exclusion
+acceptance must happen in the actually installed Kilo interface.
+
+## Launch menu — package 2026.11.17.14
+
+Before model startup, the launcher offers known projects, another existing directory
+and cancellation. Explicit `-ProjectPath` bypasses the menu. The shortcut passes
+`-PauseOnError`.
+
+Executed on Windows with PowerShell 7:
+
+- `tests/Test-ProjectSelection.ps1`: 14 checks, including registration/reselection,
+  Unicode/special characters, invalid input, unreachable folders, preservation of
+  project files and launcher cancellation.
+- `tests/Test-StartCommand.ps1`: 5 checks.
+- `tests/Test-WorkspaceGuide.ps1`: 4 checks.
+- `tests/Test-Bootstrap.ps1`: 39 checks, including native Windows junctions and
+  audit handoff under Windows PowerShell 5.1.
+
+Cancellation tests use inert runtime modules; they start neither models nor VS Code.
+Desktop shortcut, GPU and complete startup still require target-machine verification.
+The historical reports below do not replace it.
+
+## Memory fit as a warning — 2026.11.17.13
+
+In this historical release, an unproven LoKiEnte memory fit led to an explicitly
+announced loading attempt without disabling LM Studio guardrails. If rejected,
+model files remained and provisioning ended with `PROVISIONED_WITH_WARNINGS` and
+exit 0. Unverified profiles were not reported as passed; a later request retried
+loading and tests. Current opt-in behavior is described in the current README.
+
+Regressions simulate insufficient memory, accepted/rejected loads, later recovery,
+router failures, Single mode and the CPU embedding model. They do not establish
+actual memory usage or LM Studio behavior on the target PC.
+
+## Kilo extension 7.8.30 — 2026.11.17.12
+
+The isolated 7.8.30 backend was checked with four model labels and the LoKiEnte
+agents. It indexed a synthetic Python file to `Complete` using LanceDB 0.26.2 and
+a simulated local embedding endpoint. Separate Kilo CLI 7.8.27 passed effective
+configuration/agent checks. Backend file search/listing passed with verified Windows
+ripgrep. Real LM Studio inference and indexing on the target remain separate checks.
+
+## Separate coding profiles — 2026.11.17.11
+
+Coder High/Fast are separately selectable router profiles. Names include role and
+actual model; Coder Fast tasks retain independent review and validation. The embedding
+endpoint/index are separate from this selection. In an isolated test, Kilo 7.8.28's
+provider API returned all four role-labeled models; selectable built-in agents were
+absent while internal helpers remained. Further tests cover pool migration,
+router switching and the real review workflow with synthetic model responses.
+The target UI and LM Studio still require verification.
+
+## Local CPU embeddings and index configuration — 2026.11.17.10
+
+`Test-Embedding.ps1` simulates LM Studio boundaries to check ownership, RAM reserve,
+CPU load intent, reuse, vector responses and loopback configuration. Pool lifecycle
+was rerun unchanged. LanceDB 0.26.2 was installed in an isolated test directory and
+its native module loaded. Effective configuration was read with the Kilo 7.8.28
+VS Code backend in an isolated profile; separate CLI 7.8.27 also passed. The same
+backend indexed a synthetic Python file to `Complete` with LanceDB and a simulated
+local embedding endpoint. This does not establish real target-machine inference/indexing.
+
+## LoKiEnte windows and Copilot — 2026.11.17.9
+
+New isolated windows receive `--disable-extension` for both GitHub Copilot extensions.
+Other profiles/open windows are unchanged. Argument tests cover IDs, new-window
+startup and isolated paths; effective disabling requires target verification. This
+change neither enables semantic indexing nor fixes an evidenced reasoning issue.
+
+## Kilo file search and project guide — 2026.11.17.8
+
+Official ripgrep 15.1.0's Windows x64 archive and contained `rg.exe` have separate
+pinned SHA-256 checks. Setup installs only into the isolated Kilo cache and performs
+real Kilo grep/listing tests through the separate CLI and extension backend. Unknown
+existing executables are not overwritten.
+
+The official archive, executable and Kilo CLI 7.8.27 were tested locally through
+both the native Windows binary and npm entry point against a synthetic source file.
+Extension 7.8.28 was not executed in this release's test; setup checks it on target.
+`Test-WorkspaceGuide.ps1` covers the new guide and unchanged reuse of existing tasks,
+checks and guides.
+
+## PowerShell 7 launch command — 2026.11.17.7
+
+The printed launch command uses the detected PowerShell 7, process-local
+`-ExecutionPolicy Bypass` and actual registered project paths. Without a project,
+it prints a placeholder. The shortcut receives the same policy option; enforced
+Group Policy remains. `Test-StartCommand.ps1` covers several projects, the placeholder
+and a real child process under restricted execution policy with spaces, apostrophes
+and PowerShell-special characters in arguments.
+
+## Quoted smoke-test response — 2026.11.17.6
+
+On the Windows PC, a correct tool call was followed by `"LOCAL_TOOL_OK"` rather than
+an unquoted value. Chat/tool-return validation now accepts exactly the expected
+text with or without outer double quotes and optional surrounding whitespace.
+Extra explanation, wrong values/case and invalid calls remain errors. HTTP regressions
+cover both accepted forms and rejection of extra text/wrong tool responses.
+
+## Smoke-test tool choice — 2026.11.17.5
+
+Target LM Studio rejected an object `tool_choice` with HTTP 400 and confirmed the
+strings `none`, `auto`, `required`. A subsequent real `required` request returned
+`report_value(17)`; `none` produced the expected final response. The smoke test uses
+`required` and still checks tool name, unique ID, value 17 and final response.
+A local HTTP regression checks the actual JSON request and rejects wrong responses.
+
+## Large model files — 2026.11.17.4
+
+Disk calculations use 64-bit integers for file size, partial progress and the zero
+bound. `Test-LargeModelPreflight.ps1` runs real preflight with the 9,001,753,376-byte
+Qwen3-14B file, both without and with a simulated 3.5 GB partial download. It prints
+the checked numbers without creating or downloading large files.
+
+## Model selection and additive downloads — 2026.11.17.3
+
+The catalogue contains five pinned GGUF variants and required projectors. Repository
+revision, size and SHA-256 of all eight files were checked against public Hugging
+Face metadata at those revisions. Suggestions use free resources and conservative
+file-size heuristics, not measured quality or guaranteed memory fit.
+
+`Test-ModelSelection.ps1` covers role selection/confirmed reruns, changed hardware,
+realistic memory figures, opt-out, network failures, partial resume, integrity errors
+and existing-file protection, including concurrent destination access and junctions.
+`Test-SelectionIntegration.ps1` runs the real setup branch in isolation;
+`Test-ModelPool.ps1` covers other-model forwarding and switching without file deletion.
+A real HTTPS Range resume was checked with a 1,756-byte public file. This is neither
+a long-duration/speed test nor actual LM Studio registration of a new GGUF.
+
+Bootstrap waits for setup without a total deadline. An additional child-held lock
+prevents a second run after the starter exits. Audit checks saved selections or
+shows nonbinding suggestions without downloading/switching models.
+
+## Optional CPU offload — 2026.11.17.2
+
+`Test-PartialGpuOffload.ps1` covers explicit activation, GPU-strategy order/persistence,
+unchanged defaults, context fallback, GPU/RAM reserves, guardrails and matching
+estimated/requested GPU options. LM Studio/GPU boundaries are simulated; performance,
+CPU offload and real inference remain target-machine checks.
+
+## LM Studio model variants — 2026.11.17.1
+
+CLI commit `43d4b26` reports model IDs as `path` and file paths in variant-list
+`indexedModelIdentifier`. Using output supplied by the Windows PC,
+`Test-ModelVariants.ps1` checks all three exact files, legacy paths and rejection
+of changed/missing/ambiguous variants. Audit checks the same mapping under PS5.1/PS7.
+The file/selected variant is checked before and after loading; pending ownership
+records preserve variant identity. Boundaries are simulated; these package tests
+performed no real inference.
+
+## Manual-action instructions — 2026.11.16.10
+
+Missing models and required LM Studio first-run setup produce structured stdout
+instructions rather than red error output. The report stays `INCOMPLETE`, contains
+`manualAction`, and exits 1. Real errors still go to stderr. Executable setup harnesses
+check separate model/file/source/next-step lines, complete reports, exit codes and
+output channels.
+
+## Manual model downloads — 2026.11.16.9
+
+In this release, setup checked all selected local files before router/model actions.
+Missing files caused a controlled stop listing only missing exact files and sources,
+requiring manual LM Studio downloads and a rerun with the same parameters. Pool/
+Single routines were invoked with downloading disabled. `-SkipModelDownload`
+remained compatible. Audit listed missing profiles and sources.
+
+`Test-ManualModels.ps1` covers Dual with/without the optional model, partial/complete
+availability, Single/`ModelKey`, ambiguity and actual setup termination with an
+`INCOMPLETE` report before router/model actions. LM Studio/GPU boundaries are
+simulated; no models are downloaded by the test.
+
+## VS Code CLI path — 2026.11.16.8
+
+Windows VS Code 1.146.0's `bin\code.cmd` references a version-dependent subdirectory.
+The resolver reads only the expected single invocation, never executes the batch
+file, and uses that exact `cli.js` with its associated `Code.exe`. Older unversioned
+layouts and installations without a batch file but with the classic CLI path remain
+supported; unknown/ambiguous paths are rejected.
+
+Actual `--version` was run against installed VS Code 1.146.0. Tests additionally
+cover synthetic old/new layouts, malformed/ambiguous batch files, missing CLI files,
+argument forwarding and read-only audit. No extensions were installed or personal
+VS Code settings changed. That version's `--locate-extension` returned no path, so
+bundled Kilo discovery uses `--list-extensions --show-versions` plus matching manifests
+in the isolated directory. Ambiguity and missing binaries are rejected.
+
+## Selection with an existing destination — 2026.11.16.7
+
+The menu recognizes a valid destination identity and recommends option 1 without
+claiming completed migration/provisioning. Option 3 checks identities/names before
+confirmation; conflicts return to selection rather than merging/overwriting. Copy
+also checks before publication, including conflicts arising after the menu.
+
+## Kilo help output — 2026.11.16.6
+
+On the Windows PC, redirected `kilo run --help` exited 0 with empty stdout and full
+help on stderr. Setup now reads both while still requiring a successful exit and
+all options. `Test-KiloHelp.ps1` covers stdout/stderr/mixed output, missing options,
+nonzero exits and installed-CLI reuse without npm. A real child process emits help
+on stderr too.
+
+## NTFS copy verification — 2026.11.16.5
+
+A real NTFS hard link reproduced stale directory size/time after writing through
+another name while direct access returned current data. Copy verification now
+refreshes metadata before inventory and final comparison.
+
+`Test-InstallationLocation.ps1` adds four checks: successful copy despite stale
+directory metadata, identical content, rejection of real changes with a concrete
+path, and staging cleanup without modifying target files or restoring source data.
+Tests use real temporary hard links and deliberately modify the source before the
+final comparison.
+
+## CLI compatibility and empty model lists — 2026.11.16.4
+
+Vendor source for CLI commit `43d4b26` confirms hidden `--exact`/`--local` options.
+Where needed, compatibility uses the controlled missing-path error, additionally
+guarded by `--estimate-only`. Safety options remain in actual load commands.
+
+- `Test-Audit.ps1`: 41 checks each under Windows PowerShell 5.1 and PS7, including
+  hidden/missing options, unexpected probe success, counts for zero/one/two models
+  and rejection of malformed JSON shapes.
+- `Test-LmsCliCompatibility.ps1`: 16 checks for native exit codes, expected errors,
+  model lists and unchanged server-status objects.
+- `Test-ModelPool.ps1`: 30 checks; successful hidden-option setup and stopping before
+  downloads/inference when support is actually missing.
+
+CLI output/GPU/LM Studio are simulated; native child processes, JSON conversion and
+file access are real. Rerun updated `-AuditOnly` on target. No real model was loaded.
+
+## Directory selection and copying — 2026.11.16.3
+
+`Test-InstallationLocation.ps1` under PS7/Windows PowerShell 5.1 covers PS1 directory
+rather than terminal cwd, selection, confirmation only with `y`, no writing/installing
+before confirmation, noninteractive cancellation and prompt-free audit. Copy tests
+cover unchanged sources/application settings/model state, rewritten managed paths,
+JSON array preservation, locks/active processes, conflicts, links and rollback of
+partially published copies. All copies use temporary data.
+
+From the chosen root:
 
 ```powershell
 pwsh -NoProfile -File ".\app\tests\Test-InstallationLocation.ps1" -BootstrapPath ".\Provision-LoKiEnte.ps1"
 powershell -NoProfile -File ".\app\tests\Test-InstallationLocation.ps1" -BootstrapPath ".\Provision-LoKiEnte.ps1"
 ```
 
-## Manueller LM-Studio-Erststart: 2026.11.16.2
+## Manual LM Studio first run — 2026.11.16.2
 
-`Test-LmStudioInitialization.ps1` prüft die unveränderte Weitergabe einer
-vorhandenen CLI, fehlende/leere CLI-Auflösung und eine beschädigte
-Home-Konfiguration. Ein isolierter Unterprozess führt den tatsächlichen
-Setup-Abschnitt ab der CLI-Prüfung samt Fehlerbehandlung aus: fehlende CLI
-beendet ihn mit Exitcode 1 und einem gespeicherten `INCOMPLETE`-Bericht mit
-Handlungsanweisung. App-Start, Warteschleife und Modell-/Routeraktionen dürfen
-in diesem Fall nicht ausgeführt werden. Es wird keine reale LM-Studio-App
-gestartet und keine Installation ausgeführt.
+`Test-LmStudioInitialization.ps1` covers forwarding an existing CLI, missing/empty
+resolution and corrupt home configuration. An isolated child executes the real
+setup section from CLI checks through error handling: a missing CLI exits 1 with
+a saved `INCOMPLETE` report and instructions. App startup, polling and model/router
+actions must not execute. No real LM Studio app or installer runs.
 
-## Reparaturstand 2026.11.16.1
+## Repair release 2026.11.16.1
 
-Die Reparaturen ergänzen die nachfolgend dokumentierte Vorversion. Die aktuelle
-Prüfung verwendet Windows, PowerShell 7.6.10 und Windows PowerShell 5.1.26100.9818.
-Es wurden keine Anwendungen installiert und keine realen Modelle geladen oder
-entladen. GPU-/LM-Studio-Grenzen und öffentliche HTTP-Quellen werden in den
-Regressionstests simuliert; lokale HTTP-Verbindungen, Dateizugriffe,
-Prozessaufrufe und Prozesszeitlimits werden tatsächlich ausgeführt.
+These repairs supplement the prior release documented below. Tests used Windows,
+PowerShell 7.6.10 and Windows PowerShell 5.1.26100.9818. No applications were installed
+and no real models loaded/unloaded. GPU/LM Studio/public HTTP boundaries are simulated;
+local HTTP, file access, processes and timeouts really run.
 
-Mitgelieferte Prüfungen unter `app\tests` nach dem Entpacken des Pakets:
+Bundled checks under `app\tests` after extraction:
 
-| Test | Umfang |
+| Test | Coverage |
 |---|---|
-| `Test-KiloMetadata.ps1` | String-/Array-/Objektantworten, fehlende/mehrdeutige Daten, Prerelease-/Buildversion und Abbruch vor Installationsschreibzugriffen. |
-| `Test-ModelPool.ps1` | Bestehende 22 Modellpoolprüfungen plus 6 Wiederanlaufprüfungen: gespeicherter Ladeauftrag, REST-Ausfall nach Laden, Ablehnung abweichender Dateien, Wiederverwendung und persistierter Eigentumsnachweis. |
-| `Test-RouterLifecycle.ps1` | 17 Prüfungen mit echten lokalen Node-Prozessen, einschließlich HTTP-503-Identität, Schutz beschäftigter Router und authentifiziertem Beenden. |
-| `Test-Audit.ps1` | Auditbericht, Fehleraggregation, Hardware-/Modelloptionen, fehlende Downloads, Zustandsprüfung, Sperren, Token-Redaktion, keine Provisionierungsbefehle, echte Prozesszeitlimits und HTTP-/Redirectverhalten. Ausführung unter PS5.1 und PS7. |
-| `Test-Bootstrap.ps1` | 35 Prüfungen zu Argumenten, Extraktion, Sicherungen, Hash, ungültigen Pfaden, PS5.1-Audit-Handoff, strukturierten Auditfehlern, Zeitlimits und Exitcodes. |
+| `Test-KiloMetadata.ps1` | String/array/object responses, missing/ambiguous data, prerelease/build versions, stopping before installation writes. |
+| `Test-ModelPool.ps1` | Existing 22 pool checks plus 6 recovery checks: load intent, REST failure after loading, mismatched files, reuse and persisted ownership. |
+| `Test-RouterLifecycle.ps1` | 17 checks with real Node processes, including HTTP 503 identity, busy-router protection and authenticated shutdown. |
+| `Test-Audit.ps1` | Report/aggregation, hardware/model options, missing downloads, state/locks, token redaction, no provisioning calls, real timeouts and HTTP/redirect behavior under PS5.1/PS7. |
+| `Test-Bootstrap.ps1` | 35 checks: arguments, extraction, backups, hashes, invalid paths, PS5.1 audit handoff, structured audit errors, timeouts and exit codes. |
 
-Beispiel nach dem Entpacken, im gewählten Stammverzeichnis und mit explizitem Pfad zur aktualisierten PS1:
+From the chosen root after extraction, explicitly reference the updated PS1:
 
 ```powershell
 pwsh -NoProfile -File ".\app\tests\Test-KiloMetadata.ps1"
@@ -547,253 +506,205 @@ powershell -NoProfile -File ".\app\tests\Test-Audit.ps1" -BootstrapPath "C:\Down
 pwsh -NoProfile -File ".\app\tests\Test-Bootstrap.ps1" -BootstrapPath "C:\Downloads\Provision-LoKiEnte.ps1"
 ```
 
-Diese Tests prüfen nicht die aktuell installierten LM-Studio-/Kilo-Versionen
-oder die reale GPU des Zielsystems. Die vollständige Zielsysteminstallation und erste
-GUI-/Agentennutzung bleiben eine notwendige Abnahme auf dem Windows-PC.
+These tests do not check target-installed LM Studio/Kilo or its real GPU. Full
+installation and initial GUI/agent use remain necessary target acceptance.
 
-## Historischer Prüfbericht zur Vorversion
+## Historical report for the earlier release
 
-Die folgenden Ergebnisse und weitergehenden Testlisten stammen aus der früheren
-Ausgabe. Die vollständige damalige Testsammlung gehört zum alten separaten ZIP,
-nicht zum Umfang der oben aufgeführten aktuellen Reparaturtests.
+The following results/lists belong to the prior release. Its complete test collection
+was in the old separate ZIP, not the current repair-test scope listed above.
 
-Stand: 13. November 2026 (UTC), Paket 2026.11.14.1. Die folgenden Prüfungen wurden auf Debian Linux mit einer
-portablen, anhand der offiziellen SHA256-Prüfsumme geprüften PowerShell 7.6.6
-ausgeführt. Für die echten Kilo-Prüfungen wurde `@kilocode/cli` 7.8.27 in einem
-separaten Testverzeichnis installiert. Die Testwerkzeuge gehören nicht zur
-Installation auf dem Windows-PC.
+Recorded 13 November 2026 (UTC), package 2026.11.14.1. Tests ran on Debian Linux with
+portable PowerShell 7.6.6 verified against the official SHA-256. Real Kilo checks
+used `@kilocode/cli` 7.8.27 in a separate test directory. These test tools are not
+part of target-machine installation.
 
-## Ergebnis
+### Result
 
-Alle nachfolgend aufgeführten Prüfungen bestanden. Das bestätigt die geprüfte
-Skriptlogik, Konfiguration und Fehlerbehandlung. Eine vollständige Installation
-auf Windows oder ein Lauf des vorgesehenen LLM auf der GPU des Zielsystems wurde hier nicht
-ausgeführt. Die Hardware und das Modell werden beim tatsächlichen Provisionierungslauf mit
-verpflichtenden Chat-/Tool-Smoke-Tests geprüft. Die erste GUI-Nutzung und ein
-kleiner echter Projektauftrag bleiben Teil der Abnahme auf dem Windows-PC.
+All checks below passed. This confirms the exercised script logic, configuration
+and failure handling, not a full Windows installation or model inference on the
+target GPU. Actual provisioning requires chat/tool smoke tests. First GUI use and
+a small real project task remain target acceptance steps.
 
-| Prüfung | Umfang | Ergebnis |
+| Check | Scope | Result |
 |---|---|---|
-| PowerShell-Syntax | Parserprüfung der Paketdateien mit PowerShell 7.6.6 | Keine Syntaxfehler |
-| Bootstrap und PowerShell-Handoff | 32 Fälle mit echten temporären Dateien und Unterprozessen | Bestanden |
-| Native Prozesse und verwaltete Dateien | 9 benannte Fälle | Bestanden |
-| Review-Gate | 19 benannte Fälle mit echten temporären Git-Repositories | Bestanden |
-| Vollständiger Aufgabenablauf | 8 Szenarien mit echten Prozessen und synthetischen Agentenantworten | Bestanden |
-| Bestehende Projekte und Workspaces | 5 Erhaltungs- und Wiederholungsbedingungen | Bestanden |
-| Echte Kilo-Konfiguration | Tatsächlicher CLI-Parser und effektive Konfiguration, 21 deklarierte Agenten | Bestanden |
-| Echte lokale Kilo-API-Anbindung | Ohne Token und mit Testtoken gegen einen lokalen HTTP-Testserver | Beide Szenarien bestanden |
-| LM-Studio-Ablauflogik | Gemockte Neuinstallation, Speicherfallback, Wiederholung und Fehlerfälle | Bestanden |
+| PowerShell syntax | Package parsing with PowerShell 7.6.6 | No syntax errors |
+| Bootstrap/PowerShell handoff | 32 cases with real temporary files/processes | Passed |
+| Native processes/managed files | 9 named cases | Passed |
+| Review gate | 19 cases with real temporary Git repositories | Passed |
+| Complete task workflow | 8 scenarios with real processes and synthetic agents | Passed |
+| Existing projects/workspaces | 5 preservation/repetition conditions | Passed |
+| Real Kilo configuration | Actual parser/effective configuration, 21 declared agents | Passed |
+| Real local Kilo API connection | Without token and with test token against local HTTP | Both passed |
+| LM Studio control flow | Mocked initial install, memory fallback, reuse/failures | Passed |
 
-## Erweiterung auf mehrere lokale Modelle
+### Extension to multiple local models
 
-Die Mehrmodellversion erweitert die zuvor geprüfte Einmodellvariante um
-einen expliziten Modellpool, einen lokalen HTTP-Router und rollenabhängige
-Kilo-Modelle. Auch für diese Erweiterung gab es keinen tatsächlichen GPU-Lauf.
+The multi-model release adds an explicit pool, local HTTP router and role-specific
+Kilo models to the previously tested single-model variant. It also had no real GPU run.
 
-| Prüfung der Erweiterung | Umfang | Ergebnis |
+| Extension check | Scope | Result |
 |---|---|---|
-| Modellpool und Eigentumsregister | 22 gezielte Fälle, tatsächliche PowerShell-Steuerung und Dateisperren, simulierte LM-/GPU-Grenzen | Bestanden |
-| HTTP-/SSE-Router | 23 Fälle mit echten lokalen Netzwerkverbindungen und Unterprozessen | Bestanden |
-| Routerstart und Wiederverwendung | 15 Bedingungen mit echten Node-Prozessen und lokalem HTTP-Dienst | Bestanden |
-| Mehrmodell-Konfiguration | 22 Bedingungen, einschließlich tatsächlicher Kilo-CLI und vollständiger Konfigurationsprüfung | Bestanden |
-| Rollenbezogener Aufgabenrunner | 2 vollständige Szenarien mit unterschiedlichen Modellargumenten und Kontextgrenzen | Bestanden |
-| Echte Kilo-CLI durch ausgelieferten Router | 5 Szenarien: Coder, Reviewer, kleiner Chat, GPT-OSS-artiger Reasoning-/Tool-Roundtrip und native Unteragenten-Delegation | Bestanden |
+| Pool/ownership register | 22 targeted cases, real PowerShell/file locks, simulated LM/GPU | Passed |
+| HTTP/SSE router | 23 cases with real local connections/processes | Passed |
+| Router start/reuse | 15 conditions with real Node/HTTP | Passed |
+| Multi-model configuration | 22 conditions, including real CLI/full config verification | Passed |
+| Role-aware task runner | 2 complete scenarios with different model arguments/context limits | Passed |
+| Real Kilo CLI through shipped router | 5 scenarios: coder, reviewer, small chat, GPT-OSS-style reasoning/tool round trip, native subagent delegation | Passed |
 
-Der letzte Test verwendet **die tatsächliche Kilo CLI 7.8.27 und den gelieferten
-Router**, dahinter jedoch einen synthetischen LM-Endpunkt und einen simulierten
-Modellcontroller. Er belegt, dass Coder → Review-Unteragent → Coder tatsächlich
-unterschiedliche Modellrouten anfordert, Tool-Call-Daten erhalten bleiben und
-Reasoning-Inhalte über einen Tool-Roundtrip weitergegeben werden. Er belegt
-keine Modellintelligenz und kein Verhalten der realen GPU.
+The last test uses **actual Kilo CLI 7.8.27 and the shipped router**, backed by a
+synthetic LM endpoint and simulated controller. It establishes that coder → review
+subagent → coder requests different routes, preserves tool-call data and carries
+reasoning through a tool round trip. It does not establish intelligence or GPU behavior.
 
-Für Qwen sind die Metadaten auf `reasoning_content` ausgerichtet. Für GPT-OSS
-wird das von LM Studio dokumentierte Feld `reasoning` verwendet. Beide Varianten
-wurden mit echten Kilo-SDK-Requests gegen synthetische Antworten geprüft. Die
-auf dem Windows-PC tatsächlich aktivierten Modelltemplates und Ausgabeformate sind
-weiterhin durch die dortigen Funktionsprüfungen zu bestätigen.
+Qwen metadata uses `reasoning_content`; GPT-OSS uses LM Studio's documented
+`reasoning`. Both were checked with real SDK requests and synthetic responses.
+Actual target model templates/output formats still need functional verification.
 
-### Abgedeckte Mehrmodell-Fehlerfälle
+### Covered multi-model failures
 
-Der Router akzeptiert nur provisionierte Modell-Aliase und lokale Endpunkte.
-Er erhält fragmentierte Tool-Argumente im SSE-Stream und serialisiert Anfragen
-bis zum Ende der jeweiligen Generierung. Weiterleitungen an andere HTTP-Ziele
-werden abgewiesen. Fehlerhafte Antworten, unvollständige Streams, falsche
-Controllerergebnisse und unbekannte Modellnamen werden als Fehler behandelt.
-Timeouts während Warteschlange, Laden und Generierung sowie Clientabbrüche sind
-gezielt getestet. Ein unklarer Controller-Timeout sperrt weitere Modellwechsel,
-statt eine möglicherweise noch laufende Ladeoperation zu überholen.
+The router accepts only provisioned aliases/local endpoints, preserves fragmented
+SSE tool arguments and serializes requests until generation ends. Redirects are
+rejected. Malformed responses, incomplete streams, wrong controller results and
+unknown models fail. Queue/load/generation timeouts and client cancellation are
+tested. Ambiguous controller timeout blocks further switches rather than overtaking
+a possibly active load.
 
-Der Lifecycle-Test bestätigt, dass ein passender beschäftigter Router ohne
-Modellwechsel wiederverwendet wird. Ein fremder Dienst oder ein beschäftigter
-Router mit unpassender Konfiguration wird erhalten. Nur ein eindeutig selbst
-gestarteter, nicht bereit werdender Prozess wird im Fehlerpfad beendet.
+Lifecycle checks confirm reuse of a matching busy router without a model switch.
+Foreign services and busy routers with differing configuration remain. Only a
+definitely self-started process that never becomes ready is terminated on failure.
 
-Der Modellcontroller schützt fremde und aktive Modelle, prüft ID und Pfad vor
-jedem eigenen Entladen, begrenzt Parallelität auf einen Slot und vereinheitlicht
-den Kontext auf das tatsächlich getestete Minimum. Eine unklare alte v1-Instanz
-wird konservativ nicht übernommen. Zusätzliche Modelldateien werden bei
-Wiederholung wiederverwendet.
+The controller protects foreign/active models, checks ID/path before every owned
+unload, limits inference to one slot and shares the tested minimum context. An
+ambiguous legacy v1 instance is conservatively not adopted. Additional files are
+reused on rerun.
 
-### Ausführbare Zusatztests
+### Additional executable tests
 
 - `tests/Test-ModelPool.ps1`
 - `tests/Test-ModelRouter.mjs`
 - `tests/Test-RouterLifecycle.ps1`
 - `tests/Test-MultiModelConfiguration.ps1`
 - `tests/Test-MultiModelRunner.ps1`
-- `tests/Test-MultiModelKilo.js` und `Prepare-MultiModelProbe.ps1`
+- `tests/Test-MultiModelKilo.js` and `Prepare-MultiModelProbe.ps1`
 
-Die Node-Routerprüfung lässt sich aus dem entpackten Paket mit
-`node tests/Test-ModelRouter.mjs` ausführen. Die echten Kilo-Tests verlangen die
-expliziten Pfade zur PowerShell- und Kilo-Testinstallation; die Paketauslieferung
-enthält diese Testwerkzeuge nicht.
+Run the router test from the extracted package with `node tests/Test-ModelRouter.mjs`.
+Real Kilo tests require explicit paths to PowerShell and the Kilo test installation;
+those test tools are not bundled.
 
-## Was konkret geprüft wurde
+### Bootstrap and error propagation
 
-### Bootstrap und Fehlerweitergabe
+32 checks established complete ZIP preflight, unchanged reruns, correct backups,
+SHA-256 checks, literal arguments and JSON handoff. Path traversal, duplicate targets,
+file/directory collisions and reparse links in target/backup directories are rejected.
+Inventory with simulated CIM responses created no installation directory.
 
-32 Prüfungen bestätigten die vollständige ZIP-Vorabprüfung, unveränderte Wiederholung,
-korrekte Sicherungen, SHA256-Kontrolle, wörtliche Argumentübergabe und den JSON-Handoff.
-Pfadausbruch, doppelte Ziele, Datei-/Verzeichniskollisionen und Reparse-Links in Ziel-
-oder Backup-Verzeichnissen werden zurückgewiesen. Die Inventur wurde mit simulierten
-CIM-Antworten ausgeführt und erzeugte kein Installationsverzeichnis.
+A real child-process test initially found a lost inner setup exit code. Handoff now
+propagates it; tests for 0 and 23 pass. Another test reproduced following an existing
+link outside the root; complete preflight now prevents it. Native Windows junctions
+and Windows PowerShell 5.1 were not executed in this historical Linux test.
 
-Ein tatsächlicher Unterprozesstest deckte zunächst auf, dass ein innerer Setup-Exitcode
-verlorenging. Der Handoff propagiert jetzt den Fehlercode ausdrücklich; die Tests für
-Exitcodes 0 und 23 bestehen. Ein weiterer Test bestätigte das ursprüngliche Folgen
-vorhandener Verknüpfungen außerhalb des Zielordners; die vollständige Vorabprüfung
-verhindert diesen Fall jetzt. Native Windows-Junctions und Windows PowerShell 5.1
-wurden dabei weiterhin nicht ausgeführt.
+### Processes and existing files
 
-### Prozesse und vorhandene Dateien
+The actual process helper preserves empty arguments, spaces, quotes, Unicode,
+newlines and shell-special characters. stderr with exit 0 remains successful.
+Nonzero exit fails or is returned unchanged when explicitly allowed. Both streams
+are read concurrently; tests used 200 KB on each. Timeout terminates an overlong
+process. `.cmd`, `.bat` and `.ps1` are not launched as if native executables.
 
-Die tatsächliche Prozessfunktion übergibt leere Argumente, Leerzeichen,
-Anführungszeichen, Unicode, Zeilenumbrüche und Shell-Sonderzeichen unverändert.
-Eine Meldung auf stderr bei Exitcode 0 gilt als erfolgreiche Ausführung. Ein
-Exitcode ungleich 0 schlägt fehl oder wird bei explizit erlaubter Fehlerbehandlung
-unverändert zurückgegeben. Beide Ausgabeströme werden parallel gelesen; der Test
-verwendete jeweils 200 KB auf stdout und stderr. Ein Zeitlimit beendet einen
-überlangen Prozess. `.cmd`, `.bat` und `.ps1` werden nicht als vermeintliche native
-Programme gestartet.
+Changed managed files are backed up. Different existing content is not overwritten
+without a backup target. Unchanged reruns neither rewrite nor add backups. Workspace
+tests preserve project source, `AGENTS.md`, VS Code settings, custom tasks/check
+commands and existing registrations when another project is added.
 
-Geänderte verwaltete Dateien erhalten eine Sicherung. Ohne Sicherungsziel wird
-vorhandener abweichender Inhalt nicht überschrieben. Eine unveränderte Wiederholung
-schreibt die Datei nicht neu und legt keine zusätzliche Sicherung an. Der
-Workspace-Test bewahrte vorhandene Quelltexte, `AGENTS.md` und VS-Code-Einstellungen
-im Projekt. Auch vom Benutzer angepasste Aufgaben und Prüfbefehle blieben bei
-Wiederholung erhalten. Die Registrierung eines weiteren Projekts entfernte keinen
-bestehenden Eintrag.
+### Review and validation
 
-### Review und Validierung
+A positive control produced `VERIFIED`, exit 0. The gate denied it for missing,
+failed or cancelled checks, failed implementation, specialist tool errors, shared
+reviewer sessions, stale fingerprints, unresolved findings and `FAIL`/`BLOCKED`.
 
-Ein positiver Kontrolllauf erzeugte `VERIFIED` mit Exitcode 0. Das Gate verweigerte
-diesen Status bei fehlenden, fehlgeschlagenen oder abgebrochenen Prüfbefehlen,
-fehlgeschlagener Implementierung, gescheitertem Spezialistenwerkzeug, gemeinsam
-genutzter Prüfersitzung, veraltetem Quellfingerabdruck, offenen Befunden sowie
-`FAIL`- oder `BLOCKED`-Urteilen.
+Parsers reject tool output masquerading as approval, incomplete JSON, plain “PASS”,
+an earlier rather than final response, wrong role/fingerprint and invalid session
+IDs. Event-stream errors prevent later apparent approval. The validator must name
+every executed check.
 
-Zusätzliche Parserprüfungen lehnten Tool-Ausgaben als vermeintliche Freigabe,
-unvollständiges JSON, bloßes „PASS“ im Text, einen früheren statt abschließenden
-Antworttext, falsche Rolle, falschen Fingerabdruck und ungültige Sitzungskennungen
-ab. Fehlermeldungen im Ereignisstrom verhindern eine spätere scheinbare Freigabe.
-Der Validator muss sämtliche ausgeführten Prüfbefehle benennen.
+Fingerprints change for tracked files, Git index and nonignored untracked files.
+Tests explicitly cover different index content despite identical worktree/status
+output. Ignored files are intentionally excluded and the report states this limit;
+`node_modules`, generated files and local environment files are not represented as
+reviewed source.
 
-Die Quellfingerabdrücke änderten sich bei Änderungen an versionierten Dateien,
-am Git-Index und an nicht ignorierten unversionierten Dateien. Der besonders
-fehleranfällige Fall „unterschiedlicher Indexinhalt bei gleichem Arbeitsbaum und
-gleicher Git-Statusanzeige“ wurde ausdrücklich geprüft. Git-ignorierte Dateien
-liegen bewusst außerhalb dieses Fingerabdrucks; der Prüfbericht nennt diese
-Grenze. Damit werden etwa `node_modules`, erzeugte Dateien oder lokale
-Umgebungsdateien nicht als geprüftes Quellmaterial ausgegeben.
+Actual process results:
 
-Im vollständigen Ablauf ergaben sich folgende tatsächliche Prozessresultate:
+| Scenario | Status | Exit code |
+|---|---|---:|
+| Valid separate approvals and passing check | `VERIFIED` | 0 |
+| No checks configured | `REVIEWED_UNVALIDATED` | 2 |
+| Check failed | `NOT_VERIFIED` | 1 |
+| Implementation process failed | `NOT_VERIFIED` | 1 |
+| Delegated specialist reports tool error | `NOT_VERIFIED` | 1 |
+| Reviewer uses stale fingerprint | `NOT_VERIFIED` | 1 |
+| Source changes during verification | `NOT_VERIFIED` | 1 |
+| Roles reuse the same session | `NOT_VERIFIED` | 1 |
 
-| Szenario | Status | Exitcode |
-|---|---|---|
-| Gültige getrennte Freigaben und bestandener Prüfbefehl | `VERIFIED` | 0 |
-| Keine Prüfbefehle konfiguriert | `REVIEWED_UNVALIDATED` | 2 |
-| Prüfbefehl fehlgeschlagen | `NOT_VERIFIED` | 1 |
-| Implementierungsprozess fehlgeschlagen | `NOT_VERIFIED` | 1 |
-| Delegierter Spezialist meldet Werkzeugfehler | `NOT_VERIFIED` | 1 |
-| Reviewer nennt veralteten Fingerabdruck | `NOT_VERIFIED` | 1 |
-| Quelle wird während der Prüfung verändert | `NOT_VERIFIED` | 1 |
-| Rollen verwenden dieselbe Sitzung | `NOT_VERIFIED` | 1 |
+Agent responses are synthetic; this tests external coordination, not model quality.
 
-Die Agentenantworten dieser Ablaufprüfung sind synthetische Testdaten. Damit wird
-die externe Koordination geprüft, nicht die Qualität eines Sprachmodells.
+### Actual Kilo configuration and authentication
 
-### Tatsächliche Kilo-Konfiguration und Authentifizierung
+Real Kilo accepted generated configuration. Effective values matched the local
+provider, selected model, 32768 context tokens and agent permissions. Full global/
+agent permission comparison passed. The generator rejected a nonlocal API endpoint.
 
-Die echte Kilo CLI akzeptierte die erzeugte Konfiguration. Ihre aufgelösten Werte
-entsprachen dem lokalen Provider, dem festgelegten Modell, 32.768 Kontext-Tokens
-und den konfigurierten Agentenrechten. Auch der vollständige Vergleich globaler
-und agentenspezifischer Berechtigungen bestand. Ein nicht lokaler API-Endpunkt
-wurde bereits vom Konfigurationsgenerator abgewiesen.
+A test HTTP server bound only to `127.0.0.1`. Real Kilo called `/v1/chat/completions`
+and returned its control response. Without a token, no API-key field was stored.
+An obviously synthetic token produced the expected Bearer header; the server would
+reject a missing/wrong token. Configuration stored only an environment-variable
+reference. Linux could not faithfully test Windows-specific access to variables
+set only in the user environment.
 
-Für den Authentifizierungstest lief ein HTTP-Testserver ausschließlich auf
-`127.0.0.1`. Die echte Kilo CLI rief `/v1/chat/completions` auf und gab dessen
-Kontrollantwort zurück. Ohne Token wurde kein API-Key-Feld gespeichert. Mit einem
-offensichtlich künstlichen Testtoken wurde der erwartete Bearer-Header übermittelt;
-der Server hätte einen fehlenden oder falschen Token zurückgewiesen. Die
-gespeicherte Konfiguration enthielt ausschließlich einen Umgebungsvariablenverweis,
-keinen Tokenwert. Der Windows-spezifische Zugriff auf eine ausschließlich im
-Benutzerprofil gesetzte Umgebungsvariable konnte auf Linux nicht systemnah geprüft
-werden.
+Tests use `KILO_TELEMETRY_LEVEL=off` and `experimental.openTelemetry=false`, also
+shipped in configuration. This does not guarantee that all installed programs avoid
+network activity; package/model downloads and public metadata requests are separate.
 
-Die Prüfungen verwenden `KILO_TELEMETRY_LEVEL=off` sowie
-`experimental.openTelemetry=false`. Beide Einstellungen sind auch Bestandteil
-der gelieferten Konfiguration. Daraus folgt keine Garantie gegen sämtliche
-Netzwerkaktivität aller installierten Programme; Paket- und Modell-Downloads
-sowie mögliche öffentliche Metadatenabfragen sind eigenständige Vorgänge.
-
-Die drei Einstellungen für automatische Inline-Vorschläge, deren Hotkey und
-Chat-Autocomplete sind anhand des offiziellen Kilo-Erweiterungsmanifests geprüft
-und im verwalteten VS-Code-Profil sowie den erzeugten Workspaces auf `false`
-gesetzt. Der separate Autocomplete-Provider ist damit nicht Teil des lokalen
-Chat-Routings. Die tatsächliche VS-Code-Oberfläche wurde hier nicht ausgeführt;
-manuelle Befehle und selbst geänderte Einstellungen bleiben möglich.
+Three settings for automatic inline suggestions, their hotkey and chat autocomplete
+were checked against the official manifest and set false in the managed profile/
+workspaces. The separate autocomplete provider is therefore outside local chat
+routing. The real GUI was not run; manual commands/user changes remain possible.
 
 ### LM Studio
 
-Die Runtime-Vertragstests verwenden simulierte CLI- und API-Antworten. Geprüft
-wurden insbesondere die leere Erstinstallation, ein einmaliger Runtime- und
-Modelldownload, der kontrollierte Fallback von 32K auf 16K Kontext, das Wiederverwenden
-einer passenden vorhandenen Instanz, die Ablehnung eines öffentlichen Listeners,
-der Erhalt eines fremden geladenen Modells sowie das Zurückweisen falscher
-Tool-Argumente. Es wurde kein automatisches Entladen fremder Modelle beobachtet.
+Runtime contract tests simulate CLI/API responses. They cover empty first install,
+one-time runtime/model download, controlled 32K→16K fallback, matching-instance reuse,
+public-listener rejection, foreign-model preservation and wrong tool arguments.
+No automatic unloading of foreign models was observed.
 
-## Noch auf dem tatsächlichen Windows-PC zu prüfen
+### Still requiring the actual Windows PC in that release
 
-Windows PowerShell 5.1/ISE, WinGet, Installer/UAC, Windows-Verknüpfungen, die
-VS-Code-Oberfläche und die NVIDIA-GPU wurden nicht unter Windows ausgeführt.
-Der Bootstrap wurde zusätzlich auf PowerShell-5.1-kompatible Konstrukte geprüft;
-eine PowerShell-7-Parserprüfung ersetzt keinen Windows-PowerShell-5.1-Lauf.
+Windows PowerShell 5.1/ISE, WinGet, installers/UAC, shortcuts, GUI and NVIDIA GPU
+had not been run under Windows in this historical test. Bootstrap was checked for
+5.1-compatible constructs; parsing with PS7 does not replace execution on PS5.1.
 
-Auch Modellqualität, tatsächlicher VRAM-/RAM-Verbrauch, Geschwindigkeit und
-Zuverlässigkeit bei längeren Aufgaben sind damit nicht vorweggenommen. Der
-Provisionierer darf den lokalen Modellserver erst nach bestandener
-Kontrollantwort, einem echten strukturierten Tool-Aufruf und der korrekten
-Verarbeitung der Tool-Antwort als bereit markieren. Ein späteres `VERIFIED`-Receipt
-bezieht sich auf den erfassten Quellstand und die konfigurierten Prüfungen; es ist
-kein Beweis allgemeiner Fehlerfreiheit.
+Model quality, actual RAM/VRAM, speed and long-task reliability are not established.
+Readiness requires a passing control response, real structured tool call and correct
+handling of its return. A later `VERIFIED` receipt covers captured source/configured
+checks, not universal correctness.
 
-## Prüfdateien
+## Test files
 
-Die ausführbaren Prüfungen des aktuellen Pakets liegen unter `tests/`.
-Die Testdateien, die in historischen Abschnitten genannt werden, können aus
-früheren Auslieferungen stammen. Synthetische Testserver und Agenten liefern
-keinen Nachweis über die realen Modelle auf dem Windows-PC.
+Current executable tests are under `tests/`. Files mentioned in historical sections
+may belong to earlier releases. Synthetic servers/agents do not establish real
+model behavior on the target PC.
 
-Herstellerquellen für den Telemetrieschalter und das geprüfte Ereignisformat:
+Vendor sources for telemetry and the checked event format:
 
 - https://github.com/Kilo-Org/kilocode/blob/main/packages/kilo-telemetry/src/telemetry.ts
 - https://github.com/Kilo-Org/kilocode/blob/main/packages/kilo-telemetry/src/client.ts
 - https://kilo.ai/docs/code-with-ai/platforms/cli
 - https://github.com/Kilo-Org/kilocode/blob/main/packages/opencode/src/cli/cmd/run.ts
 
-## Prüfungen selbst wiederholen
+## Repeat checks locally
 
-Im Projektordner, mit PowerShell 7 und Node/Git:
+From the repository root with PowerShell 7, Node and Git:
 
 ```powershell
 pwsh -NoProfile -File .\Quellpaket\tests\Test-Bootstrap.ps1 -BootstrapPath .\Provision-LoKiEnte.ps1
@@ -808,17 +719,14 @@ pwsh -NoProfile -File .\Quellpaket\tests\Test-Embedding.ps1
 node .\Quellpaket\tests\Test-ModelRouter.mjs
 ```
 
-Einen echten kleinen Codeauftrag und die semantische Suchprobe nach der
-Provisionierung zusätzlich auf dem Windows-PC ausführen.
-## Welcome-Projekt — Paket 2026.11.18.19
+Also run a small real coding request and the semantic-search probe after provisioning.
 
-Test-WelcomeProject.ps1: 11 Prüfungen bestanden mit echtem Git und Node.
-Geprüft: sauberer Anfangscommit ohne Remote, reproduzierbarer Rechenfehler,
-automatische Erkennung des Node-JUnit-Checks, Erhalt bearbeiteter Dateien und
-HEAD beim Update, frisches Beispiel ohne Rücksetzen sowie Registrierung beider
-Projekte und Abbruch bei einem unbekannten vorhandenen Ordner.
-Test-SelectionIntegration.ps1: 3 Setup-Integrationsprüfungen bestanden.
-Alle 16 öffentlichen Bootstrapparameter sind gegen die README-Tabelle geprüft;
-PowerShell-Syntaxprüfung bestanden. Der Probeauftrag mit echten lokalen
-Modellen wird nach Provisionierung vom Anwender im Welcome-Beispiel gestartet.
+## Welcome project — package 2026.11.18.19
 
+`Test-WelcomeProject.ps1`: 11 checks passed using real Git and Node. Coverage: clean
+initial commit without remote, reproducible calculation bug, automatic Node-JUnit
+detection, preservation of modified files/HEAD during updates, fresh examples without
+resetting the old one, both registrations, and rejection of an unknown existing
+directory. `Test-SelectionIntegration.ps1`: 3 setup integration checks passed.
+All 16 public bootstrap parameters were compared with the README table; PowerShell
+syntax passed. Users run the real-model trial in Welcome after provisioning.

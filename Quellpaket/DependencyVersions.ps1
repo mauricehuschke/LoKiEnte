@@ -8,19 +8,19 @@ function Read-ShadowDependencyVersions {
     $path=Join-Path $InstallRoot 'dependency-versions.json'
     if(Test-Path -LiteralPath $path){
         $document=(ConvertFrom-Json -InputObject ('{"value":'+[IO.File]::ReadAllText($path)+'}') -ErrorAction Stop).value
-        if($document -isnot [pscustomobject]){throw "Versionsfreigaben sind kein JSON-Objekt: $path"}
+        if($document -isnot [pscustomobject]){throw "Approved versions are not a JSON object: $path"}
         foreach($entry in $document.PSObject.Properties){
-            if(-not $versions.Contains($entry.Name)){throw "Unbekannte Abhaengigkeit in $($path): $($entry.Name)"}
+            if(-not $versions.Contains($entry.Name)){throw "Unknown dependency in $($path): $($entry.Name)"}
             if($null -ne $entry.Value -and ($entry.Value -isnot [string] -or
                $entry.Value -notmatch '^\d{1,8}\.\d{1,8}\.\d{1,8}(?:\.\d{1,8})?$')){
-                throw "Freigabe fuer $($entry.Name) muss eine stabile Versionsnummer oder null sein."
+                throw "Approved version for $($entry.Name) must be a stable version number or null."
             }
             if($entry.Name -in @('kiloCli','kiloVsCode') -and $entry.Value -and $entry.Value.Split('.').Count -ne 3){
-                throw "Freigabe fuer $($entry.Name) muss dreiteilig sein."
+                throw "Approved version for $($entry.Name) must contain three components."
             }
-            if($entry.Name -eq 'kiloVsCode' -and -not $entry.Value){throw 'Kilo VS Code benoetigt eine freigegebene Version.'}
+            if($entry.Name -eq 'kiloVsCode' -and -not $entry.Value){throw 'Kilo VS Code requires an approved version.'}
             if($entry.Name -eq 'powerShell' -and $entry.Value -and [version]$entry.Value -lt [version]'7.4.0'){
-                throw 'Freigegebene PowerShell-Version muss mindestens 7.4.0 sein.'
+                throw 'Approved PowerShell version must be at least 7.4.0.'
             }
             $versions[$entry.Name]=$entry.Value
         }
