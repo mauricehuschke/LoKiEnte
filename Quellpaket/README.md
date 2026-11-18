@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.18.25 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.18.26 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
@@ -62,6 +62,16 @@ Authentication and loopback boundaries remain active. CPU embedding requests are
 bounded and can proceed during coding requests; shutdown waits until work ends.
 `runtime/embedding-status.json` preserves the last preflight result without tokens
 or request text; later failures produce sanitized router event codes.
+
+The CPU embedding preflight records `MemoryCheck` with the estimate, available RAM,
+load budget, guardrail result and measured RAM after conservative load/inference.
+For LOW confidence or absent guardrail text, the budget is the maximum of 1 GiB,
+four times estimated memory and four times the verified model file size, plus
+the unchanged 3 GiB reserve. Explicit LM Studio denial still blocks loading.
+Actual CLI rejection remains Deferred; readiness requires the vector smoke test.
+A breached reserve rolls back only the newly loaded, uniquely owned idle embedding
+instance. Coding models and pre-existing embeddings are not unloaded by this check.
+This policy does not alter coding/review model fit or GPU offload rules.
 
 Dual mode provisions LanceDB 0.26.2 and local
 `nomic-embed-text-v1.5.Q4_K_M.gguf`. The model file is checked against its size and
@@ -131,7 +141,7 @@ functional acceptance, commit and push remain your responsibility.
 ### Build the installer from source
 
 On the development machine, update the version above and run
-`python .\Build-LoKiEnte.py 2026.11.18.25` from the repository root. The script
+`python .\Build-LoKiEnte.py 2026.11.18.26` from the repository root. The script
 rebuilds the embedded payload and checksum. The target Windows PC still needs
 only the generated PS1. A separate old ZIP is unnecessary for this process. The
 provisioning report records the version and checksum of the installer actually used.

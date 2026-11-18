@@ -266,6 +266,17 @@ requests. Check LM Studio for model readiness or HTTP errors. A passed preflight
 is not a completed project index: enable indexing for the intended project and wait
 for **Complete**. Single mode still does not provision semantic indexing.
 
+`Deferred` with `SmokeTest: NotRun` means the embedding model was not ready for an
+API test. `result.MemoryCheck` distinguishes an actual RAM shortage from a low-
+confidence estimate and LM Studio guardrail denial. For the verified CPU embedding
+model, `LOW` or missing guardrail text uses a conservative load budget: at least
+1 GiB, or four times the larger of the estimate and model file size. An additional
+3 GiB must remain available. LM Studio still controls the actual load; explicit
+denial blocks it. Readiness requires successful inference. If available RAM falls
+below the reserve after a conservative load or inference check, only that newly
+loaded, verified idle embedding instance is unloaded. Busy or ambiguous instances
+are preserved and reported. No `-AllowUnfitAttempt` is needed for this path.
+
 ## How code verification works
 
 1. Preparation and independent preparation review establish the verifiable task.

@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.18.25 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.18.26 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den
@@ -60,6 +60,16 @@ CPU-Embedding-Anfragen können während Coding-Anfragen laufen; das Herunterfahr
 wartet auf laufende Arbeit. `runtime/embedding-status.json` hält das letzte
 Vorprüfungsergebnis ohne Tokens oder Anfragetexte fest; spätere Fehler erzeugen
 bereinigte Router-Ereigniscodes.
+
+Die CPU-Embedding-Vorprüfung speichert unter `MemoryCheck` Schätzung, verfügbaren RAM,
+Ladebudget, Schutzregelergebnis und RAM-Messungen nach konservativem Laden/Inferenz.
+Bei LOW oder fehlender Schutzregelmeldung gilt das Maximum aus 1 GiB, vierfacher
+Schätzung und vierfacher geprüfter Modelldateigröße, zusätzlich zur unveränderten
+3-GiB-Reserve. Eine ausdrückliche LM-Studio-Ablehnung blockiert weiterhin. Ein
+abgelehnter CLI-Ladeversuch bleibt Deferred; erst der Vektortest bestätigt Ready.
+Bei unterschrittener Reserve wird nur die dabei neu geladene, eindeutig eigene
+inaktive Embedding-Instanz entladen. Coding-Modelle und schon vorhandene Embeddings
+bleiben erhalten. RAM-/GPU-Regeln für Coding und Review werden nicht verändert.
 
 Im Dual-Modus richtet die Provisionierung LanceDB 0.26.2 und das lokale
 `nomic-embed-text-v1.5.Q4_K_M.gguf` ein. Die Datei wird mit Größe und SHA-256
@@ -134,7 +144,7 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.18.25` ausführen. Das Skript baut
+`python .\Build-LoKiEnte.py 2026.11.18.26` ausführen. Das Skript baut
 die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält

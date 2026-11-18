@@ -6,6 +6,23 @@ This document preserves the validation history and its original limitations.
 Older sections describe the behavior and evidence of their stated release, not
 necessarily the current defaults. Current usage is documented in [README.md](README.md).
 
+## Conservative CPU embedding load — package 2026.11.18.26
+
+The target report identified an embedding load blocked by LOW estimate confidence,
+with no reported guardrail approval. The previous combined error could misleadingly
+suggest a measured RAM shortage. The regression now covers that input with a
+conservative budget and unchanged reserve, followed by actual load and inference
+boundaries. The policy applies only to the hash-verified CPU embedding model.
+
+The embedding suite passed 44 checks, including malformed estimates, colored/wrapped
+CLI output, insufficient reserve, explicit guardrail denial, actual load rejection,
+post-load and post-inference RAM pressure, and rollback restrictions for busy,
+substituted and duplicate instances. Existing model-pool (44), partial-offload (8),
+router-lifecycle (18) and selection-integration (3) regressions also passed.
+LM Studio, model inference and memory measurements are mocked in these tests;
+the actual target-machine indexing result still requires acceptance. The user
+confirmed extension-only sync works; main and the published release remain unchanged.
+
 ## Embedding compatibility and extension-only sync — package 2026.11.18.25
 
 This candidate is isolated from the stable release. The new embedding router and

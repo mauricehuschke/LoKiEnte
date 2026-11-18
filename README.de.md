@@ -287,6 +287,19 @@ Vorabtest ist noch kein fertiger Projektindex: Aktiviere die Indizierung für da
 gewünschte Projekt und warte auf **Complete**. Im Single-Modus wird semantische
 Indizierung weiterhin nicht provisioniert.
 
+`Deferred` mit `SmokeTest: NotRun` bedeutet, dass das Embedding-Modell noch nicht
+für einen API-Test bereitstand. `result.MemoryCheck` unterscheidet echten RAM-Mangel,
+unsichere Schätzung und eine Ablehnung durch die LM-Studio-Schutzregeln. Für das
+geprüfte CPU-Embedding-Modell wird bei `LOW` oder fehlender Schutzregelmeldung ein
+konservatives Ladebudget angesetzt: mindestens 1 GiB oder das Vierfache des größeren
+Werts aus Schätzung und Modelldateigröße. Zusätzlich müssen 3 GiB verfügbar bleiben.
+LM Studio kontrolliert weiterhin das tatsächliche Laden; eine ausdrückliche
+Ablehnung blockiert es. Erst erfolgreiche Inferenz bestätigt die Bereitschaft.
+Wird die Reserve nach dem konservativen Laden oder Inferenztest unterschritten,
+wird ausschließlich die dabei neu geladene, eindeutig verifizierte und inaktive
+Embedding-Instanz entladen. Beschäftigte oder mehrdeutige Instanzen bleiben erhalten
+und werden gemeldet. Dafür ist kein `-AllowUnfitAttempt` erforderlich.
+
 ## Wie die Codeprüfung funktioniert
 
 1. Vorbereitung und unabhängiger Vorbereitungsreview legen den überprüfbaren Auftrag fest.

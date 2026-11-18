@@ -35,6 +35,8 @@ $owner=[pscustomobject]@{SchemaVersion=1;OwnerId=$pool.OwnerId;Entries=@(
 Write-SmpJson -Path (Join-Path $root 'runtime/model-ownership.json') -Value $owner -InstallRoot $root
 $script:loaded=@([pscustomobject]@{type='llm';identifier='coder-id';path='coder.gguf';deviceIdentifier=$null;status='idle';queued=0;contextLength=32768;parallel=1})
 $script:loads=0;$script:freeRam=8GB;$script:badFile=$false;$script:badVector=$false;$script:base64=$false;$script:duplicateIndex=$false;$script:rejectNoFit=$false
+$script:estimateText="Estimated Total Memory: 1 GiB`nThis model may be loaded based on your resource guardrails settings."
+$script:afterLoadRam=$null;$script:afterInferenceRam=$null;$script:unloads=0;$script:inferenceCalls=0
 function Ensure-SmpServer {param($Pool,$LogDirectory)}
 function Resolve-ShadowModelDirectory {return $root}
 function Test-ShadowModelFile {param($Path,$Size,$Sha256) return -not $script:badFile}
@@ -54,7 +56,7 @@ function Invoke-LrNative {
     if($Arguments[0] -cne 'load' -or $Arguments -notcontains '--exact' -or
        $Arguments -notcontains '--local' -or $Arguments -notcontains 'off'){throw 'Unsafe embedding load'}
     if($Arguments -contains '--estimate-only'){
-        return [pscustomobject]@{Stdout="Estimated Total Memory: 1 GiB`nThis model may be loaded based on your resource guardrails settings.";Stderr='';LogPath='mock';ExitCode=0}
+        return [pscustomobject]@{Stdout=$script:estimateText;Stderr='';LogPath='mock';ExitCode=0}
     }
     if($script:rejectNoFit){
         if(-not $AllowFailure){throw 'Expected explicit resource-fit load attempt'}
@@ -63,11 +65,20 @@ function Invoke-LrNative {
     $script:loads++
     $id=$Arguments[[array]::IndexOf($Arguments,'--identifier')+1]
     $script:loaded+=@([pscustomobject]@{type='embedding';identifier=$id;path=$Arguments[1];deviceIdentifier=$null;status='idle';queued=0;contextLength=2048})
+    if($null -ne $script:afterLoadRam){$script:freeRam=$script:afterLoadRam}
     return [pscustomobject]@{Stdout='';Stderr='';LogPath='mock';ExitCode=0}
 }
 function Invoke-LrApi {
     param($Uri,$Headers,$Method,$Body,$TimeoutSeconds)
+    if($Uri -ceq 'http://127.0.0.1:1234/api/v1/models/unload'){
+        if($Body.instance_id -cne ('shadow-'+$pool.OwnerId+'-embedding')){throw 'Attempted to unload a coding or foreign model'}
+        $script:loaded=@($script:loaded|Where-Object {$_.identifier -cne $Body.instance_id})
+        $script:unloads++
+        return [pscustomobject]@{instance_id=$Body.instance_id}
+    }
     if($Uri -cne 'http://127.0.0.1:1235/v1/embeddings' -or $Body.encoding_format -cne 'base64' -or $Body.dimensions -ne 768){throw 'Unexpected embedding request'}
+    $script:inferenceCalls++
+    if($null -ne $script:afterInferenceRam){$script:freeRam=$script:afterInferenceRam}
     if($script:authStatus){return & $script:realApi -Uri $Uri -Headers $Headers -Method $Method -Body $Body -TimeoutSeconds $TimeoutSeconds}
     $vector=@(for($i=0;$i -lt 768;$i++){if($script:badVector){0.0}else{0.25}})
     if($script:base64){
@@ -78,6 +89,51 @@ function Invoke-LrApi {
     return [pscustomobject]@{data=@([pscustomobject]@{index=0;embedding=$vector},[pscustomobject]@{index=$(if($script:duplicateIndex){0}else{1});embedding=$vector})}
 }
 try{
+    $normalEstimate=$script:estimateText
+    $lowEstimate="Estimated Total Memory: 112.29 MiB`nConfidence: LOW"
+    $check=Get-SmpEmbeddingMemoryCheck -EstimateText $lowEstimate -FreeRamBytes ([long](4.4GB)) -ModelSizeBytes $definition.Files[0].Size
+    Assert-Embedding ($check.ConservativeTrial -and $check.LowConfidence -and $check.Guardrails -ceq 'NotReported' -and $check.BudgetBytes -eq 1GB -and $check.ReserveBytes -eq 3GB -and $check.BlockingReasons.Count -eq 0) 'Reported LOW estimate fits a conservative 1 GiB budget plus the unchanged reserve'
+    $large=Get-SmpEmbeddingMemoryCheck -EstimateText 'Estimated Total Memory: 400 MiB Confidence: LOW' -FreeRamBytes 4GB -ModelSizeBytes $definition.Files[0].Size
+    Assert-Embedding ($large.BudgetBytes -eq 1600MB -and $large.BlockingReasons -contains 'insufficient_ram_with_reserve') 'Conservative budget scales with the estimate instead of capping memory at 1 GiB'
+    $colored=Get-SmpEmbeddingMemoryCheck -EstimateText ("Estimated Total Memory: 112.29 MiB`nConfidence: `e[33mLOW`e[0m`nThis model may be loaded based on your resource`nguardrails settings.") -FreeRamBytes 5GB -ModelSizeBytes $definition.Files[0].Size
+    Assert-Embedding ($colored.LowConfidence -and $colored.Guardrails -ceq 'Allowed') 'Color escapes and wrapped guardrail text are normalized'
+    Throws-Embedding {Get-SmpEmbeddingMemoryCheck -EstimateText 'unknown output' -FreeRamBytes 8GB -ModelSizeBytes $definition.Files[0].Size} 'Cannot interpret' 'An unparseable estimate never authorizes a trial'
+    $script:estimateText=$lowEstimate;$script:freeRam=[long](4.4GB)
+    $trial=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
+    Assert-Embedding ($trial.Status -ceq 'Ready' -and $trial.SmokeTest -ceq 'Passed' -and -not $trial.ReserveOverride -and $script:loads -eq 1 -and $script:inferenceCalls -eq 1 -and $trial.MemoryCheck.AvailableAfterInferenceBytes -ge 3GB) 'LOW confidence reaches ready only after actual load and inference without a reserve override'
+    $diagnostic=Get-Content -LiteralPath (Join-Path $root 'runtime/embedding-status.json') -Raw|ConvertFrom-Json
+    Assert-Embedding ($diagnostic.result.MemoryCheck.EstimatedBytes -gt 112MB -and $diagnostic.result.MemoryCheck.BudgetBytes -eq 1GB) 'Diagnostic report contains numeric memory evidence without raw CLI output'
+    $rollbackOwner=Get-SmpOwner $root
+    $script:loaded[1].status='processing'
+    Throws-Embedding {Remove-SmpNewEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback never unloads an active embedding instance'
+    $script:loaded[1].status='idle';$script:loaded[1].path='foreign.gguf'
+    Throws-Embedding {Remove-SmpNewEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback rejects a substituted model path'
+    $script:loaded[1].path=$definition.ExpectedPath
+    $script:loaded=@($script:loaded[0],$script:loaded[1],$script:loaded[1])
+    Throws-Embedding {Remove-SmpNewEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback rejects duplicate identifiers'
+    $script:loaded=@($script:loaded[0]);$script:loads=0;$script:inferenceCalls=0
+    foreach($stage in @('load','inference','failed-inference')){
+        $script:freeRam=[long](4.4GB);$script:afterLoadRam=if($stage -ceq 'load'){2GB}else{$null}
+        $script:afterInferenceRam=if($stage -cne 'load'){2GB}else{$null};$script:badVector=$stage -ceq 'failed-inference'
+        $beforeUnloads=$script:unloads;$beforeInference=$script:inferenceCalls
+        $deferredTrial=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
+        Assert-Embedding ($deferredTrial.Status -ceq 'Deferred' -and $script:unloads -eq $beforeUnloads+1 -and $script:loaded.Count -eq 1 -and $script:loaded[0].identifier -ceq 'coder-id') "Reserve violation after $stage rolls back only the newly loaded embedding"
+        $expectedSmoke=if($stage -ceq 'load'){'NotRun'}elseif($script:badVector){'Failed'}else{'Passed'}
+        Assert-Embedding ($deferredTrial.SmokeTest -ceq $expectedSmoke -and ($stage -cne 'load' -or $script:inferenceCalls -eq $beforeInference)) 'Deferred status accurately records whether inference ran'
+    }
+    $script:afterLoadRam=$null;$script:afterInferenceRam=$null;$script:badVector=$false;$script:freeRam=3.9GB
+    $beforeLoads=$script:loads
+    $shortage=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
+    Assert-Embedding ($shortage.Status -ceq 'Deferred' -and $shortage.MemoryCheck.BlockingReasons -contains 'insufficient_ram_with_reserve' -and $script:loads -eq $beforeLoads) 'LOW estimate cannot bypass the conservative budget or 3 GiB reserve'
+    $script:freeRam=8GB;$script:estimateText=$lowEstimate+"`nThis model will fail to load based on your resource guardrails settings."
+    $denied=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
+    Assert-Embedding ($denied.Status -ceq 'Deferred' -and $denied.MemoryCheck.BlockingReasons -contains 'lm_studio_guardrails_denied' -and $script:loads -eq $beforeLoads) 'Explicit LM Studio guardrail denial blocks loading despite ample RAM'
+    Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition -AllowUnfitAttempt} 'lm_studio_guardrails_denied' 'A reserve override cannot bypass explicit embedding guardrail denial'
+    $script:estimateText=$lowEstimate;$script:rejectNoFit=$true
+    $rejected=Initialize-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition
+    Assert-Embedding ($rejected.Status -ceq 'Deferred' -and $rejected.SmokeTest -ceq 'NotRun' -and $rejected.Message -match 'exit code 43' -and $script:loads -eq $beforeLoads) 'Actual LM Studio rejection remains deferred without a false inference success'
+    $script:estimateText=$normalEstimate;$script:rejectNoFit=$false;$script:loads=0;$script:unloads=0;$script:inferenceCalls=0
+    Write-SmpJson -Path (Join-Path $root 'runtime/model-ownership.json') -Value $owner -InstallRoot $root
     $script:badFile=$true
     Throws-Embedding {Start-ShadowEmbeddingModel -InstallRoot $root -Pool $pool -Definition $definition} 'Embedding file' 'A changed embedding file is not loaded'
     Assert-Embedding ($script:loads -eq 0) 'Invalid file caused no model load'

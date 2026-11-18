@@ -6,6 +6,23 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
+## Konservatives Laden des CPU-Embeddings — Paket 2026.11.18.26
+
+Der Zielbericht zeigte ein durch LOW-Schätzsicherheit blockiertes Laden ohne
+gemeldete Schutzregelfreigabe. Die bisherige Sammelmeldung konnte fälschlich einen
+gemessenen RAM-Mangel nahelegen. Die Regression prüft jetzt diese Eingabe mit
+konservativem Budget und unveränderter Reserve sowie anschließendem Laden und
+Inferenz. Diese Regel gilt ausschließlich für das hashgeprüfte CPU-Embedding-Modell.
+
+Die Embedding-Suite bestand 44 Prüfungen: unlesbare Schätzung, farbige/umgebrochene
+CLI-Ausgabe, fehlende Reserve, ausdrückliche Schutzregelablehnung, abgelehnter
+Ladeversuch, RAM-Druck nach Laden/Inferenz und begrenztes Zurückrollen bei aktiven,
+ausgetauschten oder doppelten Instanzen. Bestanden haben außerdem Modellpool (44),
+Teiloffloading (8), Router-Lebenszyklus (18) und Auswahlintegration (3).
+LM Studio, Modellinferenz und RAM-Messungen sind in diesen Tests simuliert; die
+Indizierung auf dem Ziel-PC bleibt abzunehmen. Der Nutzer hat funktionierenden
+Erweiterungs-Sync bestätigt; main und veröffentlichtes Release bleiben unverändert.
+
 ## Embedding-Kompatibilität und nur Erweiterungen synchronisieren — Paket 2026.11.18.25
 
 Dieser Kandidat ist vom stabilen Release getrennt. Die neuen Tests für Embedding-
