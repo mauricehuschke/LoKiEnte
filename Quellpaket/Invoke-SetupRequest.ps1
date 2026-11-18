@@ -1,0 +1,16 @@
+#requires -Version 7.4
+[CmdletBinding()]
+param([Parameter(Mandatory)][string]$RequestPath)
+Set-StrictMode -Version Latest
+$ErrorActionPreference='Stop'
+$arguments=Get-Content -LiteralPath $RequestPath -Raw|ConvertFrom-Json -AsHashtable
+$allowed=@('InstallRoot','ModelMode','IncludeFastModel','AllowPartialGpuOffload','AllowUnfitAttempt','BundleVersion','PayloadSha256','RouterPort','PreferredModel','ModelKey','ApiTokenEnvironmentVariable','ContextLength','Port','ProjectPath','SkipModelDownload','UpdateManaged','NoShortcut')
+foreach($key in $arguments.Keys){if($key -notin $allowed){throw "Unbekannter Installationsparameter: $key"}}
+$lockPath=Join-Path (Split-Path -Parent $PSScriptRoot) 'setup-active.lock'
+try{$lock=[IO.File]::Open($lockPath,[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)}
+catch [IO.IOException]{throw 'Eine andere Setup-Instanz laeuft bereits. Keine parallele Provisionierung gestartet.'}
+try{
+    & (Join-Path $PSScriptRoot 'Setup.ps1') @arguments
+    # A nested .ps1 exit sets LASTEXITCODE; -File otherwise returns 0.
+    exit $LASTEXITCODE
+}finally{$lock.Dispose()}

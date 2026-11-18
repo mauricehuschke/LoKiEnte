@@ -1,0 +1,252 @@
+// Local-only, single-slot OpenAI-compatible router. Node >=20, no dependencies.
+// Each completed HTTP generation releases the slot so native subagents may use
+// another model. Sessions and history remain the responsibility of Kilo.
+import http from 'node:http';
+import { readFile, writeFile, mkdir, unlink } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { once } from 'node:events';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const ROUTER_VERSION = '2026.11.17.15';
+const BODY_LIMIT = 4 * 1024 * 1024;
+const RESPONSE_LIMIT = 16 * 1024 * 1024;
+const ALLOWED_FIELDS = new Set(['model','messages','stream','stream_options','max_tokens',
+  'max_completion_tokens','temperature','top_p','top_k','min_p','repeat_penalty',
+  'presence_penalty','frequency_penalty','seed','tools','tool_choice','parallel_tool_calls',
+  'response_format','stop','reasoning_effort','logit_bias','logprobs','top_logprobs','user','n']);
+
+class RouterError extends Error {
+  constructor(status, code, message, fatal=false) { super(message); Object.assign(this,{status,code,fatal}); }
+}
+function equalSecret(left, right) {
+  const a=Buffer.from(left||''), b=Buffer.from(right||'');
+  return a.length===b.length && timingSafeEqual(a,b);
+}
+function json(res,status,body) {
+  if(res.destroyed||res.writableEnded)return;
+  res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});
+  res.end(JSON.stringify(body));
+}
+function errorResponse(res,error) {
+  if(res.destroyed||res.writableEnded)return;
+  if(res.headersSent){res.destroy();return;}
+  json(res,error.status||502,{error:{type:'local_router_error',code:error.code||'local_request_failed',
+    message:error instanceof RouterError?error.message:'The local model request failed. Inspect local runtime status.'}});
+}
+function loopbackUrl(value) {
+  const u=new URL(value);
+  if(u.protocol!=='http:' || !['127.0.0.1','localhost','[::1]'].includes(u.hostname) || u.username || u.password || u.search || u.hash)
+    throw new Error('Only an HTTP loopback backend without credentials is allowed.');
+  if(u.pathname.replace(/\/$/,'')!=='/v1')throw new Error('The backend must use its /v1 endpoint.');
+  return u;
+}
+export function validatePool(config) {
+  if(config.SchemaVersion!==2||config.Status!=='Ready'||!Array.isArray(config.Profiles)||config.Profiles.length<2)
+    throw new Error('A configured multi-model pool is required.');
+  const backend=loopbackUrl(config.BackendApiBaseUrl), aliases=new Set(), ids=new Set(), instances=new Set();
+  for(const p of config.Profiles){
+    if(!p || !/^[a-z][a-z0-9-]{0,40}$/.test(p.Alias)||!/^shadow-[a-z0-9-]+$/.test(p.RouteId)||!p.InstanceId || aliases.has(p.Alias)||ids.has(p.RouteId)||instances.has(p.InstanceId))
+      throw new Error('Model aliases and owned instance IDs must be unique and explicit.');
+    if(!Number.isInteger(p.ContextLength)||p.ContextLength<8192||!Number.isInteger(p.OutputLimit)||p.OutputLimit<1||p.OutputLimit>=p.ContextLength)
+      throw new Error('Verified model context/output limits are missing.');
+    const checks=['Chat','ToolCall','ToolResultRoundTrip'];
+    const verified=p.SmokeTests&&checks.every(k=>p.SmokeTests[k]==='Passed')&&
+      (p.VerificationState===undefined||p.VerificationState==='Verified');
+    const deferred=p.VerificationState==='Deferred'&&p.SmokeTests&&
+      ['NotRun','NotVerified'].some(status=>checks.every(k=>p.SmokeTests[k]===status));
+    if(!verified&&!deferred)throw new Error('Every model must have verified or explicitly deferred smoke tests.');
+    aliases.add(p.Alias);ids.add(p.RouteId);instances.add(p.InstanceId);
+  }
+  return {backend,profiles:new Map(config.Profiles.map(p=>[p.RouteId,p]))};
+}
+async function readBody(req) {
+  if(Number(req.headers['content-length']||0)>BODY_LIMIT)throw new RouterError(413,'body_too_large','Request exceeds the local router body limit.');
+  let length=0;const chunks=[];
+  for await(const chunk of req){length+=chunk.length;if(length>BODY_LIMIT)throw new RouterError(413,'body_too_large','Request exceeds the local router body limit.');chunks.push(chunk);}
+  try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+  catch{throw new RouterError(400,'invalid_json','A JSON request object is required.');}
+}
+
+export function createModelRouter({config,configDigest,switchModel,token='',controlToken='',requestTimeoutMs=1800000,maxQueued=8,log=()=>{}}) {
+  const {backend,profiles}=validatePool(config);
+  if(typeof switchModel!=='function')throw new Error('A model switch controller is required.');
+  let busy=false,activeAlias=null,shuttingDown=false,fatal=null;
+  const queue=[];
+  const identity=randomUUID();
+  const server=http.createServer((req,res)=>{handle(req,res).catch(e=>errorResponse(res,e));});
+  server.headersTimeout=30000;server.requestTimeout=120000;
+  async function drain(){
+    if(busy)return;busy=true;
+    try{while(queue.length){const job=queue.shift();await job();}}
+    finally{busy=false;}
+  }
+  function enqueue(job){queue.push(job);void drain();}
+  async function handle(req,res){
+    // No CORS grants: browser pages cannot silently submit authenticated JSON.
+    if(req.headers.origin)throw new RouterError(403,'browser_origin_denied','Browser-origin requests are not supported by this endpoint.');
+    if(token&&!equalSecret(req.headers.authorization,`Bearer ${token}`))throw new RouterError(401,'authentication_required','The configured local API token is required.');
+    if(req.method==='GET'&&req.url==='/health'){
+      json(res,fatal?503:200,{service:'shadow-local-model-router',version:ROUTER_VERSION,identity,pid:process.pid,
+        configDigest,ready:!fatal&&!shuttingDown,activeAlias,busy,queued:queue.length,
+        models:[...profiles.values()].map(p=>({id:p.RouteId,context:p.ContextLength,output:p.OutputLimit,verification:p.VerificationState||'Verified'}))});return;
+    }
+    if(req.method==='POST'&&req.url==='/admin/shutdown'){
+      if(!controlToken||!equalSecret(req.headers['x-shadow-control'],controlToken))throw new RouterError(403,'control_denied','A valid local control token is required.');
+      if(busy||queue.length)throw new RouterError(409,'router_busy','The router has active or queued work. Finish it before restarting.');
+      shuttingDown=true;json(res,200,{stopping:true});server.close();server.closeIdleConnections();return;
+    }
+    if(req.method==='GET'&&req.url==='/v1/models'){
+      json(res,200,{object:'list',data:[...profiles.values()].map(p=>({id:p.RouteId,object:'model',created:0,owned_by:'local-shadow-pool'}))});return;
+    }
+    if(req.method!=='POST'||req.url!=='/v1/chat/completions')throw new RouterError(404,'endpoint_not_supported','Only local models and chat completions are exposed.');
+    if(shuttingDown||fatal)throw new RouterError(503,'router_unavailable','The local router needs a deliberate restart after its recorded controller failure.');
+    const body=await readBody(req);
+    if(!body||typeof body!=='object'||Array.isArray(body)||!Array.isArray(body.messages)||!body.messages.length)
+      throw new RouterError(400,'invalid_messages','A nonempty messages array is required.');
+    const profile=profiles.get(body.model);
+    if(!profile)throw new RouterError(400,'model_not_provisioned','The requested model is not in this verified local pool.');
+    for(const key of Object.keys(body)){if(!ALLOWED_FIELDS.has(key))throw new RouterError(400,'unsupported_field',`Unsupported chat field: ${key}`);}
+    if(body.n!==undefined&&body.n!==1)throw new RouterError(400,'multiple_predictions_denied','Only one prediction per request is supported.');
+    if(body.stream!==undefined&&typeof body.stream!=='boolean')throw new RouterError(400,'invalid_stream','stream must be a boolean.');
+    for(const key of ['max_tokens','max_completion_tokens']){
+      if(body[key]!==undefined&&(!Number.isInteger(body[key])||body[key]<1||body[key]>profile.OutputLimit))
+        throw new RouterError(400,'output_limit_exceeded','Requested output exceeds the verified model output budget.');
+    }
+    if(body.max_tokens===undefined&&body.max_completion_tokens===undefined)body.max_tokens=profile.OutputLimit;
+    if(queue.length>=maxQueued)throw new RouterError(429,'queue_full','The single-GPU request queue is full. Retry after current work completes.');
+    const abort=new AbortController();
+    // A deadline also has to answer a still-open client while it is queued or
+    // waiting for the controller. Merely aborting fetch leaves those clients
+    // hanging, because no fetch exists yet and the later job is skipped.
+    const deadline=setTimeout(()=>{
+      const error=new RouterError(504,'request_timeout','The local request deadline was exceeded.');
+      abort.abort(error);errorResponse(res,error);
+    },requestTimeoutMs);
+    const disconnect=()=>{if(!res.writableFinished)abort.abort(new Error('Client disconnected.'));};
+    res.once('close',disconnect);req.once('aborted',disconnect);
+    enqueue(async()=>{
+      try{
+        if(abort.signal.aborted)return;
+        if(fatal)throw new RouterError(503,'controller_failed','The local model controller requires attention.');
+        // Do not abort an in-progress model load when the client disconnects.
+        // Wait for its settled result; otherwise a second request could race it.
+        const state=await switchModel(profile);
+        if(state.Status!=='Ready'||state.Alias!==profile.Alias||state.ModelId!==profile.InstanceId||state.ContextLength!==profile.ContextLength||state.Parallel!==1)
+          throw new RouterError(503,'switch_verification_failed','The loaded model does not match the verified pool profile.');
+        if(profile.VerificationState==='Deferred'&&state.VerificationState!=='Verified')
+          throw new RouterError(503,'model_unverified','Das lokale Modell wurde noch nicht erfolgreich geprueft.');
+        if(state.VerificationState==='Verified'){
+          profile.VerificationState='Verified';
+          profile.SmokeTests={Chat:'Passed',ToolCall:'Passed',ToolResultRoundTrip:'Passed'};
+        }
+        activeAlias=profile.Alias;
+        if(abort.signal.aborted)return;
+        const headers={'content-type':'application/json'};
+        if(token)headers.authorization=`Bearer ${token}`;
+        const upstream=await fetch(new URL('chat/completions',backend.href.replace(/\/?$/,'/')),
+          {method:'POST',headers,body:JSON.stringify({...body,model:state.ModelId}),signal:abort.signal,redirect:'error'});
+        if(!upstream.ok){await upstream.body?.cancel();throw new RouterError(upstream.status>=400&&upstream.status<600?upstream.status:502,'upstream_rejected','LM Studio rejected the request. Check its local status; no cloud fallback was attempted.');}
+        if(body.stream){
+          if(!upstream.headers.get('content-type')?.includes('text/event-stream')){await upstream.body?.cancel();throw new RouterError(502,'invalid_stream_type','LM Studio did not return an event stream.');}
+          res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache','x-accel-buffering':'no'});
+          let tail='',done=false,eventError=false,bytes=0;
+          const decoder=new TextDecoder();
+          for await(const chunk of upstream.body){
+            bytes+=chunk.length;tail+=decoder.decode(chunk,{stream:true});
+            let newline;
+            while((newline=tail.indexOf('\n'))>=0){
+              const line=tail.slice(0,newline).trimEnd();tail=tail.slice(newline+1);
+              if(line.startsWith('data:')){
+                const data=line.slice(5).trim();
+                if(data==='[DONE]')done=true;
+                else if(data){try{if(JSON.parse(data).error)eventError=true;}catch{eventError=true;}}
+              }
+            }
+            if(tail.length>1024*1024)throw new RouterError(502,'invalid_stream_frame','LM Studio returned an oversized event frame.');
+            // The close handler aborts this signal. A cancellable single wait
+            // removes its listeners after every drain instead of accumulating
+            // losing `close` listeners over a long streamed response.
+            if(!res.write(chunk))await once(res,'drain',{signal:abort.signal});
+          }
+          if(!bytes||!done||eventError)throw new RouterError(502,'incomplete_stream','LM Studio did not complete a valid prediction stream.');
+          res.end();
+        }else{
+          let size=0;const chunks=[];
+          for await(const chunk of upstream.body){size+=chunk.length;if(size>RESPONSE_LIMIT){abort.abort();throw new RouterError(502,'response_too_large','Local response exceeded its transfer limit.');}chunks.push(chunk);}
+          let result;try{result=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new RouterError(502,'invalid_upstream_json','LM Studio returned invalid JSON.');}
+          if(result.error||!Array.isArray(result.choices)||!result.choices.length)throw new RouterError(502,'invalid_completion','LM Studio did not return a valid completion.');
+          json(res,200,result);
+        }
+      }catch(e){
+        if(e.fatal){fatal=e.code||'controller_failed';log({event:'controller_failed',code:fatal});}
+        if(e.code==='model_memory_unavailable'||e.code==='model_unverified'){
+          profile.VerificationState='Deferred';
+          const status=e.code==='model_unverified'?'NotVerified':'NotRun';
+          profile.SmokeTests={Chat:status,ToolCall:status,ToolResultRoundTrip:status};
+        }
+        // Record metadata only, never prompts, completions, headers or tokens.
+        log({event:'request_failed',alias:profile.Alias,code:e.code||'request_aborted_or_failed'});
+        errorResponse(res,e);
+      }finally{clearTimeout(deadline);res.removeListener('close',disconnect);req.removeListener('aborted',disconnect);}
+    });
+  }
+  return server;
+}
+
+export function makePowerShellSwitcher({installRoot,pwsh,switchScript,timeoutMs=900000}){
+  return async profile=>{
+    const temporary=path.join(installRoot,'runtime','router-work');await mkdir(temporary,{recursive:true});
+    const resultPath=path.join(temporary,`${randomUUID()}.json`);
+    try{
+      const exitCode=await new Promise((resolve,reject)=>{
+        const child=spawn(pwsh,['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',switchScript,'-InstallRoot',installRoot,'-Alias',profile.Alias,'-ResultPath',resultPath],
+          {shell:false,windowsHide:true,stdio:['ignore','ignore','ignore'],env:process.env});
+        // On timeout stop accepting new work. Do not kill an uncertain model load
+        // and then start a competing one; the controller retains its own OS lock.
+        const timer=setTimeout(()=>reject(new RouterError(503,'controller_timeout','Model loading exceeded its deadline. Finish or inspect the controller before restarting.',true)),timeoutMs);
+        child.once('error',()=>{clearTimeout(timer);reject(new RouterError(503,'controller_start_failed','The local model controller could not be started.'));});
+        child.once('close',code=>{clearTimeout(timer);resolve(code);});
+      });
+      let state;try{state=JSON.parse(await readFile(resultPath,'utf8'));}catch{
+        if(exitCode!==0)throw new RouterError(503,'controller_rejected','The model switch was refused. Inspect local model ownership, memory and busy state.');
+        throw new RouterError(503,'controller_result_missing','The controller did not provide a valid verification result.');
+      }
+      if(exitCode!==0){
+        if(state?.Status==='Error'&&state.Code==='resource_fit')
+          throw new RouterError(503,'model_memory_unavailable','Das lokale Modell ist derzeit nicht ladbar. Speicher freigeben und erneut versuchen; die Modelldatei bleibt erhalten.');
+        if(state?.Status==='Error'&&state.Code==='model_unverified')
+          throw new RouterError(503,'model_unverified','Das lokale Modell hat den Chat- oder Werkzeugtest nicht bestanden. Lokale Protokolle pruefen.');
+        throw new RouterError(503,'controller_rejected','The model switch was refused. Inspect local model ownership, memory and busy state.');
+      }
+      return state;
+    }finally{await unlink(resultPath).catch(()=>{});}
+  };
+}
+
+async function main(){
+  const args=new Map();
+  for(let i=2;i<process.argv.length;i+=2){if(!process.argv[i]?.startsWith('--')||process.argv[i+1]===undefined)throw new Error('Expected named arguments.');args.set(process.argv[i],process.argv[i+1]);}
+  const file=path.resolve(args.get('--config')||'');
+  const raw=await readFile(file);const config=JSON.parse(raw.toString('utf8').replace(/^\uFEFF/,''));
+  const port=Number(args.get('--port'));if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('Invalid router port.');
+  const advertised=loopbackUrl(config.RouterApiBaseUrl);
+  if(Number(advertised.port||80)!==port||advertised.port===loopbackUrl(config.BackendApiBaseUrl).port)
+    throw new Error('Router port must match its verified pool and differ from the backend.');
+  const installRoot=path.dirname(path.dirname(file));
+  const logPath=path.join(installRoot,'runtime','router-events.jsonl');
+  const log=event=>void writeFile(logPath,JSON.stringify({utc:new Date().toISOString(),...event})+'\n',{flag:'a'}).catch(()=>{});
+  const token=config.ApiTokenEnvironmentVariable?process.env[config.ApiTokenEnvironmentVariable]||'':'';
+  const configDigest=args.get('--routing-digest');
+  if(!/^[a-f0-9]{64}$/.test(configDigest||''))throw new Error('Missing routing contract digest.');
+  const server=createModelRouter({config,configDigest,token,
+    controlToken:process.env.SHADOW_LOCAL_ROUTER_CONTROL||'',log,
+    switchModel:makePowerShellSwitcher({installRoot,pwsh:args.get('--pwsh'),switchScript:args.get('--switch-script')})});
+  server.listen(port,'127.0.0.1');await once(server,'listening');
+  log({event:'started',pid:process.pid,version:ROUTER_VERSION,port});
+  server.on('close',()=>log({event:'stopped'}));
+}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+  main().catch(()=>{process.stderr.write('Local model router could not start. Check its configuration and port.\n');process.exitCode=1;});
+}
