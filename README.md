@@ -18,13 +18,29 @@ a bounded change, then review the code and results. Models run locally.
 Installation and downloads require internet access; project tools may make
 network requests independently.
 
-Package version: **2026.11.18.22**. English is the default for documentation,
+Package version: **2026.11.18.23**. English is the default for documentation,
 provisioning, menus, diagnostics and generated agent instructions. German
 documents are available alongside the English files as `*.de.md`. There is no
 runtime language switch. Output from third-party programs follows their own locale.
 Updates also deploy paired guides to registered projects. Existing personal guides
 and task text remain; an untouched bundled German Welcome README is backed up and
 replaced with its English counterpart. Customized Welcome guides are preserved.
+
+## License
+
+[Apache License 2.0 with Commons Clause 1.0](LICENSE.txt) permits cloning,
+forking, modification, free redistribution and commercial internal use under
+its terms. The Commons Clause restricts selling products or services whose
+value derives entirely or substantially from LoKiEnte's functionality; this
+can also cover hosting and consulting/support. The two texts apply together.
+
+**Projects and work products developed with LoKiEnte may be used commercially
+and sold.** Using LoKiEnte does not put those independent results under its
+license. LoKiEnte code actually incorporated into a product retains its license
+conditions; third-party materials retain their respective licenses.
+
+This combined license is **source available, not OSI open source**. Read the
+[full terms](LICENSE.txt) or the [German explanatory notes](LICENSE.de.txt).
 
 ## Requirements
 
@@ -39,53 +55,105 @@ Local reports, backups and runtime data do not belong in the repository.
 - Code tasks require a Git repository with at least one commit, installed project
   dependencies and known, locally executable test commands.
 
-## Install or update
+## Quick install: latest release
 
-1. Copy the current `Provision-LoKiEnte.ps1` to the target machine. This single
-   file embeds the source package; no separate ZIP is needed.
-2. Open Windows PowerShell in that directory. For a new installation:
+Download the [latest release](https://github.com/mauricehuschke/LoKiEnte/releases/latest)
+or its [standalone installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1). The installer embeds the complete source
+package; the GitHub source ZIP and a repository clone are not required.
+Release **v0.1** contains installer build **2026.11.18.23**; the release version and
+the internal build version have different purposes.
 
-   ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "$env:LOCALAPPDATA\LoKiEnte"
-   ```
+These unauthenticated commands work once the repository is public. While it is
+private, download the two assets from the release page while signed in to an
+authorized GitHub account; unauthenticated requests may return 404.
 
-3. Check the destination and confirm provisioning with `y`. Select and confirm
-   the offered model profiles.
-4. If LM Studio requires first-run setup, open the app yourself, complete it,
-   and run the same provisioning command again.
-5. Read the final report. `PROVISIONED_WITH_WARNINGS` means that individual
-   features or models have not been fully verified as ready.
+### PowerShell (recommended, with checksum verification)
 
-**Use the same installation directory for updates.** First close active AI tasks
-and LoKiEnte windows. The provisioner also updates reachable registered projects.
-Your tasks, project files and test commands are preserved. Managed tasks and Kilo
-tools receive automatic task preparation for existing projects as well.
-
-Approved tool versions are controlled by `dependency-versions.json` in the
-installation directory. The package specifies an approved Kilo extension version.
-It does not independently update your application libraries. See the
-[technical README](Quellpaket/README.md).
-
-## Update an existing installation
-
-Stop active LoKiEnte tasks and close its VS Code windows. Copy the current PS1 to
-the target machine and open PowerShell beside it. For an existing installation at D:\LoKi:
+Open Windows PowerShell in a writable download directory and paste the entire
+block. It resolves the latest published release once, downloads both files from
+that same version, overwrites any files with the same names in the current
+directory, verifies SHA-256, and starts provisioning. Change `InstallRoot` if needed.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "D:\LoKi"
+& {
+    $ErrorActionPreference = 'Stop'
+    $installRoot = "$env:LOCALAPPDATA\LoKiEnte"
+    $release = Invoke-RestMethod 'https://api.github.com/repos/mauricehuschke/LoKiEnte/releases/latest'
+    $base = "https://github.com/mauricehuschke/LoKiEnte/releases/download/$($release.tag_name)"
+    Invoke-WebRequest "$base/Provision-LoKiEnte.ps1" -OutFile .\Provision-LoKiEnte.ps1 -UseBasicParsing
+    Invoke-WebRequest "$base/Provision-LoKiEnte.ps1.sha256" -OutFile .\Provision-LoKiEnte.ps1.sha256 -UseBasicParsing
+    $expected = ((Get-Content .\Provision-LoKiEnte.ps1.sha256 -Raw).Trim() -split '\s+')[0]
+    if ($expected -notmatch '^[a-fA-F0-9]{64}$' -or (Get-FileHash .\Provision-LoKiEnte.ps1 -Algorithm SHA256).Hash -ne $expected) {
+        throw 'Installer checksum verification failed. Do not run this download.'
+    }
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot $installRoot
+}
 ```
 
-For any other installation, specify that exact previous directory. Confirm with
-`y` and review model selection. Saved model options are retained unless explicitly
-overridden. An explicitly different ModelMode does not inherit the old model
-options. UpdateManaged is not required for an update.
+### Command Prompt (CMD, using Windows curl)
 
-Optionally, `Provision-Run.ps1` runs this command with the legacy default destination
-`D:\LoKi`. It finds the PS1 beside itself regardless of the working directory and
-does not force new model options. Use `-InstallRoot` for another destination.
-`Project-Run.ps1` opens project selection for the same destination;
-`-ProjectPath` is optional. No separate ZIP is needed: the current PS1 and its
-embedded payload are authoritative.
+```bat
+curl.exe --fail --location --output Provision-LoKiEnte.ps1 "https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1" && powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "%LOCALAPPDATA%\LoKiEnte"
+```
+
+### GNU wget (if installed, run from CMD)
+
+```bat
+wget.exe -O Provision-LoKiEnte.ps1 "https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1" && powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "%LOCALAPPDATA%\LoKiEnte"
+```
+
+Use `wget.exe` for GNU wget: `wget` in Windows PowerShell 5.1 is an alias for
+`Invoke-WebRequest`, with different options. The CMD alternatives start only after
+a successful download; use the recommended PowerShell block for checksum verification.
+The checksum detects a damaged or mismatched download; it is not a digital signature.
+
+Confirm the displayed installation directory with `y`, review the proposed model
+profiles, and complete any requested LM Studio first-run setup. Run the same
+command again if setup asks you to finish a first launch. Read the final report,
+then launch the **LoKiEnte** desktop shortcut and select the Welcome test project.
+`PROVISIONED_WITH_WARNINGS` means some features still need verification.
+
+## Update: replace the installer and provision again
+
+Stop active LoKiEnte tasks and close its VS Code windows. Re-run the PowerShell
+block above from the directory containing your downloaded installer: it fetches
+the latest release and **overwrites `Provision-LoKiEnte.ps1` and its checksum**.
+Set `$installRoot` to the **exact existing installation directory** before running
+it. For example, replace its assignment with:
+
+```powershell
+$installRoot = 'D:\LoKi'
+```
+
+For the default installation, keep `$env:LOCALAPPDATA\LoKiEnte`. The download
+directory and installation directory do not have to be the same. Downloading alone
+does not update an installation; running provisioning again does.
+
+For example, this CMD command replaces the downloaded installer and updates an
+existing installation at `D:\LoKi` (use the PowerShell block for checksum verification):
+
+```bat
+curl.exe --fail --location --output Provision-LoKiEnte.ps1 "https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1" && powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "D:\LoKi"
+```
+
+No uninstall or `-UpdateManaged` switch is required. Provisioning updates managed
+configuration, approved tool versions and reachable registered projects. Personal
+project files, custom test commands and saved model options are preserved unless
+explicitly overridden. Changing `ModelMode` explicitly resets inherited model options.
+It does not independently upgrade the libraries of your application projects.
+See [all parameters](#all-provisioning-parameters-and-options) and the
+[technical README](Quellpaket/README.md) for details.
+
+`releases/latest/download/...` follows the latest published release, not the newest
+commit on `main`. For a fixed version, replace `latest/download` with `download/v0.1`.
+GitHub Releases is the distribution channel: it provides versioned downloads and
+stable latest links. GitHub Packages is intended for package registries such as
+npm, NuGet and container images; a standalone Windows PS1 does not need a second
+package there.
+
+Optional repository helpers `Provision-Run.ps1` and `Project-Run.ps1` retain the
+legacy default `D:\LoKi`; supply `-InstallRoot` for another destination. They are
+not required when installing from the single release PS1.
 
 ## All provisioning parameters and options
 
@@ -253,7 +321,7 @@ Quellpaket contains editable scripts, guides and tests. Build-LoKiEnte.py embeds
 them with a SHA-256 checksum. After updating the version in Quellpaket/README.md:
 
 ```powershell
-python .\Build-LoKiEnte.py 2026.11.18.22
+python .\Build-LoKiEnte.py 2026.11.18.23
 ```
 
 Executable checks and their limits are recorded in [VALIDATION.md](Quellpaket/VALIDATION.md).

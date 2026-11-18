@@ -1,0 +1,53 @@
+LoKiEnte - Apache License 2.0 mit Commons Clause 1.0
+Copyright (c) 2026 LoKiEnte-Mitwirkende
+
+Deutsche Erläuterung (keine vollständige Übersetzung und keine eigenständige
+Lizenz). Rechtlich maßgeblich sind die englischen Texte in LICENSE.txt.
+
+LoKiEnte steht unter Apache License 2.0 mit der zusätzlichen Commons Clause 1.0.
+Die Texte gelten zusammen; es besteht keine Wahl zwischen zwei Lizenzen.
+
+Mit LoKiEnte entwickelte eigenständige Projekte und Arbeitsergebnisse dürfen
+kommerziell genutzt, lizenziert, verteilt und verkauft werden. Allein die
+Verwendung von LoKiEnte unterwirft diese Ergebnisse nicht dessen Lizenz.
+Tatsächlich übernommener LoKiEnte-Code behält jedoch seine Lizenzbedingungen.
+Für enthaltene Materialien Dritter gelten deren eigene Lizenzbedingungen.
+
+Klonen, Forken, Ändern, kostenlose Weitergabe und kommerzielle interne Nutzung
+von LoKiEnte sind unter den Bedingungen der kombinierten Lizenz erlaubt.
+Apache 2.0 regelt insbesondere Urheber- und Patentrechte, Weitergabe,
+Änderungshinweise, Lizenz-/Attributionshinweise und gegebenenfalls NOTICE-Dateien,
+Beiträge, Marken, Gewährleistung und Haftung. Die Commons Clause schränkt das
+Recht zum „Verkaufen“ zusätzlich ein. Daher ist die Kombination Source Available,
+nicht OSI-anerkanntes Open Source.
+
+Sinngemäße deutsche Wiedergabe der Commons Clause:
+
+Die Software wird vom Lizenzgeber unter der unten bezeichneten Lizenz unter
+der folgenden Bedingung bereitgestellt.
+
+Unbeschadet anderer Lizenzbedingungen umfasst die Rechtseinräumung nicht das
+Recht, die Software zu „verkaufen“.
+
+„Verkaufen“ bedeutet hier die Ausübung eines oder mehrerer Lizenzrechte, um
+Dritten gegen Entgelt oder eine andere Gegenleistung ein Produkt oder eine
+Dienstleistung anzubieten, deren Wert vollständig oder wesentlich aus der
+Funktionalität der Software stammt. Das kann insbesondere Entgelte für Hosting
+oder Beratungs-/Supportleistungen im Zusammenhang mit der Software umfassen.
+
+Jeder nach der Lizenz erforderliche Lizenz- oder Attributionshinweis muss auch
+den Hinweis auf diese Commons-Clause-Lizenzbedingung enthalten.
+
+Software: LoKiEnte
+Lizenz: Apache License, Version 2.0
+Lizenzgeber: Die Urheberrechtsinhaber von LoKiEnte
+
+Das ist kein pauschales Verbot jeder entgeltlichen Dienstleistung oder jedes
+Produkts, das LoKiEnte enthält: Entscheidend ist die Definition im englischen
+Original. Eigenständige Produkte mit wesentlichem zusätzlichem Wert sind von
+einer bloßen Weitervermarktung von LoKiEnte zu unterscheiden. Mit LoKiEnte
+erstellte Anwendungen fallen nicht allein durch ihre Erstellung darunter.
+
+Originaltexte:
+https://commonsclause.com/
+https://www.apache.org/licenses/LICENSE-2.0.txt
