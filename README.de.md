@@ -1,77 +1,51 @@
-# LoKiEnte – lokale KI-Entwicklung mit VS Code, Kilo und LM Studio
+# LoKiEnte — lokale KI-Entwicklung mit VS Code, Kilo und LM Studio
 
-<!-- lokiente-language -->
 [English](README.md) · Deutsch
 
-Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
-Neue Anleitungen liegen als GUIDE.md und GUIDE.de.md vor; bestehende persoenliche
-ANLEITUNG.md und bearbeitete Auftraege bleiben erhalten. Unveraenderte mitgelieferte
-Welcome-Readmes werden mit Sicherung auf Englisch umgestellt.
-<!-- /lokiente-language -->
-
 <p align="center">
-  <img src="assets/lokiente-preview.png" width="280" alt="LoKiEnte: eine freche Ente mit gruenem Loki-Helm und goldenen Hoernern">
+  <img src="assets/lokiente-preview.png" width="280" alt="LoKiEnte: eine freche Ente mit grünem Loki-Helm und goldenen Hörnern">
 </p>
 
-LoKiEnte richtet eine lokale Entwicklungsumgebung unter Windows ein. Du arbeitest
-in VS Code, nutzt Kilo für Analyse und Entwicklung und führst die Modelle über
-LM Studio auf deinem Rechner aus. Das Paket ist für Windows x64 auf lokalen PCs, Workstations und geeigneten
-virtuellen Maschinen ausgelegt. Es prüft die tatsächlich verfügbaren Ressourcen.
-Die automatischen GPU-Prüfungen sind derzeit auf NVIDIA ausgerichtet; andere
-GPU-Hersteller und reine CPU-Systeme sind nicht als gleichwertige Zielkonfiguration
-validiert. Linux und macOS werden vom Provisionierer nicht unterstützt.
+LoKiEnte richtet eine lokale KI-Entwicklungsumgebung unter Windows ein: VS Code
+als Editor, Kilo für deine Entwicklungsaufträge und LM Studio für die Modelle
+auf deinem Rechner. Du beschreibst eine Änderung; getrennte Agenten planen,
+erstellen Tests, implementieren und prüfen das Ergebnis.
 
-**Schwerpunkt ist überprüfbare Codequalität:** Getrennte Agenten erstellen Tests,
-implementieren eine begrenzte Änderung und prüfen anschließend Code und Ergebnisse.
-Die Modelle arbeiten lokal. Für Installation und Downloads wird Internet benötigt;
-Projektwerkzeuge können unabhängig davon Netzwerkzugriffe ausführen.
+**Im Mittelpunkt steht überprüfbare Codequalität.** Kilo leitet Akzeptanzkriterien
+und passende Testbefehle aus deinem Auftrag und Projekt ab. Du siehst den Ablauf
+und die Ergebnisse und entscheidest selbst, was du committest.
 
-Paketversion: **2026.11.18.23**.
-
-## Lizenz
-
-[Apache License 2.0 mit Commons Clause 1.0](LICENSE.txt) erlaubt unter ihren
-Bedingungen Klonen, Forken, Ändern, kostenlose Weitergabe und kommerzielle interne
-Nutzung. Die Commons Clause schränkt den Verkauf von Produkten oder Leistungen
-ein, deren Wert vollständig oder wesentlich aus der Funktionalität von LoKiEnte
-stammt. Das kann auch Hosting und Beratung/Support betreffen. Beide Texte gelten
-zusammen.
-
-**Mit LoKiEnte entwickelte Projekte und Arbeitsergebnisse dürfen kommerziell
-genutzt und verkauft werden.** Die Verwendung von LoKiEnte stellt diese
-eigenständigen Ergebnisse nicht unter dessen Lizenz. Tatsächlich übernommener
-LoKiEnte-Code behält seine Lizenzbedingungen; für Materialien Dritter gelten
-deren eigene Lizenzen.
-
-Die kombinierte Lizenz ist **Source Available, kein Open Source nach OSI**.
-Maßgeblich sind die [englischen Lizenzbedingungen](LICENSE.txt); eine
-[deutsche Erläuterung](LICENSE.de.txt) liegt daneben.
+[Installieren](#schnellinstallation-aktuelles-release) ·
+[Erster Testauftrag](#erster-testauftrag) ·
+[Aktualisieren](#update-installer-ersetzen-und-erneut-provisionieren) ·
+[Optionen](#sämtliche-parameter-des-provisionierungsskripts) ·
+[Hilfe](#häufige-fragen)
 
 ## Voraussetzungen
 
-Hinweise zu privaten Dateien, API-Tokens und Git-Commit-Metadaten stehen in
-[SECURITY.md](SECURITY.de.md). Lokale Berichte, Sicherungen und Laufzeitdaten
-gehören nicht in das Repository.
+- **Windows x64** auf einem PC, einer Workstation oder einer geeigneten VM.
+  Linux und macOS werden vom Installer nicht unterstützt.
+- **Ausreichend RAM, Grafikspeicher und Speicherplatz** für die gewählten Modelle.
+  Die Provisionierung prüft die verfügbaren Ressourcen und bietet passende Profile an.
+  Die automatischen GPU-Prüfungen sind auf NVIDIA ausgerichtet; andere GPUs und
+  reine CPU-Systeme sind nicht als gleichwertige Konfiguration validiert.
+- **Internet** für Installation und Downloads. Die Modelle laufen anschließend
+  lokal; Werkzeuge deiner Projekte können weiterhin Netzwerkzugriffe benötigen.
+- Ein normales Windows-Benutzerkonto. **Windows PowerShell 5.1 genügt zum Start**;
+  der Installer richtet benötigte Werkzeuge und PowerShell 7.4 oder neuer ein.
+- Für eigene Codeaufträge: ein Git-Repository mit mindestens einem Commit,
+  installierte Projektabhängigkeiten und ausführbare Tests. Das mitgelieferte
+  Welcome-Testprojekt ermöglicht einen ersten Versuch ohne eigenes Projekt.
 
-- Windows x64, ein normales Benutzerkonto und ausreichend Speicher für die Modelle.
-- Für den Start genügt Windows PowerShell 5.1; der Installer richtet benötigte
-  Werkzeuge ein und nutzt anschließend PowerShell 7.4 oder neuer.
-- Die Modellauswahl richtet sich nach RAM/VRAM. Eine größere Modelldatei ist
-  keine Garantie für bessere Ergebnisse oder für ausreichenden Speicher.
-- Für Codeaufträge: ein Git-Repository mit mindestens einem Commit, installierte
-  Projektabhängigkeiten und bekannte, lokal ausführbare Testbefehle.
+Programmausgaben und erzeugte Agentenanweisungen sind Englisch. Deutsche
+Anleitungen liegen als `*.de.md` daneben; eine Sprachumschaltung im Programm
+gibt es nicht. Ausgaben anderer Programme folgen deren eigenen Spracheinstellungen.
 
 ## Schnellinstallation: aktuelles Release
 
 Lade das [aktuelle Release](https://github.com/mauricehuschke/LoKiEnte/releases/latest)
 oder direkt den [eigenständigen Installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1) herunter. Die PS1 enthält das
 vollständige Quellpaket; die GitHub-Quellcode-ZIP und ein Repository-Klon sind nicht nötig.
-Release **v0.1** enthält Installer-Build **2026.11.18.23**. Release-Version und
-interne Build-Version erfüllen unterschiedliche Zwecke.
-
-Diese Befehle ohne Anmeldung funktionieren, sobald das Repository öffentlich ist.
-Solange es privat ist, lade beide Dateien auf der Release-Seite mit einem
-berechtigten GitHub-Konto herunter; nicht angemeldete Abrufe können 404 liefern.
 
 ### PowerShell (empfohlen, mit Prüfsummenprüfung)
 
@@ -122,6 +96,82 @@ Lies den Abschlussbericht, starte die Desktopverknüpfung **LoKiEnte** und wähl
 das Welcome-Testprojekt. `PROVISIONED_WITH_WARNINGS` bedeutet, dass einzelne
 Funktionen noch geprüft werden müssen.
 
+## Erster Testauftrag
+
+1. Starte nach der Provisionierung die Desktopverknüpfung **LoKiEnte**.
+2. Wähle `welcome\workflow-test`. Es ist ein eigenes Beispielprojekt im
+   Installationsordner und benötigt keine deiner Anwendungen.
+3. Öffne dessen README, kopiere den enthaltenen Testauftrag und füge ihn in Kilo
+   im Modus **`shadow-chat`** ein.
+4. Beobachte Vorbereitung, Testautor, Implementierung und unabhängige Reviews
+   in den Kilo-Werkzeugkarten oder in `LOKI-STATUS.md`.
+5. Die Ausgangstests müssen den absichtlichen Fehler der Rabattfunktion zeigen;
+   die abschließenden Tests müssen bestehen. Prüfe den Git-Diff und den Bericht
+   mit Status `VERIFIED`.
+
+Der [vollständige Testauftrag](Quellpaket/welcome-example/README.de.md) verwendet
+nur künstliche Daten. Ein Update erhält deine Änderungen am Beispiel. Für einen
+frischen Versuch führe in PowerShell 7 Folgendes aus; passe den Installationsordner
+an, wenn du einen anderen gewählt hast:
+
+```powershell
+$installRoot = "$env:LOCALAPPDATA\LoKiEnte"
+& "$installRoot\app\New-WelcomeTestProject.ps1" -InstallRoot $installRoot -NewExample
+```
+
+Das Beispiel vermeidet Änderungen an deinen Anwendungen. Es ist keine
+Betriebssystem-Sandbox: Agenten und Tests laufen mit deinem Windows-Konto.
+
+## Im Alltag starten
+
+Öffne die erzeugte Desktopverknüpfung. Im PowerShell-Menü wählst du ein bekanntes
+Projekt oder einen weiteren vorhandenen Ordner aus. LoKiEnte bereitet den lokalen
+Modellzugriff vor und öffnet den verwalteten VS-Code-Arbeitsbereich.
+
+Für ein neues Projekt zunächst einen Ordner und das Grundgerüst anlegen sowie
+Git initialisieren und einen ersten Commit erstellen. Danach den Ordner auswählen.
+LoKiEnte legt keinen zusätzlichen Git-Worktree an.
+
+Wähle in Kilo `shadow-chat` und beschreibe direkt die gewünschte Änderung samt
+Grenzen und erwartetem Verhalten. Kilo startet den geprüften Ablauf; ein
+Vorbereitungsagent leitet Kriterien, Änderungsarten, genaue Dateigrenzen und
+passende lokale Tests ab. Ein unabhängiger Reviewer prüft diese Vorbereitung,
+bevor `checks.json` gesichert und ergänzt wird. Eine manuelle JSON-Pflege pro
+Auftrag ist nicht nötig. Bei unklaren Anforderungen oder fehlender Testumgebung
+meldet Kilo den konkreten Klärungsbedarf.
+
+Die Statusausgabe in Kilo zeigt Phase, Agentenrolle, Rollenmodell und Ergebnis.
+Im LoKiEnte-Auftragsordner steht zusätzlich `LOKI-STATUS.md`. Mit „Zeige die Details“
+oder „Brich den Auftrag ab“ kannst du Bericht bzw. Abbruch anfordern. Die Rollen
+laufen als getrennte externe CLI-Sitzungen; der Status ist keine native
+Kilo-Task-Baumansicht. `task.md` und die VS-Code-Tasks bleiben eine optionale
+Alternative mit derselben automatischen Vorbereitung.
+
+Die [Anwenderanleitung mit vollständigem Beispiel](Quellpaket/WORKFLOW.de.md)
+erklärt die Freigaben, Testberichte und Workflows. Nach Installation liegt sie
+unter `app\WORKFLOW.md` und für jedes registrierte Projekt als `LOKI-WORKFLOW.md` vor.
+
+## Wie die Codeprüfung funktioniert
+
+1. Vorbereitung und unabhängiger Vorbereitungsreview legen den überprüfbaren Auftrag fest.
+2. Ein Architekturagent plant anhand deiner Anforderungen.
+3. Ein Testautor bearbeitet ausschließlich freigegebene Testdateien.
+4. Ein unabhängiger Agent prüft diese Tests, bevor sie ausgeführt werden.
+5. Der Runner führt Ausgangstests aus; Bugfixes müssen konkret reproduziert sein.
+6. Der Implementierer bearbeitet die freigegebenen Produktionsdateien. Die Tests
+   sind für diese Phase gesperrt.
+7. Checks, Code-Review und eine separate Validierung prüfen das Ergebnis.
+8. Sicherheitsrelevante Änderungen benötigen zusätzlich Security-Review;
+   UI-/API-Änderungen Integrationsprüfungen und einen eigenen Prüfer.
+
+Akzeptanzkriterien besitzen feste IDs und müssen durch tatsächlich berichtete
+Testfälle abgedeckt sein. Ein Exitcode 0 ohne Testnachweis genügt nicht.
+
+`VERIFIED` im Laufbericht bedeutet, dass die Prüfbedingungen für diesen Stand
+bestanden wurden. Prüfe weiterhin Git-Diff und tatsächliches Verhalten.
+Commit und Push führst du selbst aus. Ergebnisse von Sprachmodellen und Tests
+sind keine Garantie für Fehlerfreiheit.
+
 ## Update: Installer ersetzen und erneut provisionieren
 
 Beende laufende LoKiEnte-Aufträge und schließe dessen VS-Code-Fenster. Führe den
@@ -153,18 +203,10 @@ Modelloptionen bleiben erhalten, sofern sie nicht ausdrücklich überschrieben w
 Ein ausdrücklich geänderter `ModelMode` setzt übernommene Modelloptionen zurück.
 Bibliotheken deiner Anwendungsprojekte werden nicht eigenständig aktualisiert.
 Details stehen unter [allen Parametern](#sämtliche-parameter-des-provisionierungsskripts)
-und in der [technischen README](Quellpaket/README.de.md).
+und in der [ausführlichen Anleitung](Quellpaket/WORKFLOW.de.md).
 
-`releases/latest/download/...` folgt dem aktuellen veröffentlichten Release, nicht
-dem neuesten Commit auf `main`. Für eine feste Version ersetze `latest/download`
-durch `download/v0.1`. GitHub Releases ist der Vertriebskanal für versionierte
-Downloads und dauerhafte Latest-Links. GitHub Packages ist für Paketregistries wie
-npm, NuGet oder Container-Images gedacht; eine eigenständige Windows-PS1 benötigt
-dort kein zweites Paket.
-
-Die optionalen Repository-Hilfsskripte `Provision-Run.ps1` und `Project-Run.ps1`
-behalten das bisherige Standardziel `D:\LoKi`; für andere Ziele `-InstallRoot`
-angeben. Für die Installation mit der einzelnen Release-PS1 sind sie nicht nötig.
+Der Latest-Link liefert immer das neueste veröffentlichte Release. Ein neuer
+Commit auf `main` allein ist noch kein Installer-Update.
 
 ## Sämtliche Parameter des Provisionierungsskripts
 
@@ -219,88 +261,6 @@ CmdletBinding hinzu (unter PowerShell 7 zusätzlich ProgressAction).
 Sie ändern keine Modelloptionen. WhatIf/Confirm werden hier nicht unterstützt;
 die y-Abfrage bleibt die Freigabe zur Provisionierung.
 
-## Welcome-Test ohne eigenes Anwendungsprojekt
-
-Bei der Provisionierung entsteht `D:\LoKi\welcome\workflow-test` als eigenes,
-registriertes Git-Beispiel. Es enthält eine absichtlich fehlerhafte
-Rabattfunktion, ein package.json ohne externe Dependencies und den fertigen
-Testauftrag in seiner README. Es werden nur künstliche Beispieldaten verwendet.
-Ein lokaler Anfangscommit ermöglicht die Quellstandsprüfung; kein Remote oder
-automatischer Commit der späteren Kilo-Änderungen wird eingerichtet.
-
-1. Desktopverknüpfung starten und das registrierte `welcome\workflow-test` wählen.
-2. Dessen README öffnen und den Testauftrag in Kilo `shadow-chat` einfügen.
-3. Automatische checks.json, Vorbereitung und unabhängige Reviews beobachten.
-   Die Ausgangstests müssen den Rechenfehler zeigen, danach müssen sie bestehen.
-4. Rollen, Modelle und Ergebnisse in den Werkzeugkarten bzw. LOKI-STATUS.md
-   prüfen. Ein passender VERIFIED-Bericht und ein nachvollziehbarer Git-Diff
-   belegen den erfolgreichen Basisablauf. Security-/Integrationsphasen sind
-   für diese reine Rechenfunktion nicht nötig.
-
-Der vollständige [Testauftrag](Quellpaket/welcome-example/README.de.md) liegt auch
-im Quellpaket. Er verlangt unter anderem 8000 Cent für 10000 Cent mit 20 %
-Rabatt sowie Randfälle und Fehlerbehandlung.
-
-Ein Update setzt den bearbeiteten Teststand nicht zurück. Für einen weiteren
-Versuch erstellt dieser Befehl in PowerShell 7 einen neuen registrierten Ordner:
-
-```powershell
-& 'D:\LoKi\app\New-WelcomeTestProject.ps1' -InstallRoot 'D:\LoKi' -NewExample
-```
-
-Das Beispiel vermeidet Änderungen an eigenen Anwendungsprojekten.
-Es ist keine Betriebssystem-Sandbox: Auch diese Prozesse laufen mit deinem Konto.
-
-## Im Alltag starten
-
-Öffne die erzeugte Desktopverknüpfung. Im PowerShell-Menü wählst du ein bekanntes
-Projekt oder einen weiteren vorhandenen Ordner aus. LoKiEnte bereitet den lokalen
-Modellzugriff vor und öffnet den verwalteten VS-Code-Arbeitsbereich.
-
-Für ein neues Projekt zunächst einen Ordner und das Grundgerüst anlegen sowie
-Git initialisieren und einen ersten Commit erstellen. Danach den Ordner auswählen.
-LoKiEnte legt keinen zusätzlichen Git-Worktree an.
-
-Wähle in Kilo `shadow-chat` und beschreibe direkt die gewünschte Änderung samt
-Grenzen und erwartetem Verhalten. Kilo startet den geprüften Ablauf; ein
-Vorbereitungsagent leitet Kriterien, Änderungsarten, genaue Dateigrenzen und
-passende lokale Tests ab. Ein unabhängiger Reviewer prüft diese Vorbereitung,
-bevor `checks.json` gesichert und ergänzt wird. Eine manuelle JSON-Pflege pro
-Auftrag ist nicht nötig. Bei unklaren Anforderungen oder fehlender Testumgebung
-meldet Kilo den konkreten Klärungsbedarf.
-
-Die Statusausgabe in Kilo zeigt Phase, Agentenrolle, Rollenmodell und Ergebnis.
-Im LoKiEnte-Auftragsordner steht zusätzlich `LOKI-STATUS.md`. Mit „Zeige die Details“
-oder „Brich den Auftrag ab“ kannst du Bericht bzw. Abbruch anfordern. Die Rollen
-laufen als getrennte externe CLI-Sitzungen; der Status ist keine native
-Kilo-Task-Baumansicht. `task.md` und die VS-Code-Tasks bleiben eine optionale
-Alternative mit derselben automatischen Vorbereitung.
-
-Die [Anwenderanleitung mit vollständigem Beispiel](Quellpaket/WORKFLOW.de.md)
-erklärt die Freigaben, Testberichte und Workflows. Nach Installation liegt sie
-unter `app\WORKFLOW.md` und für jedes registrierte Projekt als `LOKI-WORKFLOW.md` vor.
-
-## Wie die Codeprüfung funktioniert
-
-1. Vorbereitung und unabhängiger Vorbereitungsreview legen den überprüfbaren Auftrag fest.
-2. Ein Architekturagent plant anhand deiner Anforderungen.
-3. Ein Testautor bearbeitet ausschließlich freigegebene Testdateien.
-4. Ein unabhängiger Agent prüft diese Tests, bevor sie ausgeführt werden.
-5. Der Runner führt Ausgangstests aus; Bugfixes müssen konkret reproduziert sein.
-6. Der Implementierer bearbeitet die freigegebenen Produktionsdateien. Die Tests
-   sind für diese Phase gesperrt.
-7. Checks, Code-Review und eine separate Validierung prüfen das Ergebnis.
-8. Sicherheitsrelevante Änderungen benötigen zusätzlich Security-Review;
-   UI-/API-Änderungen Integrationsprüfungen und einen eigenen Prüfer.
-
-Akzeptanzkriterien besitzen feste IDs und müssen durch tatsächlich berichtete
-Testfälle abgedeckt sein. Ein Exitcode 0 ohne Testnachweis genügt nicht.
-
-`VERIFIED` im Laufbericht bedeutet, dass die Prüfbedingungen für diesen Stand
-bestanden wurden. Prüfe weiterhin Git-Diff und tatsächliches Verhalten.
-Commit und Push führst du selbst aus. Ergebnisse von Sprachmodellen und Tests
-sind keine Garantie für Fehlerfreiheit.
-
 ## Häufige Fragen
 
 **Warum startet der Schreibauftrag nach einem Update noch nicht?**
@@ -350,47 +310,28 @@ Sie bekommen bereinigte Umgebungsvariablen und eigene Temp-/Profilpfade, laufen
 aber mit deinem Windows-Konto. Sie können Dateien und Netzwerk erreichen.
 Verwende bestätigte Testbefehle und lokale Testdaten ohne Produktionszugänge.
 
-## Für Paketentwickler
+## Weitere Dokumentation
 
-`Quellpaket` enthält die bearbeitbaren Skripte, Anleitungen und Tests.
-`Build-LoKiEnte.py` erzeugt daraus die eingebettete Nutzlast mit SHA-256.
-Nach Änderung der Versionsangabe in `Quellpaket/README.md`:
+- [Vollständige Anwenderanleitung und Arbeitsabläufe](Quellpaket/WORKFLOW.de.md)
+- [Welcome-Testauftrag](Quellpaket/welcome-example/README.de.md)
+- [Fehler melden oder Verbesserungen vorschlagen](https://github.com/mauricehuschke/LoKiEnte/issues)
+- [LoKiEnte selbst anpassen oder dazu beitragen](docs/development/README.de.md)
 
-```powershell
-python .\Build-LoKiEnte.py 2026.11.18.23
-```
+## Lizenz
 
-Ausführbare Prüfungen und deren Grenzen sind in
-[VALIDATION.md](Quellpaket/VALIDATION.de.md) dokumentiert. Ein echter Probeauftrag
-und die GPU-/GUI-Abnahme müssen zusätzlich auf dem Zielrechner erfolgen.
+[Apache License 2.0 mit Commons Clause 1.0](LICENSE.txt) erlaubt unter ihren
+Bedingungen Klonen, Forken, Ändern, kostenlose Weitergabe und kommerzielle interne
+Nutzung. Die Commons Clause schränkt den Verkauf von Produkten oder Leistungen
+ein, deren Wert vollständig oder wesentlich aus der Funktionalität von LoKiEnte
+stammt. Das kann auch Hosting und Beratung/Support betreffen. Beide Texte gelten
+zusammen.
 
-## Logo und Projektname
+**Mit LoKiEnte entwickelte Projekte und Arbeitsergebnisse dürfen kommerziell
+genutzt und verkauft werden.** Die Verwendung von LoKiEnte stellt diese
+eigenständigen Ergebnisse nicht unter dessen Lizenz. Tatsächlich übernommener
+LoKiEnte-Code behält seine Lizenzbedingungen; für Materialien Dritter gelten
+deren eigene Lizenzen.
 
-Das Projekt heißt **LoKiEnte**. Der Desktop-Launcher erhält bei der Provisionierung
-den Namen **LoKiEnte** und das Enten-Logo. Das gilt auch für Updates; passende alte
-Verknüpfungen derselben Installation werden gesichert und ersetzt. `-NoShortcut`
-überspringt diesen Schritt. Verknüpfungen zu anderen Installationen bleiben erhalten.
-
-- [Transparentes PNG-Original, 1254 × 1254 Pixel](assets/lokiente-logo.png)
-- [PNG-Vorschau, 512 × 512 Pixel](assets/lokiente-preview.png)
-- [Windows-Icon, 16 bis 256 Pixel](Quellpaket/assets/lokiente.ico)
-- [Asset-Herkunft und Generierungsprompt](assets/README.de.md)
-
-`scripts/Build-Logo.ps1` erzeugt unter Windows mit PowerShell 7 aus dem Original
-die Vorschau und das mehrstufige ICO erneut. Anschließend den Installer mit
-`python .\Build-LoKiEnte.py 2026.11.18.23` neu bauen. Nur das kleine ICO wird
-für die Desktopverknüpfung im Installer benötigt; das PNG-Original bleibt im Repo.
-
-Die bisherigen technischen Kennungen (`loki_*`, `LOKI_*`, `shadow-*`),
-Dateien wie `LOKI-STATUS.md` und Installationsmarker bleiben für bestehende
-Projekte kompatibel. Vorhandene Installationsordner werden nicht umbenannt;
-die Starthelfer verwenden weiterhin `D:\LoKi`, sofern kein `-InstallRoot`
-angegeben wird. Neue Installationen können beispielsweise `D:\LoKiEnte` nutzen.
-
-### Kompatibilität bestehender Installationen
-
-Der neue Standard für den **Namen** einer optionalen Token-Umgebungsvariable ist
-`LOKIENTE_LM_API_KEY`. Das ist kein Token. Beim Update bleibt der gespeicherte
-Variablenname erhalten; mit `-ApiTokenEnvironmentVariable` kannst du ihn ausdrücklich
-ändern. Den Wert weiterhin nur lokal bereitstellen. Interne historische Präfixe
-sind keine Anbieterbindung und enthalten keine persönlichen Daten.
+Die kombinierte Lizenz ist **Source Available, kein Open Source nach OSI**.
+Maßgeblich sind die [englischen Lizenzbedingungen](LICENSE.txt); eine
+[deutsche Erläuterung](LICENSE.de.txt) liegt daneben.
