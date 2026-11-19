@@ -5,6 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 . (Join-Path $SourceRoot 'ModelPool.ps1')
 . (Join-Path $SourceRoot 'ModelSelection.ps1')
+. (Join-Path $SourceRoot 'Indexing.ps1')
 . (Join-Path $SourceRoot 'AgentTemplates.ps1')
 $root=Join-Path ([IO.Path]::GetTempPath()) ('shadow-embedding-'+[guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory((Join-Path $root 'runtime'))
@@ -105,12 +106,12 @@ try{
     Assert-Embedding ($diagnostic.result.MemoryCheck.EstimatedBytes -gt 112MB -and $diagnostic.result.MemoryCheck.BudgetBytes -eq 1GB) 'Diagnostic report contains numeric memory evidence without raw CLI output'
     $rollbackOwner=Get-SmpOwner $root
     $script:loaded[1].status='processing'
-    Throws-Embedding {Remove-SmpNewEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback never unloads an active embedding instance'
+    Throws-Embedding {Remove-SmpIdleEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback never unloads an active embedding instance'
     $script:loaded[1].status='idle';$script:loaded[1].path='foreign.gguf'
-    Throws-Embedding {Remove-SmpNewEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback rejects a substituted model path'
+    Throws-Embedding {Remove-SmpIdleEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback rejects a substituted model path'
     $script:loaded[1].path=$definition.ExpectedPath
     $script:loaded=@($script:loaded[0],$script:loaded[1],$script:loaded[1])
-    Throws-Embedding {Remove-SmpNewEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback rejects duplicate identifiers'
+    Throws-Embedding {Remove-SmpIdleEmbeddingInstance -Pool $pool -Owner $rollbackOwner -InstanceId $trial.InstanceId -ModelPath $definition.ExpectedPath -LogDirectory 'fixture'} 'idle local' 'Rollback rejects duplicate identifiers'
     $script:loaded=@($script:loaded[0]);$script:loads=0;$script:inferenceCalls=0
     foreach($stage in @('load','inference','failed-inference')){
         $script:freeRam=[long](4.4GB);$script:afterLoadRam=if($stage -ceq 'load'){2GB}else{$null}
@@ -213,5 +214,13 @@ try{
         $editing.agent.'shadow-validator'.model -ceq 'lmstudio/coder-high' -and
         (Get-ShadowRoleModelInfo -Config $editing -Role 'shadow-implementer').ContextLength -eq 16384) 'Fast implementation preserves independent review, validation and its own context limit'
     Throws-Embedding {New-ShadowAgentConfiguration -InstallRoot $root -ModelId 'test' -ApiBaseUrl $pool.RouterApiBaseUrl -EmbeddingApiBaseUrl 'https://example.invalid/v1' -EmbeddingModelId $result.InstanceId} 'loopback' 'External embedding endpoint is rejected'
+    $script:loaded[1].status='processing'
+    Throws-Embedding {Stop-ShadowEmbeddingModel -InstallRoot $root -Pool $pool} 'idle local' 'Disabling indexing preserves an active embedding instance'
+    $script:loaded[1].status='idle'
+    $beforeUnloads=$script:unloads
+    Stop-ShadowEmbeddingModel -InstallRoot $root -Pool $pool
+    Assert-Embedding ($script:loaded.Count -eq 1 -and $script:loaded[0].identifier -ceq 'coder-id' -and $script:unloads -eq $beforeUnloads+1) 'Disabling indexing unloads only the verified idle embedding and retains the coding model'
+    Stop-ShadowEmbeddingModel -InstallRoot $root -Pool $pool
+    Assert-Embedding ($script:unloads -eq $beforeUnloads+1) 'Repeated disable does not unload another model'
     [pscustomobject]@{suite='CPU embedding and indexing configuration';passed=$true;checks=$count;limitations='LM Studio and GPU boundaries are mocked.'}|ConvertTo-Json
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}

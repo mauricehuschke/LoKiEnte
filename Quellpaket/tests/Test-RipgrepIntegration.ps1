@@ -32,7 +32,7 @@ if($Scenario -eq 'deferred'){$pool.VerificationStatus='Partial';$embedding.Statu
 if($Scenario -eq 'single-deferred'){$ModelMode='Single';$runtime=[pscustomobject]@{Status='Deferred';Estimate=$null};$report.warnings=@('Synthetic unverified model')}
 if($Scenario -eq 'reserve'){$pool.Profiles=@([pscustomobject]@{Estimate=[pscustomobject]@{ReserveOverride=$true}});$report.warnings=@('Synthetic reserve override')}
 $ProjectPath=@();$NoShortcut=$true
-$IncludeFastModel=$false;$AllowPartialGpuOffload=$false;$AllowUnfitAttempt=$false
+$IndexingMode='Off';$IncludeFastModel=$false;$AllowPartialGpuOffload=$false;$AllowUnfitAttempt=$false
 $RouterPort=1235;$Port=1234;$ContextLength=32768;$PreferredModel='Auto';$ModelKey='';$ApiTokenEnvironmentVariable=''
 function Get-LrProperty {param($Object,$Name,$Default=$null) if($null -ne $Object -and $null -ne $Object.PSObject.Properties[$Name]){return $Object.$Name};return $Default}
 function Update-ShadowWorkspaces {param($Root,$ProjectPath,$PwshPath) return @{Entries=@();Warnings=@()}}

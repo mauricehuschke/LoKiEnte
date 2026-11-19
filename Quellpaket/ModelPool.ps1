@@ -590,9 +590,9 @@ function Get-SmpEmbeddingMemoryCheck {
     }
 }
 
-function Remove-SmpNewEmbeddingInstance {
+function Remove-SmpIdleEmbeddingInstance {
     param($Pool,$Owner,[string]$InstanceId,[string]$ModelPath,[string]$LogDirectory)
-    # This rollback is called only for an instance loaded by the current attempt.
+    # Used for rollback of a new load or an explicitly disabled owned embedding.
     # Do not use the coding-model unload helper: it deliberately excludes embeddings.
     $entries=@($Owner.Entries|Where-Object {$_.InstanceId -ceq $InstanceId -and $_.ModelPath -ceq $ModelPath -and $_.Verified -eq $true -and (Get-LrProperty $_ 'Origin') -ceq 'verified-cpu-embedding'})
     if($InstanceId -cne ('shadow-'+$Owner.OwnerId+'-embedding') -or $entries.Count -ne 1){throw 'Cannot verify embedding rollback ownership. No instance was unloaded.'}
@@ -687,7 +687,7 @@ function Start-ShadowEmbeddingModel {
         if($loadedHere -and $memoryCheck.ConservativeTrial -and -not $reserveOverride){
             $memoryCheck.AvailableAfterLoadBytes=[long](Get-LocalNvidiaGpu -LogDirectory $logs).FreeRamBytes
             if($memoryCheck.AvailableAfterLoadBytes -lt 3GB){
-                Remove-SmpNewEmbeddingInstance -Pool $Pool -Owner $owner -InstanceId $id -ModelPath $path -LogDirectory $logs
+                Remove-SmpIdleEmbeddingInstance -Pool $Pool -Owner $owner -InstanceId $id -ModelPath $path -LogDirectory $logs
                 $error=[InvalidOperationException]::new('CPU embedding load left less than 3 GiB available RAM. The newly loaded embedding was unloaded; coding models remain unchanged.')
                 $error.Data['ShadowResourceFitFailure']=$true;$error.Data['ShadowEmbeddingMemoryCheck']=$memoryCheck
                 throw $error
@@ -726,7 +726,7 @@ function Start-ShadowEmbeddingModel {
         if($loadedHere -and $memoryCheck.ConservativeTrial -and -not $reserveOverride){
             $memoryCheck.AvailableAfterInferenceBytes=[long](Get-LocalNvidiaGpu -LogDirectory $logs).FreeRamBytes
             if($memoryCheck.AvailableAfterInferenceBytes -lt 3GB){
-                Remove-SmpNewEmbeddingInstance -Pool $Pool -Owner $owner -InstanceId $id -ModelPath $path -LogDirectory $logs
+                Remove-SmpIdleEmbeddingInstance -Pool $Pool -Owner $owner -InstanceId $id -ModelPath $path -LogDirectory $logs
                 if($inferenceError -and $inferenceError.Data['ShadowAuthenticationFailure']){throw $inferenceError}
                 $error=[InvalidOperationException]::new('CPU embedding inference left less than 3 GiB available RAM. The newly loaded embedding was unloaded; indexing remains deferred.')
                 $error.Data['ShadowResourceFitFailure']=$true;$error.Data['ShadowEmbeddingMemoryCheck']=$memoryCheck

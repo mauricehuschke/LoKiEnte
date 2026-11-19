@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.18.26 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.19.1 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den
@@ -49,6 +49,56 @@ löst persönliche Konflikte nicht, solange Settings ausgewählt bleibt. Auch di
 Ausnahmelisten werden beim Einstellungs-Sync übertragen; sie können sich nicht selbst
 ausschließen. Nach Updates alle LoKiEnte-Fenster vollständig schließen und neu starten.
 
+### Optionale Indizierung: Aus, bei Bedarf oder automatisch
+
+Die Indizierung ist **standardmäßig für alle Projekte aus**, auch bei bestehenden
+Installationen. Im Dual-Modus fragt die Provisionierung nach der Startart, sofern
+`-IndexingMode` fehlt. Enter wählt Off. Jede erneute Provisionierung verwendet
+wieder Off als Vorgabe; eine frühere Automatic-Auswahl wird nicht still übernommen.
+Die gewählte Startart wird für spätere Starts über das Desktopicon gespeichert.
+
+| Option | Provisionierung | Desktoplauncher |
+| --- | --- | --- |
+| `Off` (Standard) | Deaktiviert die Indizierung; kein Download oder Laden von Index-Abhängigkeiten bzw. Embedding-Modell. | Startet ohne Indizierung für alle Projekte, auch zuvor freigegebene. |
+| `OnDemand` | Bereitet LanceDB und den Download des Embedding-Modells vor; lädt das Modell nicht in den Speicher. | Fragt bei jedem Start nach der Indizierung; Enter bedeutet Nein. |
+| `Automatic` | Bereitet Abhängigkeiten vor und prüft den Embedding-Dienst. | Startet den Embedding-Dienst automatisch; Kilo indiziert bereits freigegebene Projekte. |
+
+Ergänze deine üblichen Modelloptionen um eine dieser Startarten:
+
+```powershell
+# Standard: Speicher für Coding und Review freihalten
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off
+
+# Indizierung vorbereiten, bei jedem Desktopstart nachfragen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode OnDemand
+
+# Indizierung für in Kilo freigegebene Projekte automatisch starten
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Automatic
+```
+
+Nach einem Moduswechsel alle LoKiEnte-VS-Code-Fenster vollständig schließen und
+den Desktoplauncher erneut starten. Die Einstellung gilt für das gemeinsame
+LoKiEnte-Profil; laufende Fenster übernehmen nicht die Umgebung eines weiteren
+Starts. Bei OnDemand die vorherige Sitzung schließen, bevor du anders auswählst.
+Kilo verlangt weiterhin eine einmalige Projektfreigabe unter **Settings > Indexing**.
+Bestehende Freigaben bleiben erhalten; Off setzt sie außer Kraft. Automatic kann
+diese Zustimmung nicht selbst erteilen. Vor semantischer Suche auf **Complete** warten.
+
+Für einen OnDemand-Start ohne Rückfrage den installierten Launcher in PowerShell 7
+mit `-StartIndexing` ausführen (Installations- und Projektpfade anpassen):
+
+```powershell
+pwsh -NoProfile -File D:\LocalAI\app\Start-LocalAI.ps1 -InstallRoot D:\LocalAI -ProjectPath D:\Projects\Example -StartIndexing
+```
+
+Der Schalter aktiviert keine Off-Installation: Zuerst OnDemand oder Automatic
+provisionieren. Single unterstützt nur Off. Off erhält heruntergeladene Modelle
+und gespeicherte Indizes. Beim Wechsel auf Off/OnDemand oder beim Ablehnen im
+OnDemand-Launcher wird nur die nachweislich eigene, inaktive Embedding-Instanz
+entladen. Aktive oder unklare Instanzen stoppen den Vorgang mit einer Erklärung.
+Vorherige Sitzung schließen und erneut versuchen. Dateisuche, Subagenten, Reviews
+und Tests bleiben ohne Indizierung verfügbar.
+
 ### Lokale semantische Indexierung
 
 Kilo und Embedding-Vorabtest verwenden `/v1/embeddings` am lokalen Router. Dieser
@@ -71,19 +121,20 @@ Bei unterschrittener Reserve wird nur die dabei neu geladene, eindeutig eigene
 inaktive Embedding-Instanz entladen. Coding-Modelle und schon vorhandene Embeddings
 bleiben erhalten. RAM-/GPU-Regeln für Coding und Review werden nicht verändert.
 
-Im Dual-Modus richtet die Provisionierung LanceDB 0.26.2 und das lokale
+Im Dual-Modus mit OnDemand oder Automatic richtet die Provisionierung LanceDB 0.26.2 und das lokale
 `nomic-embed-text-v1.5.Q4_K_M.gguf` ein. Die Datei wird mit Größe und SHA-256
 geprüft, bei Bedarf heruntergeladen und ohne Überschreiben abgelegt. Das
 Embeddingmodell wird zusätzlich zum jeweils aktiven Codingmodell mit `--gpu off`
 gestartet und sein RAM-Bedarf geschätzt. Ein echter
-lokaler Embedding-Aufruf mit zwei Vektoren ist Teil des Setups und Launcherstarts.
+lokaler Embedding-Aufruf mit zwei Vektoren ist Teil von Automatic-Setup/-Start
+und einem bestätigten OnDemand-Start.
 Die Berechnung und der Vektorspeicher bleiben lokal; es gibt keinen Cloud-Fallback.
 Ist der Speicherfit nicht nachweisbar, bleibt das Modell standardmäßig
 ungeprüft. Nur `-AllowUnfitAttempt` erlaubt einen Versuch ohne die Reserven des
 Pakets. LM Studios Schutzregeln bleiben aktiv. Wird das Embeddingmodell nicht geladen
 oder besteht es den Test nicht, bleibt die Einrichtung mit einer Warnung
 benutzbar, aber die Indexierung ist noch nicht betriebsbereit. Beim nächsten
-LoKiEnte-Start wird sie erneut versucht. Beschädigte Modelldateien, unklare
+LoKiEnte-Start mit angeforderter Indizierung wird sie erneut versucht. Beschädigte Modelldateien, unklare
 Eigentumsverhältnisse und Authentifizierungsfehler bleiben ausdrücklich Fehler.
 Im Single-Modus wird diese Indexierung derzeit nicht eingerichtet.
 Die Integration ist für die VS-Code-Erweiterungen Kilo 7.8.28 und 7.8.30
@@ -94,7 +145,7 @@ hat eine eigene Versionsnummer.
 
 Nach vollständigem Schließen der LoKiEnte-Fenster und erneutem Start des Projekts
 in Kilo **Einstellungen > Indexing** öffnen und für das jeweilige Projekt
-freigeben. Diese Freigabe verwaltet Kilo pro Projekt; das Paket verändert nicht
+freigeben, nachdem OnDemand oder Automatic gewählt wurde. Diese Freigabe verwaltet Kilo pro Projekt; das Paket verändert nicht
 dessen interne VS-Code-Datenbank. Erst der Status **Complete** und eine
 tatsächliche semantische Suche belegen die fertige Indexierung des Projekts.
 Die erfolgreiche Provisionierung allein beweist das nicht.
@@ -144,7 +195,7 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.18.26` ausführen. Das Skript baut
+`python .\Build-LoKiEnte.py 2026.11.19.1` ausführen. Das Skript baut
 die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält
@@ -698,7 +749,7 @@ setzt bestätigtes Prozessende oder einen Systemneustart voraus.
 
 Modellserver und Router sind an Loopback gebunden. Ein vorhandener öffentlich gebundener Server wird nicht still umgestellt; die Einrichtung stoppt mit einem Hinweis. Haupt-, Hilfs-, Unteragenten-, Memory- und Komprimierungsmodelle sind auf den lokalen Provider und den ausgewählten Modellkatalog festgelegt. Noch ungeprüfte Modelle sind ausdrücklich gekennzeichnet. Vor CLI-Arbeit wird die wirksame Konfiguration geprüft, einschließlich möglicher verwalteter Vorgaben. Abweichungen führen zu einem Fehler.
 
-Kilo-Telemetrie wird für die gestarteten Prozesse abgeschaltet; VS-Code-Telemetrie im eigenen Profil ebenfalls. Im Dual-Modus wird der oben beschriebene lokale Embedding-Dienst eingerichtet; die Projektindexierung muss in Kilo gezielt freigegeben werden. Im Single-Modus bleibt die Indexierung deaktiviert. Dateisuche und gezielte Lesezugriffe bleiben verfügbar. Die Einrichtung selbst benötigt Internet für Software und Modell-Dateien. „Lokal“ bedeutet Modellinferenz auf dem Windows-Rechner, auf dem du LoKiEnte installierst. Bei einer gehosteten Windows-VM liegt dieser Rechner auf der Infrastruktur deines Hosting-Anbieters. Das Paket ist kein Netzwerk-Isolationssystem und enthält keine pauschale Garantie, dass jedes Drittprogramm nie eine Update- oder Metadatenabfrage macht.
+Kilo-Telemetrie wird für die gestarteten Prozesse abgeschaltet; VS-Code-Telemetrie im eigenen Profil ebenfalls. Mit OnDemand oder Automatic im Dual-Modus wird der oben beschriebene lokale Embedding-Dienst vorbereitet; die Projektindexierung muss in Kilo gezielt freigegeben werden. Im Single-Modus bleibt die Indexierung deaktiviert. Dateisuche und gezielte Lesezugriffe bleiben verfügbar. Die Einrichtung selbst benötigt Internet für Software und Modell-Dateien. „Lokal“ bedeutet Modellinferenz auf dem Windows-Rechner, auf dem du LoKiEnte installierst. Bei einer gehosteten Windows-VM liegt dieser Rechner auf der Infrastruktur deines Hosting-Anbieters. Das Paket ist kein Netzwerk-Isolationssystem und enthält keine pauschale Garantie, dass jedes Drittprogramm nie eine Update- oder Metadatenabfrage macht.
 
 Wenn dein bestehender LM-Studio-Server Authentifizierung verlangt, stelle das Token im Prozess bereit, bevor du Setup bzw. Launcher startest:
 

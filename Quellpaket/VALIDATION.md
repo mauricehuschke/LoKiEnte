@@ -6,6 +6,44 @@ This document preserves the validation history and its original limitations.
 Older sections describe the behavior and evidence of their stated release, not
 necessarily the current defaults. Current usage is documented in [README.md](README.md).
 
+## Optional indexing start policy — package 2026.11.19.1
+
+Indexing now defaults to Off, including existing projects and installations.
+Provisioning offers Off, OnDemand and Automatic; an explicit `-IndexingMode`
+skips the menu. OnDemand prepares dependencies without loading embeddings and
+asks at each launcher start (default No). Automatic checks embeddings at setup
+and launch, then respects Kilo's one-time project consent. Failed readiness keeps
+Kilo indexing disabled for that launch. No internal VS Code consent database is
+modified. See [README.md](README.md) for commands and session restart requirements.
+
+Regression evidence:
+
+- Indexing policy/migration: 32 checks; actual launcher configuration path: 8;
+  model-selection setup integration: 5; CPU embedding and safe disable/unload: 47.
+  Coverage includes legacy defaults, preserving consent while disabling the global
+  indexer, no embedding initialization/download in Off, OnDemand deferral, explicit
+  launch opt-in, failed readiness and refusing to unload busy or ambiguous models.
+- The actual Kilo 7.8.30 indexer remained Disabled with zero embedding requests
+  even after project consent was explicitly enabled against a synthetic backend.
+  Its actual effective-config verifier accepted the complete generated Off profile
+  without LanceDB installed. This verifies disabling; it is not a real-model
+  inference or retrieval-quality result.
+- All 33 Node router/startup/sync tests passed. The full 54-check reviewed workflow
+  passed with real processes/Git and synthetic agent responses. Model pool (44),
+  partial offload (8), router lifecycle (18), provisioning settings (6), workspace
+  migration (14), localization (28), start commands (7), ripgrep setup (7), workflow
+  discovery (13) and tool-import preflight (18) passed.
+- Bootstrap/handoff: 42 checks; installation-location migration and audit each
+  passed 51 checks under Windows PowerShell 5.1. No real application installation,
+  model download or GPU inference is performed by these regression fixtures.
+
+Target acceptance remains pending: close all LoKiEnte windows, reprovision the
+existing installation, then check Off, OnDemand No/Yes and Automatic on a small
+consented project. Confirm that Off starts without IDX errors or an embedding
+load, OnDemand No stays inactive, and an enabled run reaches Complete when RAM
+and LM Studio are ready. Existing extension-only sync and project quality checks
+must continue to work. Main, releases and platform branches are unchanged.
+
 ## Conservative CPU embedding load — package 2026.11.18.26
 
 The target report identified an embedding load blocked by LOW estimate confidence,

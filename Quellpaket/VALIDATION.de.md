@@ -6,6 +6,48 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
+## Optionale Startart der Indizierung — Paket 2026.11.19.1
+
+Die Indizierung ist jetzt standardmäßig aus, auch für bestehende Projekte und
+Installationen. Die Provisionierung bietet Off, OnDemand und Automatic an;
+`-IndexingMode` überspringt das Menü. OnDemand bereitet Abhängigkeiten vor, ohne
+Embeddings zu laden, und fragt bei jedem Launcherstart nach (Vorgabe Nein).
+Automatic prüft Embeddings bei Setup und Start und berücksichtigt Kilos einmalige
+Projektfreigabe. Eine fehlgeschlagene Vorprüfung lässt Kilos Indizierung für diesen
+Start deaktiviert. Die interne VS-Code-Freigabedatenbank wird nicht verändert.
+Befehle und erforderlicher Sitzungsneustart stehen in [README.de.md](README.de.md).
+
+Prüfnachweise:
+
+- Indexierungsregel/Migration: 32 Prüfungen; tatsächlicher Konfigurationspfad des
+  Launchers: 8; Modellauswahl-Setupintegration: 5; CPU-Embedding und sicheres
+  Deaktivieren/Entladen: 47. Geprüft werden Altinstallationsvorgaben, globale
+  Deaktivierung bei erhaltener Projektfreigabe, kein Embedding-Start/-Download mit
+  Off, OnDemand ohne Start, ausdrückliche Startauswahl, fehlgeschlagene Vorprüfung
+  und Ablehnung des Entladens aktiver oder unklarer Modelle.
+- Der echte Kilo-Indexer 7.8.30 blieb nach ausdrücklicher Projektfreigabe gegen
+  einen synthetischen Server Disabled und stellte keine Embedding-Anfrage.
+  Seine tatsächliche Konfigurationsprüfung akzeptierte das vollständige erzeugte
+  Off-Profil ohne installiertes LanceDB. Das bestätigt die Deaktivierung, keine
+  echte Modellinferenz oder Suchqualität.
+- Alle 33 Node-Tests für Router/Start/Sync bestanden. Der vollständige Qualitäts-
+  workflow bestand 54 Prüfungen mit echten Prozessen/Git und synthetischen
+  Agentenantworten. Bestanden haben auch Modellpool (44), Teiloffloading (8),
+  Router-Lebenszyklus (18), Provisionierungseinstellungen (6), Workspace-Migration
+  (14), Sprachmigration (28), Startbefehle (7), Ripgrep-Setup (7), Workflow-Erkennung
+  (13) und Tool-Import-Vorprüfung (18).
+- Bootstrap/Übergabe: 42 Prüfungen; Installationsort-Migration und Audit jeweils
+  51 unter Windows PowerShell 5.1. Diese Regressionen installieren keine echten
+  Anwendungen, laden keine Modelle herunter und führen keine GPU-Inferenz aus.
+
+Die Zielabnahme steht aus: Alle LoKiEnte-Fenster schließen, bestehende Installation
+erneut provisionieren und Off, OnDemand Nein/Ja sowie Automatic an einem kleinen,
+freigegebenen Projekt prüfen. Off soll ohne IDX-Fehler oder geladenes Embedding
+starten, OnDemand Nein inaktiv bleiben und ein aktivierter Lauf bei ausreichendem
+RAM und bereitem LM Studio Complete erreichen. Erweiterungs-Sync und Qualitäts-
+prüfungen müssen weiterhin funktionieren. Main, Releases und Plattformbranches
+bleiben unverändert.
+
 ## Konservatives Laden des CPU-Embeddings — Paket 2026.11.18.26
 
 Der Zielbericht zeigte ein durch LOW-Schätzsicherheit blockiertes Laden ohne

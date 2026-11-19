@@ -120,6 +120,56 @@ Speicherreserven und ist keine Qualitätseinstellung. Details stehen unter
 
 Für einen automatischen Download mit Prüfsummenprüfung verwende den folgenden Abschnitt.
 
+### Optionale Indizierung: Aus, bei Bedarf oder automatisch
+
+Die Indizierung ist **standardmäßig für alle Projekte aus**, auch bei bestehenden
+Installationen. Im Dual-Modus fragt die Provisionierung nach der Startart, sofern
+`-IndexingMode` fehlt. Enter wählt Off. Jede erneute Provisionierung verwendet
+wieder Off als Vorgabe; eine frühere Automatic-Auswahl wird nicht still übernommen.
+Die gewählte Startart wird für spätere Starts über das Desktopicon gespeichert.
+
+| Option | Provisionierung | Desktoplauncher |
+| --- | --- | --- |
+| `Off` (Standard) | Deaktiviert die Indizierung; kein Download oder Laden von Index-Abhängigkeiten bzw. Embedding-Modell. | Startet ohne Indizierung für alle Projekte, auch zuvor freigegebene. |
+| `OnDemand` | Bereitet LanceDB und den Download des Embedding-Modells vor; lädt das Modell nicht in den Speicher. | Fragt bei jedem Start nach der Indizierung; Enter bedeutet Nein. |
+| `Automatic` | Bereitet Abhängigkeiten vor und prüft den Embedding-Dienst. | Startet den Embedding-Dienst automatisch; Kilo indiziert bereits freigegebene Projekte. |
+
+Ergänze deine üblichen Modelloptionen um eine dieser Startarten:
+
+```powershell
+# Standard: Speicher für Coding und Review freihalten
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off
+
+# Indizierung vorbereiten, bei jedem Desktopstart nachfragen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode OnDemand
+
+# Indizierung für in Kilo freigegebene Projekte automatisch starten
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Automatic
+```
+
+Nach einem Moduswechsel alle LoKiEnte-VS-Code-Fenster vollständig schließen und
+den Desktoplauncher erneut starten. Die Einstellung gilt für das gemeinsame
+LoKiEnte-Profil; laufende Fenster übernehmen nicht die Umgebung eines weiteren
+Starts. Bei OnDemand die vorherige Sitzung schließen, bevor du anders auswählst.
+Kilo verlangt weiterhin eine einmalige Projektfreigabe unter **Settings > Indexing**.
+Bestehende Freigaben bleiben erhalten; Off setzt sie außer Kraft. Automatic kann
+diese Zustimmung nicht selbst erteilen. Vor semantischer Suche auf **Complete** warten.
+
+Für einen OnDemand-Start ohne Rückfrage den installierten Launcher in PowerShell 7
+mit `-StartIndexing` ausführen (Installations- und Projektpfade anpassen):
+
+```powershell
+pwsh -NoProfile -File D:\LocalAI\app\Start-LocalAI.ps1 -InstallRoot D:\LocalAI -ProjectPath D:\Projects\Example -StartIndexing
+```
+
+Der Schalter aktiviert keine Off-Installation: Zuerst OnDemand oder Automatic
+provisionieren. Single unterstützt nur Off. Off erhält heruntergeladene Modelle
+und gespeicherte Indizes. Beim Wechsel auf Off/OnDemand oder beim Ablehnen im
+OnDemand-Launcher wird nur die nachweislich eigene, inaktive Embedding-Instanz
+entladen. Aktive oder unklare Instanzen stoppen den Vorgang mit einer Erklärung.
+Vorherige Sitzung schließen und erneut versuchen. Dateisuche, Subagenten, Reviews
+und Tests bleiben ohne Indizierung verfügbar.
+
 ### PowerShell (empfohlen, mit Prüfsummenprüfung)
 
 Öffne Windows PowerShell in einem beschreibbaren Downloadordner und füge den
@@ -273,11 +323,16 @@ sie lassen sich nicht zuverlässig durch Einträge in ihrer eigenen Liste isolie
 ### Falls die lokale Indizierung nicht initialisiert
 
 Schließe nach dem Update alle LoKiEnte-Fenster und starte erneut über den
-Desktoplauncher. Im Dual-Modus testen Provisionierung und Start denselben lokalen
-Embedding-Endpunkt und dieselbe 768-dimensionale Anfrage wie Kilo. Der Router
+Desktoplauncher. Im Dual-Modus testen Automatic-Provisionierung/-Start und ein
+bestätigter OnDemand-Start denselben lokalen Embedding-Endpunkt und dieselbe 768-dimensionale Anfrage wie Kilo. Der Router
 berücksichtigt LM-Studio-Versionen, die das optionale Feld `dimensions` ablehnen,
 und prüft weiterhin die tatsächlichen Antwortvektoren. Es gibt keinen Cloud-Fallback
 und keine automatische Zustimmung zur Indizierung eines Projekts.
+
+`Disabled` oder `OnDemand` mit `SmokeTest: NotRun` ist beabsichtigt, solange die
+Indizierung aus ist oder auf die Startauswahl wartet. Auch eine gescheiterte
+Vorprüfung lässt Kilos Indizierung für diesen Start deaktiviert. Ursache beheben
+und für einen erneuten Versuch neu starten.
 
 Bei **Failed to initialize** zeigt `runtime/embedding-status.json` im
 Installationsordner das letzte Vorprüfungsergebnis und den lokalen Router-Endpunkt.
@@ -368,7 +423,8 @@ Setup-Parameter.
 |---|---|---|
 | `-InstallRoot` | Ordner der gestarteten PS1; nicht leer | LoKiEnte-Installationsordner. Beim Update denselben Ordner verwenden. Basisprogramme und LM-Studio-Modelle behalten ihre eigenen Speicherorte. |
 | `-AuditOnly` | Schalter | Prüft Hardware, Werkzeuge, lokale Zustände und Online-Metadaten ohne Installation oder Modelldownload. Werkzeuge können eigene Logs/Caches schreiben oder Dienste initialisieren. Kein Provisionierungslauf. |
-| `-ModelMode` | `Dual`; `Single` oder `Dual` | Dual: Rollenmodellpool mit Router und lokaler Indexierung. Modelle werden kontrolliert nacheinander verwendet; der Name bedeutet nicht zwei gleichzeitig geladene Codingmodelle. Single: ein Codingmodell, derzeit ohne eingerichtete semantische Indexierung. |
+| `-ModelMode` | `Dual`; `Single` oder `Dual` | Dual: Rollenmodellpool mit Router und optionaler lokaler Indexierung. Modelle werden kontrolliert nacheinander verwendet; der Name bedeutet nicht zwei gleichzeitig geladene Codingmodelle. Single: ein Codingmodell, derzeit ohne eingerichtete semantische Indexierung. |
+| `-IndexingMode` | `Off`; `Off`, `OnDemand`, `Automatic` | Startart der Indizierung. Ohne Angabe erscheint im Dual-Modus ein Menü mit Vorgabe Off, auch bei Updates. Single unterstützt nur Off. |
 | `-IncludeFastModel` | Schalter | Zusätzliches kleines Fast-Modell im Dual-Pool anbieten; nur mit Dual zulässig. Nicht mit dem regulären Coder-Fast-Profil verwechseln. |
 | `-AllowPartialGpuOffload` | Schalter | Teilweise CPU-/RAM-Auslagerung für den Modellpool erlauben. Kann größere Modelle ermöglichen, aber deutlich langsamer sein. |
 | `-AllowUnfitAttempt` | Schalter | Modellstart trotz nicht nachgewiesener Speicherreserve versuchen. Kann zu Ladefehlern/OOM führen; LM Studios Schutzregeln bleiben aktiv. Kein notwendiger Updateparameter. |
@@ -450,9 +506,9 @@ erhalten. Prüfe Jobprotokolle und Prozesse, bevor du wiederherstellst. Lösche 
 Sperre nicht ungeprüft und starte keinen parallelen Auftrag.
 
 **Ist die semantische Codesuche sofort bereit?**
-Die lokale Indexierung muss im unterstützten Kilo-Profil pro Projekt freigegeben
-und abgeschlossen werden. Prüfe sie einmal anhand der
-[Suchprobe](Quellpaket/VALIDATION.de.md). Im Single-Modus wird sie derzeit nicht eingerichtet.
+Die Indizierung ist standardmäßig aus. Im Dual-Modus OnDemand oder Automatic
+provisionieren, über den Launcher starten und einmal pro Projekt in Kilo freigeben.
+Auf Complete warten und die [Suchprobe](Quellpaket/VALIDATION.de.md) durchführen.
 
 **Sind Testprozesse abgeschottet?**
 Sie bekommen bereinigte Umgebungsvariablen und eigene Temp-/Profilpfade, laufen

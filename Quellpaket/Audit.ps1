@@ -7,6 +7,7 @@ param(
     [string]$PayloadHash,
     [Collections.IDictionary]$PackageFiles,
     [string]$ModelMode,
+    [ValidateSet('Off','OnDemand','Automatic')][string]$IndexingMode='Off',
     [bool]$IncludeFastModel,
     [bool]$AllowPartialGpuOffload,
     [string]$PreferredModel,
@@ -20,6 +21,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+$IndexingMode=switch($IndexingMode){'Off'{'Off'} 'OnDemand'{'OnDemand'} 'Automatic'{'Automatic'}}
 $checks=New-Object 'Collections.Generic.List[object]'
 $tools=[ordered]@{}
 $states=@{}
@@ -499,7 +501,7 @@ $missing=@($checks|Where-Object {$_.status -eq 'MISSING'}).Count
     schema=2;mode='AUDIT_ONLY';checkedAtUtc=[DateTime]::UtcNow.ToString('o');bundleVersion=$BundleVersion
     status=$(if($failed){'BLOCKED'}elseif($warnings -or $missing){'ATTENTION_REQUIRED'}else{'PRECHECK_PASSED'})
     exitCode=$(if($failed){2}else{0})
-    provisioningPerformed=$false;inferenceVerified=$false;installRoot=$InstallRoot
+    provisioningPerformed=$false;inferenceVerified=$false;installRoot=$InstallRoot;requestedIndexingMode=$IndexingMode
     sideEffects='Audit writes no package files and requests no installation, inference or model switches. Existing CLI tools may write caches/logs or initialize their background service. Public metadata is queried online.'
     summary=@{failed=$failed;warnings=$warnings;missing=$missing;checks=$checks.Count}
     tools=$tools;checks=$checks.ToArray()

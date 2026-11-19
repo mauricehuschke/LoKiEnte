@@ -3,6 +3,7 @@
 param(
     [string]$InstallRoot=(Split-Path -Parent $PSScriptRoot),
     [string]$ProjectPath,
+    [switch]$StartIndexing,
     [switch]$PauseOnError
 )
 Set-StrictMode -Version Latest
@@ -10,6 +11,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 . (Join-Path $PSScriptRoot 'ModelSelection.ps1')
+. (Join-Path $PSScriptRoot 'Indexing.ps1')
 . (Join-Path $PSScriptRoot 'Ripgrep.ps1')
 . (Join-Path $PSScriptRoot 'ModelPool.ps1')
 . (Join-Path $PSScriptRoot 'Router.ps1')
@@ -38,12 +40,17 @@ try {
         if(-not(Test-Path -LiteralPath $path)){throw "Installation missing: $path. Complete provisioning first."}
     }
     $chain=Get-Content -LiteralPath $toolchainFile -Raw|ConvertFrom-Json -AsHashtable
+    $indexingMode=Get-ShadowIndexingMode -Toolchain $chain
+    if((Get-LrProperty $chain 'modelMode' 'Single') -ne 'Dual' -and $indexingMode -cne 'Off'){throw 'Semantic indexing requires a provisioned Dual model pool.'}
+    $startIndex=Select-ShadowIndexingForLaunch -Mode $indexingMode -StartIndexing:$StartIndexing
     if($chain.ContainsKey('modelMode') -and $chain.modelMode -eq 'Dual'){
         $pool=Get-Content -LiteralPath (Join-Path $InstallRoot 'runtime/model-pool.json') -Raw|ConvertFrom-Json
         $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $chain.nodeExecutable -PowerShellPath $chain.powerShellExecutable
-        $embedding=Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)
+        if($startIndex){$embedding=Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)}
+        else{Stop-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool;$embedding=Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode $indexingMode}
+        $embeddingArguments=Get-ShadowEmbeddingConfigurationArguments -Embedding $embedding -ApiBaseUrl $router.ApiBaseUrl
         $primary=[string](Get-LrProperty $pool 'PrimaryAlias' 'coder')
-        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $primary -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable -EmbeddingModelId $embedding.InstanceId -EmbeddingApiBaseUrl $router.ApiBaseUrl
+        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $primary -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments
     }else{
         $state=Get-Content -LiteralPath $runtimeFile -Raw|ConvertFrom-Json
         $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -LmsPath $state.LmsPath -ModelKey $state.ModelPath -ContextLength $state.ContextLength -Port $state.Port -DownloadModel $false -ApiTokenEnvironmentVariable $state.ApiTokenEnvironmentVariable -AllowUnfitAttempt:($chain.ContainsKey('allowUnfitAttempt') -and $chain.allowUnfitAttempt -eq $true)
@@ -83,9 +90,10 @@ try {
     }
     $process=[Diagnostics.Process]::Start($start)
     $process.Dispose()
-    if($ProjectPath -and $chain.modelMode -eq 'Dual'){
+    if($startIndex -and $ProjectPath -and $chain.modelMode -eq 'Dual' -and $embedding.Status -ceq 'Ready'){
         Write-ShadowMessage 'Indexing: enable it in Kilo for this project; first exclude sensitive files in .gitignore or .kilocodeignore. Wait for Complete status.'
     }
+    if(-not $startIndex){Write-ShadowMessage "Indexing is off for this launch (provisioned mode: $indexingMode). File search, subagents and tests remain available."}
     Write-ShadowMessage 'VS Code started with the local profile. After configuration changes, fully close existing windows of this profile and restart.' 'OK'
 } catch {
     Write-Error -Message $_.Exception.Message -ErrorAction Continue

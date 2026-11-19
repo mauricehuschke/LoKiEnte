@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.18.26 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.19.1 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
@@ -52,6 +52,55 @@ not resolve personal conflicts if Settings remains selected. The exclusion lists
 also sync when settings sync is enabled; they cannot exclude themselves.
 After updates, fully close all LoKiEnte windows and restart.
 
+### Optional indexing: Off, OnDemand or Automatic
+
+Indexing is **Off by default for every project**, including existing installations.
+In Dual mode, provisioning asks for a start mode unless you pass `-IndexingMode`.
+Press Enter for Off. Every provisioning run defaults to Off; a previously saved
+Automatic choice is not silently inherited. The selected mode is saved for later
+desktop-launcher starts.
+
+| Option | Provisioning | Desktop launcher |
+| --- | --- | --- |
+| `Off` (default) | Disables indexing; no indexing dependency or embedding download/load. | Starts without indexing for all projects, including previously enabled ones. |
+| `OnDemand` | Prepares LanceDB and the embedding model download; does not load the embedding model. | Asks whether to start indexing for this launch; Enter means No. |
+| `Automatic` | Prepares dependencies and checks the embedding service. | Starts the embedding service automatically; Kilo indexes projects with existing consent. |
+
+Use your usual coding-model options and add one of these flags:
+
+```powershell
+# Default: keep memory available for coding and review
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off
+
+# Prepare indexing, ask at each desktop launch
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode OnDemand
+
+# Start indexing automatically for projects you have enabled in Kilo
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Automatic
+```
+
+After changing modes, fully close all LoKiEnte VS Code windows and reopen the
+desktop launcher. This is a setting for the shared LoKiEnte profile; a running
+window does not receive another launch's environment. For OnDemand, close the
+previous session before making a different choice. Kilo still requires one-time
+project consent under **Settings > Indexing**. Existing consent is preserved;
+Off overrides it. Automatic cannot grant that consent on your behalf. Wait for
+**Complete** before relying on semantic search.
+
+To skip the OnDemand question for one launch, run the installed launcher in
+PowerShell 7 with `-StartIndexing` (replace the installation/project paths):
+
+```powershell
+pwsh -NoProfile -File D:\LocalAI\app\Start-LocalAI.ps1 -InstallRoot D:\LocalAI -ProjectPath D:\Projects\Example -StartIndexing
+```
+
+This switch cannot enable an Off installation: provision OnDemand or Automatic
+first. Single model mode supports Off only. Off preserves downloaded models and
+stored indexes. Switching to Off/OnDemand, or declining an OnDemand launch, unloads
+only LoKiEnte's verified idle embedding instance; busy or ambiguous instances stop
+the operation with an explanation. Close the previous session and retry.
+File search, subagents, reviews and tests remain available without indexing.
+
 ### Local semantic indexing
 
 Kilo and the embedding preflight use the local router's `/v1/embeddings` route.
@@ -73,19 +122,19 @@ A breached reserve rolls back only the newly loaded, uniquely owned idle embeddi
 instance. Coding models and pre-existing embeddings are not unloaded by this check.
 This policy does not alter coding/review model fit or GPU offload rules.
 
-Dual mode provisions LanceDB 0.26.2 and local
+Dual mode with OnDemand or Automatic provisions LanceDB 0.26.2 and local
 `nomic-embed-text-v1.5.Q4_K_M.gguf`. The model file is checked against its size and
 SHA-256, downloaded if needed and stored without overwriting an existing file.
 The embedding model runs with `--gpu off` alongside the active coding model; its
-RAM requirement is estimated. Setup and launcher startup perform a real local
-embedding request producing two vectors. Computation and vector storage remain
+RAM requirement is estimated. Automatic setup/startup and accepted OnDemand
+launches perform a real local embedding request producing two vectors. Computation and vector storage remain
 local, with no cloud fallback.
 
 If memory fit cannot be established, the model remains unverified by default.
 Only `-AllowUnfitAttempt` permits an attempt without the package's memory reserves;
 LM Studio's guardrails remain active. Failure to load or pass the embedding test
 leaves the installation usable with a warning, but indexing is not ready. The next
-LoKiEnte launch retries it. Corrupt model files, ambiguous ownership and authentication
+LoKiEnte launch that requests indexing retries it. Corrupt model files, ambiguous ownership and authentication
 errors remain explicit failures. Single mode does not currently provision indexing.
 
 This integration was checked with Kilo VS Code extensions 7.8.28 and 7.8.30.
@@ -94,7 +143,7 @@ version is checked for the required interfaces and settings during provisioning.
 The separately installed Kilo CLI has its own version number.
 
 Close all LoKiEnte windows, reopen the project, then open **Settings > Indexing**
-in Kilo and enable indexing for that project. Kilo manages this permission per
+in Kilo and enable indexing for that project after choosing OnDemand or Automatic. Kilo manages this permission per
 project; the package does not edit its internal VS Code database. Only **Complete**
 status and a successful semantic search establish that project indexing is ready.
 Successful provisioning alone does not establish this.
@@ -106,7 +155,7 @@ encrypted. The installed Kilo version's OpenAI-compatible embedding request does
 not distinguish the search/document prefixes recommended by Nomic. Optimal search
 quality is therefore not guaranteed; file search and targeted reading remain useful.
 
-After provisioning, run the search probe in [VALIDATION.md](VALIDATION.md). It uses
+After enabling indexing, run the search probe in [VALIDATION.md](VALIDATION.md). It uses
 a small synthetic directory and checks an expected match plus exclusions through
 both ignore files.
 
@@ -141,7 +190,7 @@ functional acceptance, commit and push remain your responsibility.
 ### Build the installer from source
 
 On the development machine, update the version above and run
-`python .\Build-LoKiEnte.py 2026.11.18.26` from the repository root. The script
+`python .\Build-LoKiEnte.py 2026.11.19.1` from the repository root. The script
 rebuilds the embedded payload and checksum. The target Windows PC still needs
 only the generated PS1. A separate old ZIP is unnecessary for this process. The
 provisioning report records the version and checksum of the installer actually used.
@@ -588,7 +637,7 @@ selected catalogue. Unverified models are explicitly marked. Effective configura
 including possible managed policy, is checked before CLI work; deviations fail.
 
 Kilo telemetry is disabled for launched processes, as is VS Code telemetry in the
-managed profile. Dual mode configures the local embedding service described above;
+managed profile. OnDemand and Automatic in Dual mode prepare the local embedding service described above;
 project indexing still requires Kilo's per-project enablement. Single mode leaves
 indexing disabled. Agents can also use file search and targeted reading. Setup
 requires Internet access for software and model downloads. “Local” means inference
