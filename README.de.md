@@ -6,6 +6,11 @@
   <img src="assets/lokiente-preview.png" width="280" alt="LoKiEnte: eine freche Ente mit grünem Loki-Helm und goldenen Hörnern">
 </p>
 
+<p align="center">
+  <a href="https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1"><img src="assets/badge-windows-download.svg" alt="Aktueller Windows-Download"></a>
+  <a href="#schnellinstallation-aktuelles-release"><img src="assets/badge-provisioning.svg" alt="Provisionierungsanleitung"></a>
+</p>
+
 LoKiEnte richtet eine lokale KI-Entwicklungsumgebung unter Windows ein: VS Code
 als Editor, Kilo für deine Entwicklungsaufträge und LM Studio für die Modelle
 auf deinem Rechner. Du beschreibst eine Änderung; getrennte Agenten planen,
@@ -119,6 +124,56 @@ Speicherreserven und ist keine Qualitätseinstellung. Details stehen unter
 [allen Optionen](#sämtliche-parameter-des-provisionierungsskripts).
 
 Für einen automatischen Download mit Prüfsummenprüfung verwende den folgenden Abschnitt.
+
+### Optionale Indizierung: Aus, bei Bedarf oder automatisch
+
+Die Indizierung ist **standardmäßig für alle Projekte aus**, auch bei bestehenden
+Installationen. Im Dual-Modus fragt die Provisionierung nach der Startart, sofern
+`-IndexingMode` fehlt. Enter wählt Off. Jede erneute Provisionierung verwendet
+wieder Off als Vorgabe; eine frühere Automatic-Auswahl wird nicht still übernommen.
+Die gewählte Startart wird für spätere Starts über das Desktopicon gespeichert.
+
+| Option | Provisionierung | Desktoplauncher |
+| --- | --- | --- |
+| `Off` (Standard) | Deaktiviert die Indizierung; kein Download oder Laden von Index-Abhängigkeiten bzw. Embedding-Modell. | Startet ohne Indizierung für alle Projekte, auch zuvor freigegebene. |
+| `OnDemand` | Bereitet LanceDB und den Download des Embedding-Modells vor; lädt das Modell nicht in den Speicher. | Fragt bei jedem Start nach der Indizierung; Enter bedeutet Nein. |
+| `Automatic` | Bereitet Abhängigkeiten vor und prüft den Embedding-Dienst. | Startet den Embedding-Dienst automatisch; Kilo indiziert bereits freigegebene Projekte. |
+
+Ergänze deine üblichen Modelloptionen um eine dieser Startarten:
+
+```powershell
+# Standard: Speicher für Coding und Review freihalten
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off
+
+# Indizierung vorbereiten, bei jedem Desktopstart nachfragen
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode OnDemand
+
+# Indizierung für in Kilo freigegebene Projekte automatisch starten
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Automatic
+```
+
+Nach einem Moduswechsel alle LoKiEnte-VS-Code-Fenster vollständig schließen und
+den Desktoplauncher erneut starten. Die Einstellung gilt für das gemeinsame
+LoKiEnte-Profil; laufende Fenster übernehmen nicht die Umgebung eines weiteren
+Starts. Bei OnDemand die vorherige Sitzung schließen, bevor du anders auswählst.
+Kilo verlangt weiterhin eine einmalige Projektfreigabe unter **Settings > Indexing**.
+Bestehende Freigaben bleiben erhalten; Off setzt sie außer Kraft. Automatic kann
+diese Zustimmung nicht selbst erteilen. Vor semantischer Suche auf **Complete** warten.
+
+Für einen OnDemand-Start ohne Rückfrage den installierten Launcher in PowerShell 7
+mit `-StartIndexing` ausführen (Installations- und Projektpfade anpassen):
+
+```powershell
+pwsh -NoProfile -File D:\LocalAI\app\Start-LocalAI.ps1 -InstallRoot D:\LocalAI -ProjectPath D:\Projects\Example -StartIndexing
+```
+
+Der Schalter aktiviert keine Off-Installation: Zuerst OnDemand oder Automatic
+provisionieren. Single unterstützt nur Off. Off erhält heruntergeladene Modelle
+und gespeicherte Indizes. Beim Wechsel auf Off/OnDemand oder beim Ablehnen im
+OnDemand-Launcher wird nur die nachweislich eigene, inaktive Embedding-Instanz
+entladen. Aktive oder unklare Instanzen stoppen den Vorgang mit einer Erklärung.
+Vorherige Sitzung schließen und erneut versuchen. Dateisuche, Subagenten, Reviews
+und Tests bleiben ohne Indizierung verfügbar.
 
 ### PowerShell (empfohlen, mit Prüfsummenprüfung)
 
@@ -240,37 +295,70 @@ du stattdessen das wiederhergestellte Layout behalten, setze
 **LoKiEnte: Open Kilo** bleibt in der Befehlspalette verfügbar. Kann Kilo nicht
 geöffnet werden, beachte die Warnung und den Ausgabekanal **LoKiEnte Startup**.
 
-Über **Backup and Sync Settings** kannst du deine üblichen Erweiterungen und
-Editor-Einstellungen übernehmen. Die Provisionierung meldet dich nicht an und
-aktiviert keine Cloud-Synchronisierung. Wähle beim Einrichten von Sync:
+**Empfohlen: nur Erweiterungen synchronisieren, Einstellungen lokal lassen.** So
+übernimmst du deine üblichen Erweiterungen ohne einen Abgleich der Editor-Einstellungen
+mit einer anderen Umgebung. Die Provisionierung meldet dich nicht an und ändert
+nicht stillschweigend die Sync-Kategorien deines Kontos.
 
-- **Extensions**; bei Bedarf zusätzlich **Settings**, **Keyboard Shortcuts** und
-  **Snippets**. Themes und Formatierer bleiben deine persönliche Auswahl.
-- Lasse **UI State** und **Profiles** für LoKiEnte vorzugsweise abgewählt, damit
-  Layout und Profile einer anderen Umgebung nicht importiert werden. Diese Auswahl
-  erfolgt im Sync-Dialog von VS Code; der Installer ändert sie nicht heimlich.
-- Die Provisionierung erweitert `settingsSync.ignoredSettings`, damit das verwaltete
-  Terminal, Kilo-Autocomplete-Vorgaben, Telemetrie-/Updatevorgaben, Startpräferenz
-  und Copilot-Sichtbarkeit lokal bleiben. Die gesamte Windows-Terminalprofil-Liste
-  wird ausgeschlossen, weil sie maschinenspezifische Programmpfade enthält.
-- `settingsSync.ignoredExtensions` schließt Kilo, den Startup-Helfer und beide
-  GitHub-Copilot-Erweiterungen aus. Installation und Aktivierungszustand bleiben
-  damit von deiner persönlichen Umgebung getrennt; andere Erweiterungen können
-  normal synchronisieren. Kilo aktualisiert die Provisionierung, nicht Settings Sync.
+1. Brich einen noch offenen erstmaligen Einstellungs-Merge ab.
+2. Rufe **LoKiEnte: Configure Extension Sync** über die Befehlspalette auf. Der
+   aktualisierte Startup-Helfer bietet außerdem einmalig einen Hinweis an. Er öffnet
+   die offizielle Sync-Auswahlliste von VS Code.
+3. Wähle **nur Extensions** und wähle **alle anderen Kategorien** ab, insbesondere
+   **Settings**, **UI State** und **Profiles**. Übernimm die Auswahl. Beim erstmaligen
+   Aktivieren von Backup and Sync gilt dieselbe Auswahl im Einrichtungsdialog.
+4. Melde dich bei Bedarf selbst an. Vorhandene lokale Themes, Formatierer und
+   Terminalprofile bleiben lokal; Cloud-Einstellungen werden nicht ersetzt.
 
-Updates erhalten persönliche Einstellungen und eigene Ausnahmen, sichern geänderte
-Einstellungen unter `backups/vscode-settings` und entfernen ausdrückliche
-Sync-Freigaben, die den verwalteten Ausnahmen widersprechen. Auch bestehende
-registrierte Arbeitsbereiche erhalten die KI-Vorgabe.
+Die öffentliche Erweiterungs-API von VS Code erlaubt dem Helfer nicht, diese
+Kategorien auszulesen oder automatisch zu setzen. Das Öffnen des Dialogs bestätigt
+**nicht**, dass die Auswahl übernommen wurde. Ein bestehender Einstellungskonflikt
+wird durch das Abwählen von Settings behoben, nicht durch pauschale Übernahme einer
+Dateiseite. Erneutes Provisionieren allein kann diese Auswahl nicht treffen.
 
-**Falls beim erstmaligen Aktivieren bereits ein Merge-Konflikt angezeigt wird:**
-Brich diese Einrichtung ab, schließe die LoKiEnte-Fenster, provisioniere erneut mit
-demselben Installationsordner und öffne danach LoKiEnte und die Sync-Einrichtung.
-Für Erweiterungen allein lasse **Settings** abgewählt. Synchronisierst du auch
-Einstellungen, löse verbleibende persönliche Konflikte gezielt auf. Ersetze nicht
-die gesamte Datei pauschal über **Accept Remote Settings** oder **Accept Local Settings**.
-Persönliche Konflikte bleiben möglich; die Provisionierung überschreibt keine
-Cloud-Einstellungen und manipuliert nicht die interne Sync-Datenbank von VS Code.
+Die verwalteten Einstellungs- und Erweiterungsausnahmen bleiben als zusätzliche
+Absicherung erhalten, falls du später auch Einstellungen synchronisieren möchtest.
+Kilo, der Startup-Helfer und beide Copilot-Erweiterungen sind vom Erweiterungs-Sync
+ausgeschlossen; Kilo aktualisiert die Provisionierung. Persönliche Einstellungen
+und eigene Ausnahmen bleiben erhalten; Änderungen werden unter
+`backups/vscode-settings` gesichert. Ein späterer Abgleich persönlicher Einstellungen
+kann echte Konflikte erzeugen. VS Code synchronisiert die Ausnahmelisten selbst;
+sie lassen sich nicht zuverlässig durch Einträge in ihrer eigenen Liste isolieren.
+
+### Falls die lokale Indizierung nicht initialisiert
+
+Schließe nach dem Update alle LoKiEnte-Fenster und starte erneut über den
+Desktoplauncher. Im Dual-Modus testen Automatic-Provisionierung/-Start und ein
+bestätigter OnDemand-Start denselben lokalen Embedding-Endpunkt und dieselbe 768-dimensionale Anfrage wie Kilo. Der Router
+berücksichtigt LM-Studio-Versionen, die das optionale Feld `dimensions` ablehnen,
+und prüft weiterhin die tatsächlichen Antwortvektoren. Es gibt keinen Cloud-Fallback
+und keine automatische Zustimmung zur Indizierung eines Projekts.
+
+`Disabled` oder `OnDemand` mit `SmokeTest: NotRun` ist beabsichtigt, solange die
+Indizierung aus ist oder auf die Startauswahl wartet. Auch eine gescheiterte
+Vorprüfung lässt Kilos Indizierung für diesen Start deaktiviert. Ursache beheben
+und für einen erneuten Versuch neu starten.
+
+Bei **Failed to initialize** zeigt `runtime/embedding-status.json` im
+Installationsordner das letzte Vorprüfungsergebnis und den lokalen Router-Endpunkt.
+`runtime/router-events.jsonl` enthält bereinigte Fehlercodes späterer Anfragen.
+Prüfe in LM Studio die Modellbereitschaft und mögliche HTTP-Fehler. Ein bestandener
+Vorabtest ist noch kein fertiger Projektindex: Aktiviere die Indizierung für das
+gewünschte Projekt und warte auf **Complete**. Im Single-Modus wird semantische
+Indizierung weiterhin nicht provisioniert.
+
+`Deferred` mit `SmokeTest: NotRun` bedeutet, dass das Embedding-Modell noch nicht
+für einen API-Test bereitstand. `result.MemoryCheck` unterscheidet echten RAM-Mangel,
+unsichere Schätzung und eine Ablehnung durch die LM-Studio-Schutzregeln. Für das
+geprüfte CPU-Embedding-Modell wird bei `LOW` oder fehlender Schutzregelmeldung ein
+konservatives Ladebudget angesetzt: mindestens 1 GiB oder das Vierfache des größeren
+Werts aus Schätzung und Modelldateigröße. Zusätzlich müssen 3 GiB verfügbar bleiben.
+LM Studio kontrolliert weiterhin das tatsächliche Laden; eine ausdrückliche
+Ablehnung blockiert es. Erst erfolgreiche Inferenz bestätigt die Bereitschaft.
+Wird die Reserve nach dem konservativen Laden oder Inferenztest unterschritten,
+wird ausschließlich die dabei neu geladene, eindeutig verifizierte und inaktive
+Embedding-Instanz entladen. Beschäftigte oder mehrdeutige Instanzen bleiben erhalten
+und werden gemeldet. Dafür ist kein `-AllowUnfitAttempt` erforderlich.
 
 ## Wie die Codeprüfung funktioniert
 
@@ -340,7 +428,8 @@ Setup-Parameter.
 |---|---|---|
 | `-InstallRoot` | Ordner der gestarteten PS1; nicht leer | LoKiEnte-Installationsordner. Beim Update denselben Ordner verwenden. Basisprogramme und LM-Studio-Modelle behalten ihre eigenen Speicherorte. |
 | `-AuditOnly` | Schalter | Prüft Hardware, Werkzeuge, lokale Zustände und Online-Metadaten ohne Installation oder Modelldownload. Werkzeuge können eigene Logs/Caches schreiben oder Dienste initialisieren. Kein Provisionierungslauf. |
-| `-ModelMode` | `Dual`; `Single` oder `Dual` | Dual: Rollenmodellpool mit Router und lokaler Indexierung. Modelle werden kontrolliert nacheinander verwendet; der Name bedeutet nicht zwei gleichzeitig geladene Codingmodelle. Single: ein Codingmodell, derzeit ohne eingerichtete semantische Indexierung. |
+| `-ModelMode` | `Dual`; `Single` oder `Dual` | Dual: Rollenmodellpool mit Router und optionaler lokaler Indexierung. Modelle werden kontrolliert nacheinander verwendet; der Name bedeutet nicht zwei gleichzeitig geladene Codingmodelle. Single: ein Codingmodell, derzeit ohne eingerichtete semantische Indexierung. |
+| `-IndexingMode` | `Off`; `Off`, `OnDemand`, `Automatic` | Startart der Indizierung. Ohne Angabe erscheint im Dual-Modus ein Menü mit Vorgabe Off, auch bei Updates. Single unterstützt nur Off. |
 | `-IncludeFastModel` | Schalter | Zusätzliches kleines Fast-Modell im Dual-Pool anbieten; nur mit Dual zulässig. Nicht mit dem regulären Coder-Fast-Profil verwechseln. |
 | `-AllowPartialGpuOffload` | Schalter | Teilweise CPU-/RAM-Auslagerung für den Modellpool erlauben. Kann größere Modelle ermöglichen, aber deutlich langsamer sein. |
 | `-AllowUnfitAttempt` | Schalter | Modellstart trotz nicht nachgewiesener Speicherreserve versuchen. Kann zu Ladefehlern/OOM führen; LM Studios Schutzregeln bleiben aktiv. Kein notwendiger Updateparameter. |
@@ -422,9 +511,9 @@ erhalten. Prüfe Jobprotokolle und Prozesse, bevor du wiederherstellst. Lösche 
 Sperre nicht ungeprüft und starte keinen parallelen Auftrag.
 
 **Ist die semantische Codesuche sofort bereit?**
-Die lokale Indexierung muss im unterstützten Kilo-Profil pro Projekt freigegeben
-und abgeschlossen werden. Prüfe sie einmal anhand der
-[Suchprobe](Quellpaket/VALIDATION.de.md). Im Single-Modus wird sie derzeit nicht eingerichtet.
+Die Indizierung ist standardmäßig aus. Im Dual-Modus OnDemand oder Automatic
+provisionieren, über den Launcher starten und einmal pro Projekt in Kilo freigeben.
+Auf Complete warten und die [Suchprobe](Quellpaket/VALIDATION.de.md) durchführen.
 
 **Sind Testprozesse abgeschottet?**
 Sie bekommen bereinigte Umgebungsvariablen und eigene Temp-/Profilpfade, laufen

@@ -569,6 +569,46 @@ function Start-LocalModelPool {
     } finally {$lock.Dispose()}
 }
 
+function Get-SmpEmbeddingMemoryCheck {
+    param([string]$EstimateText,[long]$FreeRamBytes,[long]$ModelSizeBytes)
+    $plain=($EstimateText -replace '\x1B\[[0-?]*[ -/]*[@-~]','') -replace '\s+',' '
+    $total=Convert-LrEstimatedBytes -Text $plain -Label 'Estimated Total Memory'
+    if($total -le 0 -or $FreeRamBytes -lt 0 -or $ModelSizeBytes -le 0){throw 'Invalid CPU embedding memory measurements.'}
+    $guardrails=if($plain -match 'This model will fail to load based on your resource guardrails settings'){'Denied'}
+        elseif($plain -match 'This model may be loaded based on your resource guardrails settings'){'Allowed'}else{'NotReported'}
+    $low=$plain -match 'Confidence:\s*LOW\b'
+    # Only the hash-verified CPU embedding model uses this conservative trial.
+    # LOW is an uncertain estimate, not a measured resource shortage. The actual
+    # load still enforces LM Studio guardrails; readiness requires real inference.
+    $conservative=$low -or $guardrails -ceq 'NotReported'
+    $budget=if($conservative){[long][math]::Max(1GB,[math]::Max(4.0*$total,4.0*$ModelSizeBytes))}else{$total}
+    $reasons=@(if($guardrails -ceq 'Denied'){'lm_studio_guardrails_denied'};if($budget -gt ($FreeRamBytes-3GB)){'insufficient_ram_with_reserve'})
+    return [pscustomobject][ordered]@{
+        EstimatedBytes=$total;AvailableRamBytes=$FreeRamBytes;BudgetBytes=$budget;ReserveBytes=[long]3GB
+        Guardrails=$guardrails;LowConfidence=$low;ConservativeTrial=$conservative;BlockingReasons=$reasons
+        AvailableAfterLoadBytes=$null;AvailableAfterInferenceBytes=$null
+    }
+}
+
+function Remove-SmpIdleEmbeddingInstance {
+    param($Pool,$Owner,[string]$InstanceId,[string]$ModelPath,[string]$LogDirectory)
+    # Used for rollback of a new load or an explicitly disabled owned embedding.
+    # Do not use the coding-model unload helper: it deliberately excludes embeddings.
+    $entries=@($Owner.Entries|Where-Object {$_.InstanceId -ceq $InstanceId -and $_.ModelPath -ceq $ModelPath -and $_.Verified -eq $true -and (Get-LrProperty $_ 'Origin') -ceq 'verified-cpu-embedding'})
+    if($InstanceId -cne ('shadow-'+$Owner.OwnerId+'-embedding') -or $entries.Count -ne 1){throw 'Cannot verify embedding rollback ownership. No instance was unloaded.'}
+    $matches=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $LogDirectory|Where-Object {(Get-LrProperty $_ 'identifier') -ceq $InstanceId})
+    if(-not $matches.Count){return}
+    if($matches.Count -ne 1 -or (Get-LrProperty $matches[0] 'type') -cne 'embedding' -or
+       (Get-LrProperty $matches[0] 'path') -cne $ModelPath -or $null -ne (Get-LrProperty $matches[0] 'deviceIdentifier' '__unknown__') -or
+       [int](Get-LrProperty $matches[0] 'contextLength' 0) -ne 2048 -or (Get-LrProperty $matches[0] 'status') -cne 'idle' -or
+       [int](Get-LrProperty $matches[0] 'queued' -1) -ne 0){throw 'Embedding rollback cannot verify a unique idle local instance. No instance was unloaded.'}
+    $apiRoot=$Pool.BackendApiBaseUrl -replace '/v1/?$',''
+    $response=Invoke-LrApi -Uri ($apiRoot+'/api/v1/models/unload') -Headers (Get-LrApiHeaders $Pool.ApiTokenEnvironmentVariable) -Method POST -Body @{instance_id=$InstanceId} -TimeoutSeconds 120
+    if((Get-LrProperty $response 'instance_id') -cne $InstanceId){throw 'LM Studio did not confirm the targeted embedding rollback.'}
+    $remaining=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $LogDirectory|Where-Object {(Get-LrProperty $_ 'identifier') -ceq $InstanceId})
+    if($remaining.Count){throw 'Embedding instance remains loaded after rollback.'}
+}
+
 function Start-ShadowEmbeddingModel {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)]$Pool,[Parameter(Mandatory)]$Definition,[switch]$AllowUnfitAttempt)
@@ -597,41 +637,45 @@ function Start-ShadowEmbeddingModel {
         }
         $loaded=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $logs)
         $instances=@($loaded|Where-Object {(Get-LrProperty $_ 'identifier') -ceq $id})
-        $reserveOverride=$false
+        $reserveOverride=$false;$memoryCheck=$null;$loadedHere=$false
         if(-not $instances.Count){
             $estimate=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments @('load',$path,'--exact','--local','--context-length','2048','--gpu','off','--estimate-only','--yes') -LogDirectory $logs
             $text=$estimate.Stdout+"`n"+$estimate.Stderr
-            $total=Convert-LrEstimatedBytes -Text $text -Label 'Estimated Total Memory'
             $hardware=Get-LocalNvidiaGpu -LogDirectory $logs
-            if($text -notmatch 'This model may be loaded based on your resource guardrails settings\.' -or $text -match 'Confidence:\s*LOW' -or
-               $total -gt ($hardware.FreeRamBytes-3GB)){
-                if(-not $AllowUnfitAttempt){
-                    $error=[InvalidOperationException]::new('No verified RAM fit for the CPU embedding model with 3 GiB reserve. No further instance was loaded.')
+            $memoryCheck=Get-SmpEmbeddingMemoryCheck -EstimateText $text -FreeRamBytes $hardware.FreeRamBytes -ModelSizeBytes $file.Size
+            $fitMessage="CPU embedding RAM fit: estimate $($memoryCheck.EstimatedBytes) bytes, load budget $($memoryCheck.BudgetBytes) bytes, available $($memoryCheck.AvailableRamBytes) bytes, reserve $($memoryCheck.ReserveBytes) bytes; confidence low: $($memoryCheck.LowConfidence); LM Studio guardrails: $($memoryCheck.Guardrails)."
+            if($memoryCheck.BlockingReasons.Count){
+                if(-not $AllowUnfitAttempt -or $memoryCheck.Guardrails -ceq 'Denied'){
+                    $error=[InvalidOperationException]::new("No verified RAM fit for the CPU embedding model. Reasons: $($memoryCheck.BlockingReasons -join ', '). $fitMessage No further instance was loaded.")
                     $error.Data['ShadowResourceFitFailure']=$true
+                    $error.Data['ShadowEmbeddingMemoryCheck']=$memoryCheck
                     throw $error
                 }
                 $reserveOverride=$true
                 Write-Warning 'No verified RAM fit for the CPU embedding model. Attempting load without LoKiEnte reserve; LM Studio safeguards remain active.'
             }
+            if($memoryCheck.ConservativeTrial -and -not $reserveOverride){Write-Host "$fitMessage Using a conservative CPU load and inference check; the 3 GiB reserve remains required."}
             $owner.Entries=@($owner.Entries|Where-Object {$_.InstanceId -cne $id})+@(
                 [pscustomobject]@{InstanceId=$id;ModelPath=$path;Verified=$false;Origin='pending-cpu-embedding';ExpectedPath=$Definition.ExpectedPath;SelectedVariant='';GpuOffload='off'}
             )
             Write-SmpJson -Path (Join-Path $InstallRoot 'runtime/model-ownership.json') -Value $owner -InstallRoot $InstallRoot
             Write-Host 'Loading the local embedding model exclusively on the CPU ...'
             $loadArguments=@('load',$path,'--exact','--local','--context-length','2048','--gpu','off','--identifier',$id,'--yes')
-            if($reserveOverride){
+            if($reserveOverride -or $memoryCheck.ConservativeTrial){
                 $load=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments $loadArguments -LogDirectory $logs -TimeoutSeconds 900 -AllowFailure
                 $loadExit=Get-LrProperty $load 'ExitCode'
                 if($loadExit -isnot [int] -and $loadExit -isnot [long]){throw 'LM Studio returned no usable exit code for the embedding load attempt.'}
                 if($loadExit -ne 0){
-                    $error=[InvalidOperationException]::new("No verified RAM fit for the CPU embedding model; LM Studio rejected the load attempt (exit code $loadExit). Details: $($load.LogPath)")
+                    $error=[InvalidOperationException]::new("LM Studio rejected the CPU embedding load attempt (exit code $loadExit). $fitMessage Details: $($load.LogPath)")
                     $error.Data['ShadowResourceFitFailure']=$true
+                    $error.Data['ShadowEmbeddingMemoryCheck']=$memoryCheck
                     throw $error
                 }
             }else{
                 $null=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments $loadArguments -LogDirectory $logs -TimeoutSeconds 900
             }
             Restore-SmpPendingOwnership -InstallRoot $InstallRoot -Pool $Pool -Owner $owner -LogDirectory $logs
+            $loadedHere=$true
             $instances=@(Invoke-LrJson -LmsPath $Pool.LmsPath -Arguments @('ps','--json') -LogDirectory $logs|Where-Object {(Get-LrProperty $_ 'identifier') -ceq $id})
         }
 
@@ -640,10 +684,20 @@ function Start-ShadowEmbeddingModel {
            [int](Get-LrProperty $instances[0] 'contextLength' 0) -ne 2048){
             throw 'Loaded embedding instance is not uniquely verified. It remains unchanged.'
         }
+        if($loadedHere -and $memoryCheck.ConservativeTrial -and -not $reserveOverride){
+            $memoryCheck.AvailableAfterLoadBytes=[long](Get-LocalNvidiaGpu -LogDirectory $logs).FreeRamBytes
+            if($memoryCheck.AvailableAfterLoadBytes -lt 3GB){
+                Remove-SmpIdleEmbeddingInstance -Pool $Pool -Owner $owner -InstanceId $id -ModelPath $path -LogDirectory $logs
+                $error=[InvalidOperationException]::new('CPU embedding load left less than 3 GiB available RAM. The newly loaded embedding was unloaded; coding models remain unchanged.')
+                $error.Data['ShadowResourceFitFailure']=$true;$error.Data['ShadowEmbeddingMemoryCheck']=$memoryCheck
+                throw $error
+            }
+        }
+        $inferenceError=$null
         try {
             $headers=Get-LrApiHeaders -ApiTokenEnvironmentVariable $Pool.ApiTokenEnvironmentVariable
-            $response=Invoke-LrApi -Uri ($Pool.BackendApiBaseUrl+'/embeddings') -Headers $headers -Method POST -Body @{
-                model=$id;input=@('local embedding test','local source search');encoding_format='base64'
+            $response=Invoke-LrApi -Uri ($Pool.RouterApiBaseUrl+'/embeddings') -Headers $headers -Method POST -Body @{
+                model=$id;input=@('local embedding test','local source search');encoding_format='base64';dimensions=768
             } -TimeoutSeconds 60
             $data=@(Get-LrProperty $response 'data' @())
             if($data.Count -ne 2){throw 'Embedding smoke test did not return two vectors.'}
@@ -668,24 +722,42 @@ function Start-ShadowEmbeddingModel {
                 }
                 if(-not $nonzero){throw 'Embedding smoke test returned a zero vector.'}
             }
-        } catch {
-            if($_.Exception.Data['ShadowAuthenticationFailure']){throw}
-            $error=[InvalidOperationException]::new("Embedding smoke test failed: $($_.Exception.Message)")
-            $error.Data['ShadowEmbeddingVerificationFailure']=$true
+        } catch {$inferenceError=$_.Exception}
+        if($loadedHere -and $memoryCheck.ConservativeTrial -and -not $reserveOverride){
+            $memoryCheck.AvailableAfterInferenceBytes=[long](Get-LocalNvidiaGpu -LogDirectory $logs).FreeRamBytes
+            if($memoryCheck.AvailableAfterInferenceBytes -lt 3GB){
+                Remove-SmpIdleEmbeddingInstance -Pool $Pool -Owner $owner -InstanceId $id -ModelPath $path -LogDirectory $logs
+                if($inferenceError -and $inferenceError.Data['ShadowAuthenticationFailure']){throw $inferenceError}
+                $error=[InvalidOperationException]::new('CPU embedding inference left less than 3 GiB available RAM. The newly loaded embedding was unloaded; indexing remains deferred.')
+                $error.Data['ShadowResourceFitFailure']=$true;$error.Data['ShadowEmbeddingMemoryCheck']=$memoryCheck
+                $error.Data['ShadowEmbeddingSmokeTest']=if($inferenceError){'Failed'}else{'Passed'}
+                throw $error
+            }
+        }
+        if($inferenceError){
+            if($inferenceError.Data['ShadowAuthenticationFailure']){throw $inferenceError}
+            $error=[InvalidOperationException]::new("Embedding smoke test failed: $($inferenceError.Message)")
+            $error.Data['ShadowEmbeddingVerificationFailure']=$true;$error.Data['ShadowEmbeddingMemoryCheck']=$memoryCheck
             throw $error
         }
-        return [pscustomobject]@{Status='Ready';InstanceId=$id;ModelPath=$path;Dimension=768;Device='CPU';SmokeTest='Passed';ReserveOverride=$reserveOverride}
+        return [pscustomobject]@{Status='Ready';InstanceId=$id;ModelPath=$path;Dimension=768;Device='CPU';SmokeTest='Passed';ReserveOverride=$reserveOverride;MemoryCheck=$memoryCheck}
     } finally {$lock.Dispose()}
 }
 
 function Initialize-ShadowEmbeddingModel {
     param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)]$Pool,[Parameter(Mandatory)]$Definition)
     try {
-        return Start-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $Pool -Definition $Definition -AllowUnfitAttempt:(Get-LrProperty $Pool 'AllowUnfitAttempt' $false)
+        $result=Start-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $Pool -Definition $Definition -AllowUnfitAttempt:(Get-LrProperty $Pool 'AllowUnfitAttempt' $false)
     } catch {
         if(-not $_.Exception.Data['ShadowResourceFitFailure'] -and -not $_.Exception.Data['ShadowEmbeddingVerificationFailure']){throw}
         Write-Warning "Local indexing is not ready yet: $($_.Exception.Message) Model remains downloaded."
-        $smoke=if($_.Exception.Data['ShadowEmbeddingVerificationFailure']){'Failed'}else{'NotRun'}
-        return [pscustomobject]@{Status='Deferred';InstanceId=('shadow-'+$Pool.OwnerId+'-embedding');ModelPath=$Definition.ExpectedPath;Dimension=768;Device='CPU';SmokeTest=$smoke;Message=$_.Exception.Message}
+        $smoke=if($_.Exception.Data['ShadowEmbeddingSmokeTest']){[string]$_.Exception.Data['ShadowEmbeddingSmokeTest']}elseif($_.Exception.Data['ShadowEmbeddingVerificationFailure']){'Failed'}else{'NotRun'}
+        $result=[pscustomobject]@{Status='Deferred';InstanceId=('shadow-'+$Pool.OwnerId+'-embedding');ModelPath=$Definition.ExpectedPath;Dimension=768;Device='CPU';SmokeTest=$smoke;Message=$_.Exception.Message;MemoryCheck=$_.Exception.Data['ShadowEmbeddingMemoryCheck']}
     }
+    # Stable content avoids a new backup on every successful launch. API errors
+    # are already sanitized; no request text or authentication values are stored.
+    Write-SmpJson -Path (Join-Path $InstallRoot 'runtime/embedding-status.json') -InstallRoot $InstallRoot -Value ([ordered]@{
+        schema=1;apiBaseUrl=$Pool.RouterApiBaseUrl;requestedDimensions=768;result=$result
+    })
+    return $result
 }

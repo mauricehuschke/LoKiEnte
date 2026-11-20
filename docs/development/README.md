@@ -77,7 +77,17 @@ on a target Windows machine is separate from synthetic regression tests.
    "$digest  Provision-LoKiEnte.ps1" | Set-Content .\Provision-LoKiEnte.ps1.sha256 -Encoding ascii
    ```
 
-4. Verify both uploaded assets, publish the release, and check the anonymous
+4. Every release description must include a changelog and these permanent links,
+   even when GitHub already shows the assets below. Keep the latest Windows
+   download and provisioning-guide buttons at the top of both user READMEs.
+
+   - [Always download the latest Windows installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
+   - [Latest installer SHA-256](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1.sha256)
+   - [Install or update](https://github.com/mauricehuschke/LoKiEnte/blob/main/README.md#quick-install-latest-release)
+
+   Explain upgrade steps and changed defaults, record the validation performed,
+   and distinguish synthetic regression checks from target-machine acceptance.
+5. Verify both uploaded assets, publish the release, and check the anonymous
    latest-release download and checksum. Release immutability locks the tag and
    assets after publication; publish a new version to change them.
 
@@ -132,6 +142,18 @@ Validate profile preservation, sync opt-in removal, idempotence, VSIX contents,
 workspace migration and startup/failure behavior using Test-ProvisionSettings.ps1,
 Test-VsCodeProfile.ps1, Test-WorkspaceGuide.ps1 and Test-VsCodeStartup.mjs. A real
 VS Code/Kilo window and signed-in sync acceptance are separate integration checks.
+
+The startup VSIX also includes `sync-guide.cjs`. Its command
+`lokiente.configureExtensionSync` opens the supported VS Code sync configuration
+UI and explains selecting Extensions only. The one-time marker records guidance,
+not successful configuration. Test it with `node Quellpaket/tests/Test-SyncGuide.mjs`.
+Never set internal sync database keys or claim category selection was applied.
+
+The managed `/v1/embeddings` route has its own bounded CPU request handling and
+shares router authentication and shutdown protection. Run Test-EmbeddingRouter.mjs,
+Test-ModelRouter.mjs, Test-Embedding.ps1 and Test-RouterLifecycle.ps1 after changes.
+Provisioning and launch must send embedding preflight and Kilo through the same
+route. A synthetic API checks compatibility; real target inference remains separate.
 
 ## License and forks
 

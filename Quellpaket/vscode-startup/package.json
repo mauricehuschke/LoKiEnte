@@ -3,7 +3,7 @@
   "displayName": "LoKiEnte Managed Startup",
   "description": "Open Kilo in the local environment started by the LoKiEnte desktop launcher.",
   "publisher": "lokiente",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "engines": { "vscode": "^1.105.1" },
   "license": "SEE LICENSE IN LICENSE.txt",
   "main": "./extension.cjs",
@@ -11,7 +11,10 @@
   "extensionKind": ["ui"],
   "capabilities": { "untrustedWorkspaces": { "supported": true } },
   "contributes": {
-    "commands": [{ "command": "lokiente.openKilo", "title": "Open Kilo", "category": "LoKiEnte" }],
+    "commands": [
+      { "command": "lokiente.openKilo", "title": "Open Kilo", "category": "LoKiEnte" },
+      { "command": "lokiente.configureExtensionSync", "title": "Configure Extension Sync", "category": "LoKiEnte" }
+    ],
     "configuration": {
       "title": "LoKiEnte",
       "properties": {

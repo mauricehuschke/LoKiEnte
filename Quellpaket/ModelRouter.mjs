@@ -9,7 +9,7 @@ import { once } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const ROUTER_VERSION = '2026.11.17.15';
+export const ROUTER_VERSION = '2026.11.18.25';
 const BODY_LIMIT = 4 * 1024 * 1024;
 const RESPONSE_LIMIT = 16 * 1024 * 1024;
 const ALLOWED_FIELDS = new Set(['model','messages','stream','stream_options','max_tokens',
@@ -72,7 +72,9 @@ async function readBody(req) {
 export function createModelRouter({config,configDigest,switchModel,token='',controlToken='',requestTimeoutMs=1800000,maxQueued=8,log=()=>{}}) {
   const {backend,profiles}=validatePool(config);
   if(typeof switchModel!=='function')throw new Error('A model switch controller is required.');
+  const embeddingId=/^[a-f0-9]{24}$/.test(config.OwnerId||'')?`shadow-${config.OwnerId}-embedding`:null;
   let busy=false,activeAlias=null,shuttingDown=false,fatal=null;
+  let embeddingRequests=0;
   const queue=[];
   const identity=randomUUID();
   const server=http.createServer((req,res)=>{handle(req,res).catch(e=>errorResponse(res,e));});
@@ -83,24 +85,84 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
     finally{busy=false;}
   }
   function enqueue(job){queue.push(job);void drain();}
+  async function embeddings(req,res){
+    if(shuttingDown||fatal)throw new RouterError(503,'router_unavailable','The local router requires attention.');
+    const body=await readBody(req);
+    if(!body||typeof body!=='object'||Array.isArray(body))throw new RouterError(400,'invalid_embedding_request','An embedding request object is required.');
+    if(!embeddingId||body.model!==embeddingId)throw new RouterError(400,'embedding_not_managed','Only the managed local embedding model is exposed.');
+    for(const key of Object.keys(body))if(!['model','input','encoding_format','dimensions'].includes(key))
+      throw new RouterError(400,'unsupported_embedding_field','The embedding request contains an unsupported field.');
+    const inputs=typeof body.input==='string'?[body.input]:body.input;
+    if(!Array.isArray(inputs)||!inputs.length||inputs.length>128||inputs.some(value=>typeof value!=='string'||!value.length))
+      throw new RouterError(400,'invalid_embedding_input','Provide one to 128 nonempty text inputs.');
+    if(body.dimensions!==undefined&&body.dimensions!==768)throw new RouterError(400,'invalid_embedding_dimension','The managed embedding model produces exactly 768 dimensions.');
+    if(body.encoding_format!==undefined&&!['base64','float'].includes(body.encoding_format))
+      throw new RouterError(400,'invalid_embedding_encoding','Embedding encoding must be base64 or float.');
+    // CPU embeddings do not switch the active coding model or wait behind a long
+    // generation. Bound concurrency and include this work in shutdown protection.
+    if(shuttingDown||fatal)throw new RouterError(503,'router_unavailable','The local router requires attention.');
+    if(embeddingRequests>=2)throw new RouterError(429,'embedding_busy','Local embedding capacity is busy. Retry after current requests finish.');
+    embeddingRequests++;
+    const abort=new AbortController();
+    const deadline=setTimeout(()=>{
+      const error=new RouterError(504,'embedding_timeout','The local embedding deadline was exceeded.');
+      abort.abort(error);errorResponse(res,error);
+    },Math.min(requestTimeoutMs,120000));
+    const disconnect=()=>{if(!res.writableFinished)abort.abort(new Error('Client disconnected.'));};
+    res.once('close',disconnect);req.once('aborted',disconnect);
+    try{
+      const headers={'content-type':'application/json'};
+      if(token)headers.authorization=`Bearer ${token}`;
+      // Kilo sends dimensions even for a fixed-size model. Some LM Studio
+      // versions reject that optional field. Omit only this redundant field;
+      // do not truncate vectors, change models or retry arbitrary HTTP errors.
+      const {dimensions,...payload}=body;
+      const upstream=await fetch(new URL('embeddings',backend.href.replace(/\/?$/,'/')),
+        {method:'POST',headers,body:JSON.stringify(payload),signal:abort.signal,redirect:'error'});
+      if(!upstream.ok){await upstream.body?.cancel();throw new RouterError(upstream.status>=400&&upstream.status<600?upstream.status:502,'embedding_upstream_rejected','LM Studio rejected the managed embedding request. Check model readiness and local server logs.');}
+      let size=0;const chunks=[];
+      for await(const chunk of upstream.body){size+=chunk.length;if(size>RESPONSE_LIMIT){abort.abort();throw new RouterError(502,'embedding_response_too_large','Embedding response exceeded its transfer limit.');}chunks.push(chunk);}
+      let result;try{result=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new RouterError(502,'invalid_embedding_json','LM Studio returned invalid embedding JSON.');}
+      if(!result||result.error||!Array.isArray(result.data)||result.data.length!==inputs.length)
+        throw new RouterError(502,'invalid_embedding_response','LM Studio did not return one embedding for each input.');
+      const indexes=new Set();
+      for(const item of result.data){
+        if(!item||!Number.isInteger(item.index)||item.index<0||item.index>=inputs.length||indexes.has(item.index))
+          throw new RouterError(502,'invalid_embedding_index','LM Studio returned invalid or duplicate embedding indices.');
+        indexes.add(item.index);
+        let vector=item.embedding;
+        if(typeof vector==='string'&&/^[A-Za-z0-9+/]{4096}$/.test(vector)){
+          const bytes=Buffer.from(vector,'base64');vector=Array.from({length:768},(_,i)=>bytes.readFloatLE(i*4));
+        }
+        if(!Array.isArray(vector)||vector.length!==768||!vector.every(Number.isFinite)||!vector.some(value=>value!==0))
+          throw new RouterError(502,'invalid_embedding_vector','LM Studio must return finite, nonzero vectors with exactly 768 dimensions.');
+      }
+      json(res,200,result);
+    }catch(error){
+      log({event:'embedding_failed',code:error.code||'embedding_request_failed'});errorResponse(res,error);
+    }finally{
+      embeddingRequests--;clearTimeout(deadline);res.removeListener('close',disconnect);req.removeListener('aborted',disconnect);
+    }
+  }
   async function handle(req,res){
     // No CORS grants: browser pages cannot silently submit authenticated JSON.
     if(req.headers.origin)throw new RouterError(403,'browser_origin_denied','Browser-origin requests are not supported by this endpoint.');
     if(token&&!equalSecret(req.headers.authorization,`Bearer ${token}`))throw new RouterError(401,'authentication_required','The configured local API token is required.');
     if(req.method==='GET'&&req.url==='/health'){
       json(res,fatal?503:200,{service:'shadow-local-model-router',version:ROUTER_VERSION,identity,pid:process.pid,
-        configDigest,ready:!fatal&&!shuttingDown,activeAlias,busy,queued:queue.length,
+        configDigest,ready:!fatal&&!shuttingDown,activeAlias,busy:busy||embeddingRequests>0,queued:queue.length,embeddingRequests,
         models:[...profiles.values()].map(p=>({id:p.RouteId,context:p.ContextLength,output:p.OutputLimit,verification:p.VerificationState||'Verified'}))});return;
     }
     if(req.method==='POST'&&req.url==='/admin/shutdown'){
       if(!controlToken||!equalSecret(req.headers['x-shadow-control'],controlToken))throw new RouterError(403,'control_denied','A valid local control token is required.');
-      if(busy||queue.length)throw new RouterError(409,'router_busy','The router has active or queued work. Finish it before restarting.');
+      if(busy||queue.length||embeddingRequests)throw new RouterError(409,'router_busy','The router has active or queued work. Finish it before restarting.');
       shuttingDown=true;json(res,200,{stopping:true});server.close();server.closeIdleConnections();return;
     }
     if(req.method==='GET'&&req.url==='/v1/models'){
       json(res,200,{object:'list',data:[...profiles.values()].map(p=>({id:p.RouteId,object:'model',created:0,owned_by:'local-shadow-pool'}))});return;
     }
-    if(req.method!=='POST'||req.url!=='/v1/chat/completions')throw new RouterError(404,'endpoint_not_supported','Only local models and chat completions are exposed.');
+    if(req.method==='POST'&&req.url==='/v1/embeddings'){await embeddings(req,res);return;}
+    if(req.method!=='POST'||req.url!=='/v1/chat/completions')throw new RouterError(404,'endpoint_not_supported','Only local models, chat completions and managed embeddings are exposed.');
     if(shuttingDown||fatal)throw new RouterError(503,'router_unavailable','The local router needs a deliberate restart after its recorded controller failure.');
     const body=await readBody(req);
     if(!body||typeof body!=='object'||Array.isArray(body)||!Array.isArray(body.messages)||!body.messages.length)

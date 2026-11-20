@@ -6,6 +6,101 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
+## Optionale Startart der Indizierung — Paket 2026.11.19.1
+
+Die Indizierung ist jetzt standardmäßig aus, auch für bestehende Projekte und
+Installationen. Die Provisionierung bietet Off, OnDemand und Automatic an;
+`-IndexingMode` überspringt das Menü. OnDemand bereitet Abhängigkeiten vor, ohne
+Embeddings zu laden, und fragt bei jedem Launcherstart nach (Vorgabe Nein).
+Automatic prüft Embeddings bei Setup und Start und berücksichtigt Kilos einmalige
+Projektfreigabe. Eine fehlgeschlagene Vorprüfung lässt Kilos Indizierung für diesen
+Start deaktiviert. Die interne VS-Code-Freigabedatenbank wird nicht verändert.
+Befehle und erforderlicher Sitzungsneustart stehen in [README.de.md](README.de.md).
+
+Prüfnachweise:
+
+- Indexierungsregel/Migration: 32 Prüfungen; tatsächlicher Konfigurationspfad des
+  Launchers: 8; Modellauswahl-Setupintegration: 5; CPU-Embedding und sicheres
+  Deaktivieren/Entladen: 47. Geprüft werden Altinstallationsvorgaben, globale
+  Deaktivierung bei erhaltener Projektfreigabe, kein Embedding-Start/-Download mit
+  Off, OnDemand ohne Start, ausdrückliche Startauswahl, fehlgeschlagene Vorprüfung
+  und Ablehnung des Entladens aktiver oder unklarer Modelle.
+- Der echte Kilo-Indexer 7.8.30 blieb nach ausdrücklicher Projektfreigabe gegen
+  einen synthetischen Server Disabled und stellte keine Embedding-Anfrage.
+  Seine tatsächliche Konfigurationsprüfung akzeptierte das vollständige erzeugte
+  Off-Profil ohne installiertes LanceDB. Das bestätigt die Deaktivierung, keine
+  echte Modellinferenz oder Suchqualität.
+- Alle 33 Node-Tests für Router/Start/Sync bestanden. Der vollständige Qualitäts-
+  workflow bestand 54 Prüfungen mit echten Prozessen/Git und synthetischen
+  Agentenantworten. Bestanden haben auch Modellpool (44), Teiloffloading (8),
+  Router-Lebenszyklus (18), Provisionierungseinstellungen (6), Workspace-Migration
+  (14), Sprachmigration (28), Startbefehle (7), Ripgrep-Setup (7), Workflow-Erkennung
+  (13) und Tool-Import-Vorprüfung (18).
+- Bootstrap/Übergabe: 42 Prüfungen; Installationsort-Migration und Audit jeweils
+  51 unter Windows PowerShell 5.1. Diese Regressionen installieren keine echten
+  Anwendungen, laden keine Modelle herunter und führen keine GPU-Inferenz aus.
+
+Die Zielabnahme steht aus: Alle LoKiEnte-Fenster schließen, bestehende Installation
+erneut provisionieren und Off, OnDemand Nein/Ja sowie Automatic an einem kleinen,
+freigegebenen Projekt prüfen. Off soll ohne IDX-Fehler oder geladenes Embedding
+starten, OnDemand Nein inaktiv bleiben und ein aktivierter Lauf bei ausreichendem
+RAM und bereitem LM Studio Complete erreichen. Erweiterungs-Sync und Qualitäts-
+prüfungen müssen weiterhin funktionieren. Main, Releases und Plattformbranches
+bleiben unverändert.
+
+## Konservatives Laden des CPU-Embeddings — Paket 2026.11.18.26
+
+Der Zielbericht zeigte ein durch LOW-Schätzsicherheit blockiertes Laden ohne
+gemeldete Schutzregelfreigabe. Die bisherige Sammelmeldung konnte fälschlich einen
+gemessenen RAM-Mangel nahelegen. Die Regression prüft jetzt diese Eingabe mit
+konservativem Budget und unveränderter Reserve sowie anschließendem Laden und
+Inferenz. Diese Regel gilt ausschließlich für das hashgeprüfte CPU-Embedding-Modell.
+
+Die Embedding-Suite bestand 44 Prüfungen: unlesbare Schätzung, farbige/umgebrochene
+CLI-Ausgabe, fehlende Reserve, ausdrückliche Schutzregelablehnung, abgelehnter
+Ladeversuch, RAM-Druck nach Laden/Inferenz und begrenztes Zurückrollen bei aktiven,
+ausgetauschten oder doppelten Instanzen. Bestanden haben außerdem Modellpool (44),
+Teiloffloading (8), Router-Lebenszyklus (18) und Auswahlintegration (3).
+LM Studio, Modellinferenz und RAM-Messungen sind in diesen Tests simuliert; die
+Indizierung auf dem Ziel-PC bleibt abzunehmen. Der Nutzer hat funktionierenden
+Erweiterungs-Sync bestätigt; main und veröffentlichtes Release bleiben unverändert.
+
+## Embedding-Kompatibilität und nur Erweiterungen synchronisieren — Paket 2026.11.18.25
+
+Dieser Kandidat ist vom stabilen Release getrennt. Die neuen Tests für Embedding-
+Router und Sync-Hilfe sowie die bestehenden Router- und Startup-Tests bestanden
+alle 33 Node-Tests. PowerShell-Regressionen prüfen Embedding-Bereitschaft und
+Diagnose, Router-Austausch, Profilerhalt, Provisionierungseinstellungen, Launcher,
+Projektauswahl, Workspace-Migration, Modellpools und GPU-Teiloffloading.
+Alle 14 ausgewählten PowerShell-Suiten bestanden 334 Prüfungen, einschließlich
+vollständigem Qualitätsworkflow (54), Bootstrap (42), Sprachmigration (28),
+Startskripten (4) und Installationsort-Migration mit Windows PowerShell 5.1 (51).
+Die Tests verwenden synthetische Agentenantworten und installieren keine Programme
+oder Modelle. Der Installer enthält alle 98 Quelldateien bytegenau mit passender
+Prüfsumme. Syntaxprüfungen bestanden für 67 PowerShell-Dateien, 14 Node-Dateien und
+den Python-Builder; 72 lokale Markdown-Links, zwei JSON-Dateien und sechs
+JSON-Beispiele wurden validiert.
+
+Der echte Kilo-Indexer 7.8.30 reproduzierte die gemeldete Initialisierungsmeldung,
+wenn ein synthetischer lokaler Server `dimensions` ablehnte. Derselbe Indexer
+erreichte über die neue Route Complete, mit echtem LanceDB 0.26.2 und synthetischen
+768-dimensionalen Embeddings. Ein direkter Server, der das Feld akzeptierte,
+funktionierte ebenfalls. Das belegt die Kompatibilitätskorrektur, aber weder die
+Ursache auf einem Zielrechner ohne Logs noch die Suchqualität mit einem echten Modell.
+
+Der gepackte Startup-Helfer 0.1.2 wurde in einem isolierten Profil von VS Code
+1.146.0 mit Kilo 7.8.30 installiert und aktiviert. Beide LoKiEnte-Befehle, der
+offizielle Sync-Konfigurationsbefehl und der Kilo-Fokusbefehl waren verfügbar;
+Kilo war aktiv und die verwaltete Vorgabe zur KI-Sichtbarkeit blieb gesetzt.
+Es wurde kein angemeldetes Konto verwendet. Der Helfer öffnet die offizielle
+Auswahlliste; nur Extensions auszuwählen und zu bestätigen bleibt beim Nutzer.
+Die Tests prüfen Hinweise und Fehlerbehandlung, keine vorgetäuschte automatische
+Kategorieauswahl. Lokale Vorlieben und Daten des entfernten Kontos bleiben erhalten.
+
+Installation auf dem Zielrechner, echte LM-Studio-Embeddings/GPU-Inferenz, fertige
+Projektindizierung und angemeldeter Erweiterungs-Sync bleiben Abnahmeprüfungen.
+Ein erfolgreicher Vorabtest oder geöffneter Sync-Dialog belegt diese Ergebnisse nicht.
+
 ## Englisch als Standard und deutsche Dokumentation — Paket 2026.11.18.22
 
 40 eigenstaendige PowerShell-/Node-Testsuiten bestanden nach der Sprachumstellung.

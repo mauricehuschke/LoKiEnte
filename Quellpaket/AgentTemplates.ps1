@@ -10,7 +10,7 @@ function Get-ShadowLocalEnvironment {
         KILO_CONFIG_DIR=(Join-Path $InstallRoot 'kilo-managed')
         KILO_PURE='1'
         KILO_TELEMETRY_LEVEL='off'
-        KILO_DISABLE_CODEBASE_INDEXING=''
+        KILO_DISABLE_CODEBASE_INDEXING='1'
         KILO_DISABLE_CLAUDE_CODE='true'
         KILO_DISABLE_PROJECT_CONFIG='1'
         KILO_CONFIG=(Join-Path $InstallRoot 'kilo-managed/kilo.json')
@@ -29,6 +29,7 @@ function Get-ShadowLocalEnvironment {
     # started. Forward it only to the child; never put its value in config/logs.
     $settings=ConvertFrom-Json -InputObject $ConfigJson -AsHashtable -ErrorAction Stop
     if($settings.Contains('indexing') -and $settings.indexing.enabled){
+        $environment['KILO_DISABLE_CODEBASE_INDEXING']=''
         $entry=Join-Path $InstallRoot 'tooling/lancedb/node_modules/@lancedb/lancedb/dist/index.js'
         if(-not(Test-Path -LiteralPath $entry -PathType Leaf)){throw 'The local LanceDB component is missing. Rerun provisioning.'}
         $environment['KILO_LANCEDB_PATH']=$entry
@@ -101,7 +102,10 @@ function Assert-ShadowKiloEffectiveConfig {
         $base=[Uri]$effective.provider.lmstudio.options.baseURL
         if(-not $base.IsLoopback -or $base.AbsoluteUri.TrimEnd('/') -cne ([Uri]$Config.provider.lmstudio.options.baseURL).AbsoluteUri.TrimEnd('/')){throw 'Effective model API is not the configured loopback endpoint.'}
         if($effective.provider.lmstudio.options.timeout -ne $Config.provider.lmstudio.options.timeout){throw 'Effective local provider timeout differs from the verified profile.'}
-        if($Config.Contains('indexing')){
+        if($Config.Contains('indexing') -and -not $Config.indexing.enabled){
+            if(-not $effective.Contains('indexing') -or $effective.indexing.enabled -ne $false){throw 'Effective indexing must remain disabled for this launch.'}
+        }
+        if($Config.Contains('indexing') -and $Config.indexing.enabled){
             if(-not $effective.Contains('indexing')){throw 'Effective local indexing configuration is missing.'}
             $plugins=@($effective.plugin|ForEach-Object {if($_ -is [array]){$_[0]}else{$_}})
             if(-not @($plugins|Where-Object {$_ -ceq '@kilocode/kilo-indexing' -or $_ -clike '@kilocode/kilo-indexing@*'}).Count){
@@ -312,6 +316,7 @@ function New-ShadowAgentConfiguration {
         provider=@{lmstudio=@{options=@{baseURL=$ApiBaseUrl;timeout=$ProviderTimeoutMilliseconds};models=$providerModels}}
         permission=$readPermission
         instructions=@($rulesPath)
+        indexing=[ordered]@{enabled=$false}
         compaction=@{auto=$true;threshold_percent=70;prune=$true;tail_turns=2;preserve_recent_tokens=[math]::Min(4096,[int]($ContextLength/8))}
         agent=$roleDefinitions
     }

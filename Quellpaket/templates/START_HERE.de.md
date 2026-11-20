@@ -14,8 +14,12 @@ Dieses Fenster verwendet ein eigenes VS-Code-Profil und lokale Modelle.
 4. Zum Ausprobieren im Launcher welcome/workflow-test waehlen. Der fertige Testauftrag steht in [Beispielanleitung](../welcome-example/README.de.md). Das Beispiel nutzt nur kuenstliche Daten, Node-Bordmittel und ein eigenes lokales Git-Repository.
 5. Nur ein bestandener Aufgabenlauf darf VERIFIED melden. Der Status bezieht sich auf genau den geprueften Arbeitsbaum und die konfigurierten Pruefungen.
 
-Fuer semantische Suche im Dual-Modus im Kilo-Bereich Einstellungen > Indexing
-oeffnen und fuer das jeweilige Projekt die Indexierung freigeben. Vorher
+Die Indizierung ist standardmaessig fuer alle Projekte aus. Fuer semantische
+Suche im Dual-Modus mit -IndexingMode OnDemand oder Automatic provisionieren.
+OnDemand fragt beim Desktopstart nach (Enter bedeutet Nein). Vor einer anderen
+Auswahl alle LoKiEnte-Fenster schliessen. Nach dem Start der Indizierung in Kilo
+Einstellungen > Indexing oeffnen und einmalig fuer das Projekt freigeben.
+Dateisuche, Subagenten und Tests funktionieren auch ohne Indizierung. Vorher
 .gitignore und .kilocodeignore auf sensible Dateien pruefen. Der Index wird
 lokal gespeichert und ist nicht automatisch verschluesselt. Den Status
 Complete abwarten; eine Konfiguration allein beweist keinen fertigen Index.

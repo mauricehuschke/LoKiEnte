@@ -6,6 +6,11 @@
   <img src="assets/lokiente-preview.png" width="280" alt="LoKiEnte: a mischievous duck with a green Loki helmet and golden horns">
 </p>
 
+<p align="center">
+  <a href="https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1"><img src="assets/badge-windows-download.svg" alt="Latest Windows download"></a>
+  <a href="#quick-install-latest-release"><img src="assets/badge-provisioning.svg" alt="Provisioning guide"></a>
+</p>
+
 LoKiEnte sets up a local AI development environment on Windows: VS Code as your
 editor, Kilo for your development requests, and LM Studio for models running on
 your machine. Describe a change; separate agents plan, write tests, implement
@@ -117,6 +122,55 @@ without proven memory reserves and is not a quality setting. See
 
 For an automated download with checksum verification, use the following section.
 
+### Optional indexing: Off, OnDemand or Automatic
+
+Indexing is **Off by default for every project**, including existing installations.
+In Dual mode, provisioning asks for a start mode unless you pass `-IndexingMode`.
+Press Enter for Off. Every provisioning run defaults to Off; a previously saved
+Automatic choice is not silently inherited. The selected mode is saved for later
+desktop-launcher starts.
+
+| Option | Provisioning | Desktop launcher |
+| --- | --- | --- |
+| `Off` (default) | Disables indexing; no indexing dependency or embedding download/load. | Starts without indexing for all projects, including previously enabled ones. |
+| `OnDemand` | Prepares LanceDB and the embedding model download; does not load the embedding model. | Asks whether to start indexing for this launch; Enter means No. |
+| `Automatic` | Prepares dependencies and checks the embedding service. | Starts the embedding service automatically; Kilo indexes projects with existing consent. |
+
+Use your usual coding-model options and add one of these flags:
+
+```powershell
+# Default: keep memory available for coding and review
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off
+
+# Prepare indexing, ask at each desktop launch
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode OnDemand
+
+# Start indexing automatically for projects you have enabled in Kilo
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Automatic
+```
+
+After changing modes, fully close all LoKiEnte VS Code windows and reopen the
+desktop launcher. This is a setting for the shared LoKiEnte profile; a running
+window does not receive another launch's environment. For OnDemand, close the
+previous session before making a different choice. Kilo still requires one-time
+project consent under **Settings > Indexing**. Existing consent is preserved;
+Off overrides it. Automatic cannot grant that consent on your behalf. Wait for
+**Complete** before relying on semantic search.
+
+To skip the OnDemand question for one launch, run the installed launcher in
+PowerShell 7 with `-StartIndexing` (replace the installation/project paths):
+
+```powershell
+pwsh -NoProfile -File D:\LocalAI\app\Start-LocalAI.ps1 -InstallRoot D:\LocalAI -ProjectPath D:\Projects\Example -StartIndexing
+```
+
+This switch cannot enable an Off installation: provision OnDemand or Automatic
+first. Single model mode supports Off only. Off preserves downloaded models and
+stored indexes. Switching to Off/OnDemand, or declining an OnDemand launch, unloads
+only LoKiEnte's verified idle embedding instance; busy or ambiguous instances stop
+the operation with an explanation. Close the previous session and retry.
+File search, subagents, reviews and tests remain available without indexing.
+
 ### PowerShell (recommended, with checksum verification)
 
 Open Windows PowerShell in a writable download directory and paste the entire
@@ -225,35 +279,62 @@ set `lokiente.startup.openKilo` to `false` in the managed user settings. You can
 still use **LoKiEnte: Open Kilo** from the Command Palette. If Kilo cannot open,
 read the warning and the **LoKiEnte Startup** output channel.
 
-You can use **Backup and Sync Settings** to bring your usual extensions and editor
-preferences into this environment. Provisioning does not sign you in or turn on
-cloud sync. When configuring sync:
+**Recommended: sync extensions only and keep settings local.** This imports your
+usual extensions without merging editor preferences from another environment.
+Provisioning does not sign you in or silently change the account's sync categories.
 
-- Select **Extensions**; optionally add **Settings**, **Keyboard Shortcuts** and
-  **Snippets**. Themes and formatter preferences remain yours.
-- Prefer leaving **UI State** and **Profiles** unchecked for LoKiEnte, so another
-  environment's layout or profiles are not imported. This is a choice in VS Code's
-  sync dialog, not a setting silently changed by the installer.
-- Provisioning extends `settingsSync.ignoredSettings` to keep the managed terminal,
-  Kilo autocomplete controls, telemetry/update policy, startup preference and
-  Copilot visibility local. It excludes the whole Windows terminal-profile map
-  because it contains machine-specific executable paths.
-- `settingsSync.ignoredExtensions` excludes Kilo, the startup helper and both GitHub
-  Copilot extensions. Their installation/enablement state stays separate from your
-  personal environment; other extensions can sync normally. Kilo is updated by
-  provisioning, not by Settings Sync.
+1. Cancel an unfinished initial settings merge, if one is open.
+2. Run **LoKiEnte: Configure Extension Sync** from the Command Palette. The updated
+   startup helper also offers a one-time hint. It opens VS Code's own sync checklist.
+3. Select **Extensions only** and deselect **every other category**, including
+   **Settings**, **UI State** and **Profiles**. Apply the selection. When enabling
+   Backup and Sync for the first time, use the same selection in its setup dialog.
+4. Sign in yourself if needed. Existing local themes, formatter settings and terminal
+   profiles stay local; your cloud settings are not replaced.
 
-Updates preserve personal settings and custom exclusions, back up changed settings
-under `backups/vscode-settings`, and remove explicit sync opt-ins that conflict with
-the managed exclusions. Existing registered workspaces receive the AI policy too.
+The helper cannot read or apply those category choices through VS Code's public
+extension API. Opening the dialog does **not** mean the selection has been applied.
+An existing settings conflict is resolved by excluding Settings from sync, not by
+accepting an entire local or remote file. Reprovisioning alone cannot make that choice.
 
-**If the initial sync already shows a merge conflict:** cancel that setup, close
-LoKiEnte windows, provision again using the same installation root, then reopen and
-configure sync. For extensions alone, leave **Settings** unchecked. If syncing
-settings too, review any remaining personal conflicts individually; do not replace
-the entire file with **Accept Remote Settings** or **Accept Local Settings**.
-Personal conflicts can still occur; provisioning does not resolve or overwrite
-your cloud settings or manipulate VS Code's internal sync database.
+Managed settings and extension exclusions remain as additional protection if you
+later choose to sync settings too. Kilo, the startup helper and both Copilot
+extensions are excluded from extension sync; Kilo is updated by provisioning.
+Personal settings and custom exclusions are preserved and changed settings backed
+up under `backups/vscode-settings`. A later decision to sync personal settings can
+still produce genuine conflicts. VS Code synchronizes its exclusion lists themselves;
+they cannot be reliably isolated by adding them to their own ignore list.
+
+### If local indexing fails to initialize
+
+After updating, close all LoKiEnte windows and reopen the desktop launcher. In Dual
+mode, Automatic provisioning/startup and an accepted OnDemand launch test the same
+local embedding route and 768-dimensional
+request used by Kilo. The router handles LM Studio versions that reject the optional
+`dimensions` field, while validating the actual returned vectors. No cloud fallback
+or automatic project-indexing consent is added.
+
+`Disabled` or `OnDemand` with `SmokeTest: NotRun` is intentional while indexing
+is off or waiting for a launch choice. Failed readiness also leaves indexing
+disabled in Kilo for that launch; fix the cause and restart to retry.
+
+If Kilo still reports **Failed to initialize**, check `runtime/embedding-status.json`
+inside the installation folder for the last preflight result and the local router
+endpoint. `runtime/router-events.jsonl` records sanitized error codes for subsequent
+requests. Check LM Studio for model readiness or HTTP errors. A passed preflight
+is not a completed project index: enable indexing for the intended project and wait
+for **Complete**. Single mode still does not provision semantic indexing.
+
+`Deferred` with `SmokeTest: NotRun` means the embedding model was not ready for an
+API test. `result.MemoryCheck` distinguishes an actual RAM shortage from a low-
+confidence estimate and LM Studio guardrail denial. For the verified CPU embedding
+model, `LOW` or missing guardrail text uses a conservative load budget: at least
+1 GiB, or four times the larger of the estimate and model file size. An additional
+3 GiB must remain available. LM Studio still controls the actual load; explicit
+denial blocks it. Readiness requires successful inference. If available RAM falls
+below the reserve after a conservative load or inference check, only that newly
+loaded, verified idle embedding instance is unloaded. Busy or ambiguous instances
+are preserved and reported. No `-AllowUnfitAttempt` is needed for this path.
 
 ## How code verification works
 
@@ -317,6 +398,7 @@ over defaults when the parameter was not supplied explicitly.
 | `-InstallRoot` | Directory of the launched PS1; nonempty | Installation root. Use the same directory for updates. Base programs and LM Studio models retain their own storage locations. |
 | `-AuditOnly` | Switch | Inspect prerequisites without installing package files or loading models. Existing CLI tools may initialize caches/services; public metadata is queried online. |
 | `-ModelMode` | `Dual`; `Dual`, `Single` | Dual uses a role-based model pool and local router; it does not mean two coding models are loaded simultaneously. Single uses one coding model, currently without semantic indexing. |
+| `-IndexingMode` | `Off`; `Off`, `OnDemand`, `Automatic` | Indexing start policy. If omitted, a Dual-mode menu defaults to Off, including updates. Only Off is supported in Single mode. |
 | `-IncludeFastModel` | Switch | Offer an additional small Fast model in the Dual pool; valid only with Dual. Distinct from the regular Coder Fast profile. |
 | `-AllowPartialGpuOffload` | Switch | Allow partial CPU/RAM offload in the pool. May enable larger models but can be much slower. |
 | `-AllowUnfitAttempt` | Switch | Attempt loading without proven memory reserve. May cause load failures/OOM; LM Studio safeguards remain active. Not required for updates. |
@@ -388,9 +470,9 @@ without a heartbeat. The task may still run; its project lock stays. Inspect job
 logs and processes before recovery. Do not blindly delete the lock or start another task.
 
 **Is semantic code search immediately ready?**
-Enable and complete local indexing per project in the supported Kilo profile.
-Verify it once using the [search probe](Quellpaket/VALIDATION.md). Single mode does
-not currently configure indexing.
+Indexing defaults to Off. Provision OnDemand or Automatic in Dual mode, start
+indexing through the launcher, then enable it once per project in Kilo and wait
+for Complete. Verify it using the [search probe](Quellpaket/VALIDATION.md).
 
 **Are test processes isolated?**
 They receive sanitized environment variables and separate temporary/profile paths

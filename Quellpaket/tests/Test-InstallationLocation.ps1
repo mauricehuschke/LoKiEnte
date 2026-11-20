@@ -200,7 +200,7 @@ try{
         $fixture=Join-Path $directory 'Provision-LoKiEnte.ps1'
         $stubs="`n`$env:LOCALAPPDATA='"+(Join-Path $root 'absent legacy').Replace("'","''")+"';`n"
         if($mode -eq 'decline'){$stubs+="function Read-Host {param(`$Prompt) return 'n'}`n"}
-        if($mode -in @('confirm','copy-failure','copy-success')){$stubs+="function Read-Host {param(`$Prompt) return 'y'}`n"}
+        if($mode -in @('confirm','copy-failure','copy-success')){$stubs+="function Read-Host {param(`$Prompt) if(`$Prompt -like '*Select 0/1/2*'){return ''};return 'y'}`n"}
         if($mode -eq 'audit'){$stubs+="function Read-Host {throw 'PROMPT_MUST_NOT_RUN'}`n"}
         $stubs+=@'
 function Find-BootstrapExecutable {throw 'INSTALL_MUST_NOT_RUN'}

@@ -10,8 +10,11 @@ This window uses a dedicated VS Code profile and local models.
 4. To try the workflow, select welcome/workflow-test in the launcher. The ready-to-use task is in the [example guide](../welcome-example/README.md). The example uses only synthetic data, built-in Node facilities and its own local Git repository.
 5. Only a successful task run may report VERIFIED. This status applies to the exact verified working tree and configured checks.
 
-For semantic search in Dual mode, open Settings > Indexing in Kilo and enable
-indexing for the project. First check .gitignore and .kilocodeignore for sensitive
+Indexing defaults to Off for all projects. To use semantic search in Dual mode,
+provision with -IndexingMode OnDemand or Automatic. OnDemand asks at desktop
+launch (Enter means No). Close all LoKiEnte windows before changing the choice.
+After starting indexing, open Settings > Indexing in Kilo and enable it once for
+the project. File search, subagents and tests also work with indexing off. First check .gitignore and .kilocodeignore for sensitive
 files. The index is stored locally and is not automatically encrypted. Wait for
 Complete status; configuration alone does not prove that indexing has finished.
 

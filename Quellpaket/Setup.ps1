@@ -3,6 +3,7 @@
 param(
     [Parameter(Mandatory)][string]$InstallRoot,
     [ValidateSet('Single','Dual')][string]$ModelMode='Dual',
+    [ValidateSet('Off','OnDemand','Automatic')][string]$IndexingMode='Off',
     [switch]$IncludeFastModel,
     [switch]$AllowPartialGpuOffload,
     [switch]$AllowUnfitAttempt,
@@ -21,6 +22,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+$IndexingMode=switch($IndexingMode){'Off'{'Off'} 'OnDemand'{'OnDemand'} 'Automatic'{'Automatic'}}
 $PSNativeCommandUseErrorActionPreference=$false
 . (Join-Path $PSScriptRoot 'Common.ps1')
 . (Join-Path $PSScriptRoot 'VsCodeProfile.ps1')
@@ -28,6 +30,7 @@ $PSNativeCommandUseErrorActionPreference=$false
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 . (Join-Path $PSScriptRoot 'ModelPool.ps1')
 . (Join-Path $PSScriptRoot 'ModelSelection.ps1')
+. (Join-Path $PSScriptRoot 'Indexing.ps1')
 . (Join-Path $PSScriptRoot 'Ripgrep.ps1')
 . (Join-Path $PSScriptRoot 'Router.ps1')
 . (Join-Path $PSScriptRoot 'AgentTemplates.ps1')
@@ -297,6 +300,7 @@ function Install-ShadowKilo {
 $report=$null
 try {
     if (-not $IsWindows -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'X64') { throw 'This provisioning script is designed for Windows x64.' }
+    if($ModelMode -ne 'Dual' -and $IndexingMode -ne 'Off'){throw 'Semantic indexing requires ModelMode Dual.'}
     if($ModelMode -eq 'Single' -and $IncludeFastModel){throw 'IncludeFastModel requires ModelMode Dual.'}
     if($ModelMode -ne 'Dual' -and $AllowPartialGpuOffload){throw 'AllowPartialGpuOffload is supported only in the model pool (ModelMode Dual).'}
     if($ModelMode -eq 'Dual' -and ($ModelKey -or $PreferredModel -eq 'GptOss20B')){throw 'ModelMode Dual uses the verified Qwen/GPT-OSS pool. For a custom single model, use ModelMode Single.'}
@@ -334,9 +338,9 @@ try {
         curl=($curlVersion -split '\r?\n')[0]
     }
     $ripgrep=Install-ShadowRipgrep -InstallRoot $InstallRoot
-    if($ModelMode -eq 'Dual'){$null=Install-ShadowLanceDb -InstallRoot $InstallRoot -NodePath $node -NpmEntry $npm}
+    if($IndexingMode -ne 'Off'){$null=Install-ShadowLanceDb -InstallRoot $InstallRoot -NodePath $node -NpmEntry $npm}
     $toolchain=[ordered]@{
-        schema=2;modelMode=$ModelMode;allowUnfitAttempt=[bool]$AllowUnfitAttempt;kiloExecutable=$kilo.kiloExecutable;kiloArgumentPrefix=@($kilo.kiloArgumentPrefix)
+        schema=2;modelMode=$ModelMode;indexingMode=$IndexingMode;allowUnfitAttempt=[bool]$AllowUnfitAttempt;kiloExecutable=$kilo.kiloExecutable;kiloArgumentPrefix=@($kilo.kiloArgumentPrefix)
         kiloVersion=$kilo.kiloVersion;powerShellExecutable=(Get-Process -Id $PID).Path
         nodeExecutable=$node;npmEntry=$npm;gitExecutable=$git;codeExecutable=$code;curlExecutable=$curl;ripgrepExecutable=$ripgrep
     }
@@ -370,6 +374,7 @@ try {
     if(Test-Path -LiteralPath $poolPath){
         $previousPool=Get-Content -LiteralPath $poolPath -Raw|ConvertFrom-Json
     }
+    if($previousPool -and $IndexingMode -ne 'Automatic'){Stop-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $previousPool}
     $selectedDefinitions=@()
     if($ModelMode -eq 'Dual' -or ($ModelMode -eq 'Single' -and -not $ModelKey)){
         $selectionLogs=Join-Path $InstallRoot 'runtime/model-precheck-logs'
@@ -390,7 +395,7 @@ try {
         })}
         $null=Write-ShadowManagedFile -Path $selectionFile -Content ($selectedState|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/model-selection')
         $downloadDefinitions=@($selectedDefinitions)
-        if($ModelMode -eq 'Dual'){$downloadDefinitions+=@(@{Alias='embedding';Definition=(Get-ShadowEmbeddingDefinition)})}
+        if($IndexingMode -ne 'Off'){$downloadDefinitions+=@(@{Alias='embedding';Definition=(Get-ShadowEmbeddingDefinition)})}
         Install-ShadowSelectedModels -Definitions $downloadDefinitions -LmsPath $lms -InstallRoot $InstallRoot -SkipModelDownload:$SkipModelDownload
     }else{
         Assert-ShadowSetupModels -LmsPath $lms -InstallRoot $InstallRoot -ModelMode $ModelMode -PreferredModel $PreferredModel -ModelKey $ModelKey -IncludeFastModel:$IncludeFastModel
@@ -401,11 +406,13 @@ try {
     if($ModelMode -eq 'Dual'){
         $pool=Configure-LocalModelPool -InstallRoot $InstallRoot -ContextLength $ContextLength -Port $Port -RouterPort $RouterPort -IncludeFastModel:$IncludeFastModel -AllowPartialGpuOffload:$AllowPartialGpuOffload -AllowUnfitAttempt:$AllowUnfitAttempt -SelectedDefinitions $selectedDefinitions -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable
         $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $node -PowerShellPath $toolchain.powerShellExecutable
-        $embedding=Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)
-        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable -EmbeddingModelId $embedding.InstanceId -EmbeddingApiBaseUrl $pool.BackendApiBaseUrl
+        $embedding=if($IndexingMode -ceq 'Automatic'){Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)}else{Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode $IndexingMode}
+        $embeddingArguments=Get-ShadowEmbeddingConfigurationArguments -Embedding $embedding -ApiBaseUrl $router.ApiBaseUrl
+        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments
         $report.runtime=$pool;$report.router=$router
         $report.embedding=$embedding
-        $report.warnings+=@('Local indexing is configured; permission and completion must be checked in Kilo for each project.')
+        $report.indexingMode=$IndexingMode
+        if($IndexingMode -ne 'Off'){Write-Host 'Indexing remains subject to the one-time Kilo project consent. Wait for Complete before relying on semantic search.'}
         foreach($profile in $pool.Profiles){
             if($profile.VerificationState -ceq 'Deferred'){$report.warnings+=@("Model $($profile.Alias) is downloaded but unverified: $($profile.VerificationMessage)")}
             elseif((Get-LrProperty $profile.Estimate 'ReserveOverride' $false)){$report.warnings+=@("Model $($profile.Alias) was tested without LoKiEnte memory reserve.")}
@@ -414,7 +421,7 @@ try {
         elseif(Get-LrProperty $embedding 'ReserveOverride' $false){$report.warnings+=@('CPU embedding model was tested without LoKiEnte memory reserve.')}
         $report.smokeTests=@($pool.Profiles|ForEach-Object {@{model=$_.Alias;checks=$_.SmokeTests}})
     }else{
-        $report.warnings+=@('Local semantic indexing is not configured in Single mode.')
+        $report.indexingMode='Off';$report.embedding=Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode Off
         if((Test-Path -LiteralPath $poolPath) -and -not $ModelKey){
             $alias=if($PreferredModel -eq 'GptOss20B'){'review'}else{[string](Get-LrProperty $previousPool 'PrimaryAlias' 'coder')}
             $null=Switch-ShadowLocalModel -InstallRoot $InstallRoot -Alias $alias
@@ -490,7 +497,7 @@ try {
     }
     $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'toolchain.json') -Content ($toolchain|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/toolchain')
     $desired=[ordered]@{
-        ModelMode=$ModelMode;IncludeFastModel=[bool]$IncludeFastModel;AllowPartialGpuOffload=[bool]$AllowPartialGpuOffload
+        IndexingMode=$IndexingMode;ModelMode=$ModelMode;IncludeFastModel=[bool]$IncludeFastModel;AllowPartialGpuOffload=[bool]$AllowPartialGpuOffload
         AllowUnfitAttempt=[bool]$AllowUnfitAttempt;RouterPort=$RouterPort;Port=$Port;ContextLength=$ContextLength
         PreferredModel=$PreferredModel;ModelKey=$ModelKey;ApiTokenEnvironmentVariable=$ApiTokenEnvironmentVariable
     }

@@ -6,6 +6,95 @@ This document preserves the validation history and its original limitations.
 Older sections describe the behavior and evidence of their stated release, not
 necessarily the current defaults. Current usage is documented in [README.md](README.md).
 
+## Optional indexing start policy — package 2026.11.19.1
+
+Indexing now defaults to Off, including existing projects and installations.
+Provisioning offers Off, OnDemand and Automatic; an explicit `-IndexingMode`
+skips the menu. OnDemand prepares dependencies without loading embeddings and
+asks at each launcher start (default No). Automatic checks embeddings at setup
+and launch, then respects Kilo's one-time project consent. Failed readiness keeps
+Kilo indexing disabled for that launch. No internal VS Code consent database is
+modified. See [README.md](README.md) for commands and session restart requirements.
+
+Regression evidence:
+
+- Indexing policy/migration: 32 checks; actual launcher configuration path: 8;
+  model-selection setup integration: 5; CPU embedding and safe disable/unload: 47.
+  Coverage includes legacy defaults, preserving consent while disabling the global
+  indexer, no embedding initialization/download in Off, OnDemand deferral, explicit
+  launch opt-in, failed readiness and refusing to unload busy or ambiguous models.
+- The actual Kilo 7.8.30 indexer remained Disabled with zero embedding requests
+  even after project consent was explicitly enabled against a synthetic backend.
+  Its actual effective-config verifier accepted the complete generated Off profile
+  without LanceDB installed. This verifies disabling; it is not a real-model
+  inference or retrieval-quality result.
+- All 33 Node router/startup/sync tests passed. The full 54-check reviewed workflow
+  passed with real processes/Git and synthetic agent responses. Model pool (44),
+  partial offload (8), router lifecycle (18), provisioning settings (6), workspace
+  migration (14), localization (28), start commands (7), ripgrep setup (7), workflow
+  discovery (13) and tool-import preflight (18) passed.
+- Bootstrap/handoff: 42 checks; installation-location migration and audit each
+  passed 51 checks under Windows PowerShell 5.1. No real application installation,
+  model download or GPU inference is performed by these regression fixtures.
+
+Target acceptance remains pending: close all LoKiEnte windows, reprovision the
+existing installation, then check Off, OnDemand No/Yes and Automatic on a small
+consented project. Confirm that Off starts without IDX errors or an embedding
+load, OnDemand No stays inactive, and an enabled run reaches Complete when RAM
+and LM Studio are ready. Existing extension-only sync and project quality checks
+must continue to work. Main, releases and platform branches are unchanged.
+
+## Conservative CPU embedding load — package 2026.11.18.26
+
+The target report identified an embedding load blocked by LOW estimate confidence,
+with no reported guardrail approval. The previous combined error could misleadingly
+suggest a measured RAM shortage. The regression now covers that input with a
+conservative budget and unchanged reserve, followed by actual load and inference
+boundaries. The policy applies only to the hash-verified CPU embedding model.
+
+The embedding suite passed 44 checks, including malformed estimates, colored/wrapped
+CLI output, insufficient reserve, explicit guardrail denial, actual load rejection,
+post-load and post-inference RAM pressure, and rollback restrictions for busy,
+substituted and duplicate instances. Existing model-pool (44), partial-offload (8),
+router-lifecycle (18) and selection-integration (3) regressions also passed.
+LM Studio, model inference and memory measurements are mocked in these tests;
+the actual target-machine indexing result still requires acceptance. The user
+confirmed extension-only sync works; main and the published release remain unchanged.
+
+## Embedding compatibility and extension-only sync — package 2026.11.18.25
+
+This candidate is isolated from the stable release. The new embedding router and
+sync-guide tests, together with the existing model-router and startup tests, passed
+all 33 Node tests. PowerShell regressions cover embedding readiness and diagnostics,
+router replacement, profile preservation, provisioning settings, launcher commands,
+project selection, workspace migration, model pools and partial GPU offload.
+All 14 selected PowerShell suites passed 334 checks, including the complete
+54-check quality workflow, bootstrap (42), localization (28), entry scripts (4)
+and installation-location migration under Windows PowerShell 5.1 (51). The tests
+use synthetic agent responses and do not install applications or download models.
+The installer contains all 98 source files byte-for-byte with a matching checksum.
+Syntax checks passed for 67 PowerShell files, 14 Node files and the Python builder;
+72 local Markdown links, two JSON files and six JSON examples were validated.
+
+The actual Kilo 7.8.30 indexer reproduced the reported initialization message when
+a synthetic local backend rejected `dimensions`. The same indexer reached Complete
+through the new route, using real LanceDB 0.26.2 and synthetic 768-dimensional
+embeddings. A direct backend accepting the field also completed. This demonstrates
+the compatibility fix; it does not establish the cause on a machine without logs
+or validate semantic retrieval quality with a real model.
+
+The packaged startup helper 0.1.2 was installed and activated in an isolated
+VS Code 1.146.0 profile with Kilo 7.8.30. Both LoKiEnte commands, the supported sync
+configuration command and Kilo focus command were available, Kilo was active and
+the managed AI visibility setting remained enabled. No signed-in account was used.
+The helper opens the official checklist; the user must select Extensions only and
+apply it. Tests verify guidance and failure handling, not a fictitious automatic
+category change. Existing local preferences and remote account data are preserved.
+
+Target-machine installation, real LM Studio embeddings/GPU inference, project-index
+completion and signed-in extension-only synchronization remain acceptance checks.
+Neither a successful preflight nor an opened sync dialog proves those outcomes.
+
 ## English defaults and German documentation — package 2026.11.18.22
 
 40 independent PowerShell/Node suites passed after the language update. The complete

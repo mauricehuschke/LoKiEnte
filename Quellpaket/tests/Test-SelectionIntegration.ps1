@@ -18,9 +18,11 @@ $root=Join-Path ([IO.Path]::GetTempPath()) ('shadow-selection-integration-'+[gui
 try{
     $runtimeFile=(Join-Path $SourceRoot 'Runtime.ps1').Replace("'","''")
     $selectionFile=(Join-Path $SourceRoot 'ModelSelection.ps1').Replace("'","''")
+    $indexingFile=(Join-Path $SourceRoot 'Indexing.ps1').Replace("'","''")
+    $poolFile=(Join-Path $SourceRoot 'ModelPool.ps1').Replace("'","''")
     $commonFile=(Join-Path $SourceRoot 'Common.ps1').Replace("'","''")
     $harness=@'
-param($InstallRoot,$Scenario)
+param($InstallRoot,$Scenario,$IndexingMode='Automatic')
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $report=[ordered]@{schema=1;status='IN_PROGRESS';steps=@();warnings=@()}
@@ -31,7 +33,7 @@ $kilo=@{kiloExecutable='cli-fixture';kiloArgumentPrefix=@()};$bundledKilo='gui-f
 $script:selectionPrompt=0
 function Read-Host {param($Prompt) if($Prompt -like '*Confirm*'){return 'y'};$script:selectionPrompt++;if($script:selectionPrompt -eq 1){return '3'};return ''}
 '@
-    $harness+="`n. '$commonFile'`n. '$runtimeFile'`n. '$selectionFile'`n"
+    $harness+="`n. '$commonFile'`n. '$runtimeFile'`n. '$selectionFile'`n. '$poolFile'`n. '$indexingFile'`n"
     $harness+=@'
 function Resolve-ShadowSetupLms {param($StudioPath) return 'fixture'}
 function Get-LocalNvidiaGpu {param($LogDirectory) return [pscustomobject]@{Gpu=[pscustomobject]@{FreeBytes=19GB};FreeRamBytes=21.6GB}}
@@ -47,7 +49,7 @@ function Configure-LocalModelPool {
     }
 }
 function Start-ShadowModelRouter {param($InstallRoot,$Pool,$NodePath,$PowerShellPath) return [pscustomobject]@{ApiBaseUrl='http://127.0.0.1:1235/v1'}}
-function Initialize-ShadowEmbeddingModel {param($InstallRoot,$Pool,$Definition) return [pscustomobject]@{Status='Deferred';InstanceId='shadow-fixture-embedding';Message='Synthetic insufficient RAM'}}
+function Initialize-ShadowEmbeddingModel {param($InstallRoot,$Pool,$Definition) [IO.File]::WriteAllText((Join-Path $InstallRoot 'embedding-called'),'yes');return [pscustomobject]@{Status='Deferred';InstanceId='shadow-fixture-embedding';Message='Synthetic insufficient RAM'}}
 function Get-ShadowPoolCatalog {param($Pool) return @{}}
 function New-ShadowAgentConfiguration {param($InstallRoot,$ModelCatalog,$MainModel,$ApiBaseUrl,$ApiTokenEnvironmentVariable,$EmbeddingModelId,$EmbeddingApiBaseUrl) return [pscustomobject]@{Config=@{}}}
 function Assert-ShadowKiloEffectiveConfig {param($KiloExecutable,$KiloArgumentPrefix,$InstallRoot,$Config,$WorkingDirectory) return @{Verified=$true}}
@@ -78,5 +80,15 @@ function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPat
        @($report.warnings|Where-Object {$_ -match 'Synthetic insufficient RAM'}).Count -ne 1){
         throw "Resource warnings blocked setup or were not recorded: $($warning.StdErr)"
     }
-    [pscustomobject]@{suite='Selection setup integration';passed=$true;checks=3}|ConvertTo-Json
+    foreach($mode in @('Off','OnDemand')){
+        Remove-Item -LiteralPath (Join-Path $root 'embedding-called') -ErrorAction SilentlyContinue
+        $optional=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root,'-Scenario','warning','-IndexingMode',$mode) -AllowFailure -Quiet -TimeoutSeconds 30
+        if($optional.ExitCode -ne 0){throw "Optional setup failed: $($optional.StdErr)"}
+        $report=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw|ConvertFrom-Json
+        $desired=Get-Content -LiteralPath (Join-Path $root 'provisioning-options.json') -Raw|ConvertFrom-Json
+        $expectedCount=if($mode -ceq 'Off'){'4'}else{'5'}
+        if((Test-Path -LiteralPath (Join-Path $root 'embedding-called')) -or $desired.IndexingMode -cne $mode -or
+           [IO.File]::ReadAllText((Join-Path $root 'install-seen')) -cne $expectedCount -or $report.indexingMode -cne $mode){throw "Optional indexing policy was not propagated: $mode"}
+    }
+    [pscustomobject]@{suite='Selection setup integration';passed=$true;checks=5}|ConvertTo-Json
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}

@@ -81,7 +81,19 @@ einem Windows-Zielrechner ist zusätzlich zu synthetischen Regressionstests erfo
    "$digest  Provision-LoKiEnte.ps1" | Set-Content .\Provision-LoKiEnte.ps1.sha256 -Encoding ascii
    ```
 
-4. Prüfe beide hochgeladenen Dateien, veröffentliche und teste Latest-Download
+4. Jede Release-Beschreibung enthält ein Changelog und diese dauerhaften Links,
+   auch wenn GitHub darunter bereits die Artefakte auflistet. Die Buttons zum
+   aktuellen Windows-Download und zur Provisionierungsanleitung bleiben oben
+   in beiden Anwender-READMEs.
+
+   - [Immer den aktuellen Windows-Installer herunterladen](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
+   - [SHA-256 des aktuellen Installers](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1.sha256)
+   - [Installieren oder aktualisieren](https://github.com/mauricehuschke/LoKiEnte/blob/main/README.de.md#schnellinstallation-aktuelles-release)
+
+   Beschreibe Update-Schritte und geänderte Standardwerte, dokumentiere die
+   durchgeführten Prüfungen und unterscheide synthetische Regressionen von der
+   Abnahme auf dem Zielsystem.
+5. Prüfe beide hochgeladenen Dateien, veröffentliche und teste Latest-Download
    sowie Prüfsumme ohne Anmeldung. Unveränderliche Releases sperren Tag und Dateien
    nach Veröffentlichung; Änderungen daran benötigen eine neue Version.
 
@@ -141,6 +153,20 @@ VSIX-Inhalt, Arbeitsbereichsmigration und Startup-/Fehlerverhalten prüfen
 Test-ProvisionSettings.ps1, Test-VsCodeProfile.ps1, Test-WorkspaceGuide.ps1 und
 Test-VsCodeStartup.mjs. Ein echtes VS-Code-/Kilo-Fenster und angemeldeter Settings
 Sync sind separate Integrationsprüfungen.
+
+Der Startup-VSIX enthält außerdem `sync-guide.cjs`. Sein Befehl
+`lokiente.configureExtensionSync` öffnet die unterstützte Sync-Einrichtung von VS Code
+und erklärt die Auswahl ausschließlich von Extensions. Die einmalige Markierung
+belegt den Hinweis, keine erfolgreiche Konfiguration. Prüfen mit
+`node Quellpaket/tests/Test-SyncGuide.mjs`. Keine internen Sync-Datenbankfelder setzen
+und keine ungeprüfte Übernahme der Kategorien behaupten.
+
+Die verwaltete Route `/v1/embeddings` besitzt eine begrenzte CPU-Anfrageverarbeitung
+und nutzt Authentifizierung und Shutdown-Schutz des Routers. Nach Änderungen
+Test-EmbeddingRouter.mjs, Test-ModelRouter.mjs, Test-Embedding.ps1 und
+Test-RouterLifecycle.ps1 ausführen. Vorprüfung und Kilo müssen bei Provisionierung
+und Start denselben Endpunkt nutzen. Eine künstliche API prüft Kompatibilität;
+echte Inferenz auf dem Zielgerät bleibt eine separate Prüfung.
 
 ## Lizenz und Forks
 
