@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="234" height="36" viewBox="0 0 234 36" role="img" aria-labelledby="title">
+  <title id="title">Open the provisioning guide</title>
+  <clipPath id="rounded"><rect width="234" height="36" rx="5"/></clipPath>
+  <g clip-path="url(#rounded)">
+    <rect width="80" height="36" fill="#24292f"/>
+    <rect x="80" width="154" height="36" fill="#0969da"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" font-weight="bold" letter-spacing="0.7">
+    <text x="40" y="22">SETUP</text>
+    <text x="157" y="22">PROVISIONING</text>
+  </g>
+</svg>

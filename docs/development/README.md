@@ -77,7 +77,17 @@ on a target Windows machine is separate from synthetic regression tests.
    "$digest  Provision-LoKiEnte.ps1" | Set-Content .\Provision-LoKiEnte.ps1.sha256 -Encoding ascii
    ```
 
-4. Verify both uploaded assets, publish the release, and check the anonymous
+4. Every release description must include a changelog and these permanent links,
+   even when GitHub already shows the assets below. Keep the latest Windows
+   download and provisioning-guide buttons at the top of both user READMEs.
+
+   - [Always download the latest Windows installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
+   - [Latest installer SHA-256](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1.sha256)
+   - [Install or update](https://github.com/mauricehuschke/LoKiEnte/blob/main/README.md#quick-install-latest-release)
+
+   Explain upgrade steps and changed defaults, record the validation performed,
+   and distinguish synthetic regression checks from target-machine acceptance.
+5. Verify both uploaded assets, publish the release, and check the anonymous
    latest-release download and checksum. Release immutability locks the tag and
    assets after publication; publish a new version to change them.
 

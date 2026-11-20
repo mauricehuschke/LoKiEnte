@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="292" height="36" viewBox="0 0 292 36" role="img" aria-labelledby="title">
+  <title id="title">Download the latest Windows installer</title>
+  <clipPath id="rounded"><rect width="292" height="36" rx="5"/></clipPath>
+  <g clip-path="url(#rounded)">
+    <rect width="104" height="36" fill="#24292f"/>
+    <rect x="104" width="188" height="36" fill="#238636"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" font-weight="bold" letter-spacing="0.7">
+    <text x="52" y="22">WINDOWS</text>
+    <text x="198" y="22">DOWNLOAD LATEST</text>
+  </g>
+</svg>

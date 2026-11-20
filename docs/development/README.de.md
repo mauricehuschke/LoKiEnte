@@ -81,7 +81,19 @@ einem Windows-Zielrechner ist zusätzlich zu synthetischen Regressionstests erfo
    "$digest  Provision-LoKiEnte.ps1" | Set-Content .\Provision-LoKiEnte.ps1.sha256 -Encoding ascii
    ```
 
-4. Prüfe beide hochgeladenen Dateien, veröffentliche und teste Latest-Download
+4. Jede Release-Beschreibung enthält ein Changelog und diese dauerhaften Links,
+   auch wenn GitHub darunter bereits die Artefakte auflistet. Die Buttons zum
+   aktuellen Windows-Download und zur Provisionierungsanleitung bleiben oben
+   in beiden Anwender-READMEs.
+
+   - [Immer den aktuellen Windows-Installer herunterladen](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
+   - [SHA-256 des aktuellen Installers](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1.sha256)
+   - [Installieren oder aktualisieren](https://github.com/mauricehuschke/LoKiEnte/blob/main/README.de.md#schnellinstallation-aktuelles-release)
+
+   Beschreibe Update-Schritte und geänderte Standardwerte, dokumentiere die
+   durchgeführten Prüfungen und unterscheide synthetische Regressionen von der
+   Abnahme auf dem Zielsystem.
+5. Prüfe beide hochgeladenen Dateien, veröffentliche und teste Latest-Download
    sowie Prüfsumme ohne Anmeldung. Unveränderliche Releases sperren Tag und Dateien
    nach Veröffentlichung; Änderungen daran benötigen eine neue Version.
 

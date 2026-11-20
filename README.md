@@ -6,6 +6,11 @@
   <img src="assets/lokiente-preview.png" width="280" alt="LoKiEnte: a mischievous duck with a green Loki helmet and golden horns">
 </p>
 
+<p align="center">
+  <a href="https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1"><img src="assets/badge-windows-download.svg" alt="Latest Windows download"></a>
+  <a href="#quick-install-latest-release"><img src="assets/badge-provisioning.svg" alt="Provisioning guide"></a>
+</p>
+
 LoKiEnte sets up a local AI development environment on Windows: VS Code as your
 editor, Kilo for your development requests, and LM Studio for models running on
 your machine. Describe a change; separate agents plan, write tests, implement

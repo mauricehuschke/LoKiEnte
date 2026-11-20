@@ -6,6 +6,11 @@
   <img src="assets/lokiente-preview.png" width="280" alt="LoKiEnte: eine freche Ente mit grünem Loki-Helm und goldenen Hörnern">
 </p>
 
+<p align="center">
+  <a href="https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1"><img src="assets/badge-windows-download.svg" alt="Aktueller Windows-Download"></a>
+  <a href="#schnellinstallation-aktuelles-release"><img src="assets/badge-provisioning.svg" alt="Provisionierungsanleitung"></a>
+</p>
+
 LoKiEnte richtet eine lokale KI-Entwicklungsumgebung unter Windows ein: VS Code
 als Editor, Kilo für deine Entwicklungsaufträge und LM Studio für die Modelle
 auf deinem Rechner. Du beschreibst eine Änderung; getrennte Agenten planen,
