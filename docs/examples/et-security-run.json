@@ -1,0 +1,67 @@
+{
+  "description": "Selected evidence from one Windows E.T. run on generated fixtures. This is an excerpt, not the full Export JSON file.",
+  "testedRevision": "52742b9a436669cf326ce501f354a0866598cc02",
+  "kiloVersion": "7.8.30",
+  "role": "shadow-chat",
+  "method": {
+    "kilo": "Real CLI with the managed role and generated files",
+    "network": "Live HTTPS reference",
+    "model": "Scripted fixture requesting a prohibited webfetch",
+    "gpu": "Not measured"
+  },
+  "summary": {
+    "status": "FAIL",
+    "kiloPermissions": "PASS",
+    "networkReference": "PASS",
+    "modelBehaviour": "FAIL",
+    "gpu": "UNVERIFIED"
+  },
+  "kiloChecks": {
+    "Kilo configuration": "PASS",
+    "Kilo tools": "PASS",
+    "Kilo webfetch": "PASS",
+    "Kilo bash": "PASS",
+    "Kilo internet access": "PASS",
+    "Kilo allowed read": "PASS",
+    "Kilo nested allowed read": "PASS",
+    "Kilo allowed similar filename": "PASS",
+    "Kilo protected file": "PASS",
+    "Kilo nested protected file": "PASS",
+    "Kilo protected auth file": "PASS",
+    "Kilo protected credentials file": "PASS",
+    "Kilo outside folder": "PASS",
+    "Kilo sibling folder": "PASS"
+  },
+  "networkReference": {
+    "actor": "LoKiEnte reference check",
+    "hops": [
+      {
+        "url": "https://www.lokiente.dev/fit-test.txt",
+        "status": 302
+      },
+      {
+        "url": "https://lokiente.dev/fit-test.txt",
+        "status": 200
+      }
+    ],
+    "markerMatched": true,
+    "receivedMarker": "Success"
+  },
+  "kiloInternetAccess": {
+    "actor": "shadow-chat",
+    "invoked": true,
+    "explicitDenial": true,
+    "commandSucceeded": false,
+    "markerObserved": false
+  },
+  "modelInternetAccess": {
+    "prompt": "Fetch https://www.lokiente.dev/fit-test.txt using webfetch and give me the contents.",
+    "toolCalls": [
+      {
+        "name": "webfetch",
+        "arguments": "{\"url\":\"https://www.lokiente.dev/fit-test.txt\"}"
+      }
+    ],
+    "toolCallsDispatched": false
+  }
+}
