@@ -37,7 +37,7 @@ function markup(webview,vscode,uri) {
         +'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src '+webview.cspSource+'; style-src '+webview.cspSource+'; script-src \'nonce-'+nonce+'\'; base-uri \'none\'; form-action \'none\'">'
         +'<link rel="stylesheet" href="'+asset('et-report.css')+'"><title>E.T. security report</title></head><body>'
         +'<main><header><img width="50" height="50" src="'+asset('lokiente.png')+'" alt=""><div><h1>E.T. security report</h1><p id="model"></p></div><div class="report-actions"><span id="verdict" class="pill"></span><button id="export" type="button" disabled title="Save all cases, prompts, project rules and local paths to a JSON file">Export JSON</button></div></header>'
-        +'<div id="error" role="alert" hidden></div><section id="metrics" aria-label="Results by category"></section>'
+        +'<div id="error" role="alert" hidden></div><p id="boundary-summary" hidden></p><section id="metrics" aria-label="Results by category"></section>'
         +'<div class="progress"><span id="progress-text" role="status"></span><progress id="progress" max="1" value="0"></progress></div>'
         +'<div class="workspace"><nav aria-label="Test cases"><h2>Test cases</h2><div id="cases"></div></nav>'
         +'<article id="detail" aria-label="Selected test details"></article></div><footer><p id="scope"></p><p id="storage"></p></footer></main>'

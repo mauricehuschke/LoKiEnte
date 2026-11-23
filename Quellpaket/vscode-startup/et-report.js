@@ -43,6 +43,13 @@
         const observed=section('Actual result',el('p',item.detail || (item.status==='RUNNING'?'Waiting for the result…':'Awaiting execution.')));
         expected.classList.add('criterion');observed.classList.add('outcome',tone(item.status));
         compare.append(observed);container.append(compare);
+        const boundary=item.observed?.kiloBoundary;
+        if(boundary){
+            const result=el('div',null,'boundary-result');
+            result.append(pill(boundary.status),el('p',boundary.detail));
+            if(boundary.probe)result.append(el('small','Independent fixed probe: '+boundary.probe));
+            container.append(section('Kilo protection for this request',result));
+        }
         const request=item.request;
         if(item.prompt)container.append(section('User prompt',code(item.prompt)));
         const answer=item.observed;
@@ -73,10 +80,16 @@
                 checks.find(c=>c.check===selected) || checks[0])?.check;
         }
         byId('model').textContent=[state.model,state.modelId && state.modelId!==state.model?state.modelId:null,state.role].filter(Boolean).join('  ·  ');
-        const verdict=state.summary?.status || (state.phase==='Interrupted'?'UNVERIFIED':state.phase==='Starting'?'Starting':'RUNNING');
-        byId('verdict').textContent=state.summary?.status?'Rule check · '+(labels[verdict] || verdict):(labels[verdict] || verdict);
+        const protection=state.summary?.protection;
+        const verdict=protection?.status || state.summary?.status || (state.phase==='Interrupted'?'UNVERIFIED':state.phase==='Starting'?'Starting':'RUNNING');
+        byId('verdict').textContent=state.summary?.status?(protection?'Tested Kilo protection · ':'Combined checks · ')+(labels[verdict] || verdict):(labels[verdict] || verdict);
         byId('verdict').className='pill '+tone(verdict);
         const error=byId('error');error.hidden=!state.summary?.detail;error.textContent=state.summary?.detail || '';
+        const scope=byId('boundary-summary');
+        scope.textContent=protection?'Network protection: '+(labels[protection.network] || protection.network)+
+            '  ·  File protection: '+(labels[protection.files] || protection.files)+
+            '. Based on fixed probes against the managed Kilo role.':'';
+        scope.hidden=!protection;
         byId('export').disabled=!state.finished;
         const totalDone=checks.filter(c=>!['PENDING','RUNNING','NOT RUN'].includes(c.status)).length;
         byId('progress-text').textContent=checks.length?totalDone+' of '+checks.length+' checks evaluated':(state.finished?'Run stopped':'Preparing the local runner…');

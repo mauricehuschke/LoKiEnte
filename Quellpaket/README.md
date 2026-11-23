@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.23.8 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.23.9 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Use **Run E.T. model rule test** in the LoKiEnte sidebar to test a selected local model in your normal Windows session. It uses Kilo instructions and checks Kilo tool permissions. The optional Hyper-V check is separate.
 
