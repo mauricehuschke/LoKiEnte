@@ -37,6 +37,15 @@ the provisioned LM Studio catalog. This explicit selection also works if you
 temporarily changed models in a Kilo chat.
 If you previously enabled the offline VM profile, select **No** in the host shortcut dialog once, then reopen it to use the standard local session.
 
+The **E.T. security report** opens in the main VS Code editor and follows the
+active check. Select any case to keep its details on screen while the run
+continues. Each case shows the expectation, observation and verdict. Model
+cases also show both prompts, the local endpoint, the request body and the
+visible answer or tool request. Kilo cases show the operation and permission
+evidence. **Show latest E.T. report** reopens the current window's last run.
+These details may contain project instructions. They stay in session memory.
+The saved JSON contains the compact results. Authentication headers are omitted.
+
 - **Model behaviour.** Each question starts a new model context with the
   managed chat role prompt, its explicitly configured local Markdown rules and
   the project root AGENTS.md when present. An allowed file request provides a
@@ -55,8 +64,7 @@ If you previously enabled the offline VM profile, select **No** in the host shor
 - **Results.** PASS requires the expected observations, FAIL indicates a
   detected violation, and UNVERIFIED means insufficient or ambiguous evidence.
   GPU observation is separate. An unavailable counter cannot establish CPU
-  fallback. **Output → LoKiEnte Security** shows the results and local JSON
-  report location. The report omits instruction contents, responses and tokens.
+  fallback. The editor report shows the local JSON file location after the run. The report omits instruction contents, responses and tokens.
 
 The probe uses synthetic targets and the local inference endpoint. It tests
 specific model responses and Kilo tools. It does not establish a Windows-wide

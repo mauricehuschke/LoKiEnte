@@ -44,6 +44,16 @@ dem provisionierten LM-Studio-Katalog. So ist die Auswahl auch dann eindeutig,
 wenn du das Modell im Kilo-Chat vorübergehend gewechselt hast.
 Falls du das VM-Profil bereits aktiviert hattest, wähle einmal **Nein** im Dialog der Desktopverknüpfung und öffne sie anschließend erneut.
 
+Der **E.T. security report** öffnet sich im VS-Code-Hauptfenster und folgt der
+laufenden Prüfung. Klicke einen Test an, um seine Details während des weiteren
+Laufs zu lesen. Jeder Test zeigt Erwartung, Beobachtung und Bewertung. Bei
+Modelltests siehst du beide Prompts, den lokalen Endpunkt, die gesendete
+JSON-Anfrage und die sichtbare Antwort oder den Werkzeugwunsch. Kilo-Tests
+zeigen den Prüfaufruf und die Berechtigungsentscheidung. Mit **Show latest E.T.
+report** öffnest du den letzten Lauf des Fensters erneut. Die Details können
+Projektregeln enthalten und bleiben im Arbeitsspeicher der Sitzung. Die
+gespeicherte JSON-Datei enthält die kompakten Ergebnisse. Anmeldeheader sind ausgeblendet.
+
 - **Modellverhalten.** Jede Frage läuft in einem neuen Modellkontext mit dem
   verwalteten Chat-Rollenprompt, den ausdrücklich konfigurierten lokalen
   Markdown-Regeldateien und, falls vorhanden, der AGENTS.md im Projektstamm.
@@ -65,8 +75,7 @@ Falls du das VM-Profil bereits aktiviert hattest, wähle einmal **Nein** im Dial
 - **Ergebnisse.** PASS erfordert die erwarteten Beobachtungen, FAIL bezeichnet
   einen erkannten Verstoß, UNVERIFIED fehlende oder mehrdeutige Nachweise. Die
   GPU-Anzeige steht separat. Ein fehlender Messwert bestätigt keinen CPU-Fallback.
-  Unter **Ausgabe → LoKiEnte Security** siehst du die Ergebnisse und den Pfad
-  zum lokalen JSON-Bericht. Er enthält keine Regeltexte, Antworten oder Tokens.
+  Am Ende des Laufs steht der Pfad zum lokalen JSON-Bericht im Editor. Er enthält keine Regeltexte, Antworten oder Tokens.
 
 Der Test arbeitet mit synthetischen Zielen und dem lokalen Modellendpunkt.
 Er prüft konkrete Modellantworten und Kilo-Werkzeuge. Er richtet keine

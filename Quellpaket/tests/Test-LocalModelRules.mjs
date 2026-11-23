@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import {once} from 'node:events';
+import {randomUUID} from 'node:crypto';
 import probe from '../security-probe/local-model.cjs';
 
 const refusal='BLOCKED-fixture';
@@ -32,10 +33,15 @@ test('normal-machine entry exercises each turn against loopback, reads native ru
     const rules=path.join(root,'instructions.md');
     const server=http.createServer();
     const requests=[];
-    let attempted=false,missingToolDecision=false,wrongModel=false;
+    const events=[];
+    const credential=randomUUID();
+    const authVariable='LOKIENTE_ET_TEST_'+process.pid;
+    process.env[authVariable]=credential;
+    let attempted=false,missingToolDecision=false,wrongModel=false,interrupt=false;
     server.on('request',async(req,res)=>{
         try{
             assert.equal(req.url,'/v1/chat/completions');
+            assert.equal(req.headers.authorization,'Bearer '+credential);
             const chunks=[];for await(const chunk of req)chunks.push(chunk);
             const body=JSON.parse(Buffer.concat(chunks));requests.push(body);
             const system=body.messages[0].content, prompt=body.messages[1].content;
@@ -47,15 +53,17 @@ test('normal-machine entry exercises each turn against loopback, reads native ru
             else if(!marker)reply=answer('APPROVED');
             else if(attempted && prompt.includes('lokiente-et.invalid'))reply=answer(null,[call('webfetch',{url:'https://lokiente-et.invalid/status'})]);
             else reply=answer(marker);
+            if(interrupt && prompt.includes('lokiente-et.invalid')){res.writeHead(503);res.end();return;}
+            reply.choices[0].message.reasoning_content='hidden response fixture';
             if(wrongModel)reply.model='incorrect';
             res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify(reply));
         }catch(error){res.writeHead(500);res.end();throw error;}
     });
     server.listen(0,'127.0.0.1');await once(server,'listening');
     const cfg={enabled_providers:['lmstudio'],instructions:[rules],agent:{'shadow-chat':{prompt:'Managed chat role.',permission:{bash:'deny'}}},
-        provider:{lmstudio:{options:{baseURL:'http://127.0.0.1:'+server.address().port+'/v1'},models:{coder:{tool_call:true,id:'fixture'}}}}};
+        provider:{lmstudio:{options:{baseURL:'http://127.0.0.1:'+server.address().port+'/v1',apiKey:'{env:'+authVariable+'}'},models:{coder:{tool_call:true,id:'fixture'}}}}};
     const opts={root,config:cfg,alias:'coder',project:root,binary:'fixture',custom:{prompt:'Check the project rule',expected:'APPROVED'}};
-    const deps={log(){},measure:async run=>{await run();return false;},kilo:async(_binary,_cwd,args)=>{
+    const deps={trace:event=>events.push(event),log(){},measure:async run=>{await run();return false;},kilo:async(_binary,_cwd,args)=>{
         if(args[1]==='config')return {ok:true,data:cfg};
         if(args.length===3)return {ok:true,data:{name:'shadow-chat',tools:{read:true,webfetch:false,bash:false}}};
         const {filePath}=JSON.parse(args.at(-1));
@@ -71,11 +79,37 @@ test('normal-machine entry exercises each turn against loopback, reads native ru
         const serialized=JSON.stringify(good);
         for(const privateText of ['APPROVED','Project rule fixture',root,'Check the project rule'])assert(!serialized.includes(privateText));
         assert(!requests[4].messages[0].content.includes('APPROVED'));
+        const sent=events.filter(e=>e.request?.body);
+        assert.deepEqual(sent.map(e=>e.request.body),requests);
+        assert(sent.every(e=>e.request.method==='POST' && e.request.endpoint===cfg.provider.lmstudio.options.baseURL+'/chat/completions'));
+        const plan=events.find(e=>e.type==='plan');
+        const custom=plan.checks.find(c=>c.check==='Custom rule');
+        assert.equal(custom.expected,'APPROVED');assert.equal(custom.prompt,requests.at(-1).messages[1].content);
+        assert.equal(events.find(e=>e.check==='Custom rule' && e.status==='PASS').observed.answer,'APPROVED');
+        assert.equal(events.find(e=>e.check==='Kilo protected file' && e.status==='PASS').observed.explicitDenial,true);
+        assert(!JSON.stringify(events).includes('hidden response fixture'));
+        assert.deepEqual(JSON.parse(await fs.readFile(events.at(-1).reportFile,'utf8')),good);
+        assert(!JSON.stringify(events).includes(credential));
+        events.length=0;
         attempted=true;assert.equal((await probe.run(opts,deps)).status,'FAIL');
+        const failed=events.find(e=>e.check==='Model internet access' && e.status==='FAIL');
+        assert.equal(failed.observed.toolCalls[0].name,'webfetch');
+        assert.deepEqual(JSON.parse(failed.observed.toolCalls[0].arguments),{url:'https://lokiente-et.invalid/status'});
+        events.length=0;interrupt=true;
+        assert.equal((await probe.run(opts,deps)).status,'UNVERIFIED');
+        assert.match(events.find(e=>e.check==='Model internet access' && e.status==='UNVERIFIED').detail,/503/);
+        assert(!events.some(e=>e.check==='Custom rule' && e.status==='RUNNING'));
+        interrupt=false;
         attempted=false;missingToolDecision=true;assert.equal((await probe.run(opts,deps)).status,'UNVERIFIED');
         missingToolDecision=false;wrongModel=true;assert.equal((await probe.run(opts,deps)).status,'UNVERIFIED');
-        wrongModel=false;cfg.instructions=['https://example.invalid/rules.md'];
+        wrongModel=false;
+        await fs.appendFile(rules,' '+credential);
+        events.length=0;await probe.run(opts,deps);
+        assert(requests.at(-1).messages[0].content.includes(credential));
+        assert(!JSON.stringify(events).includes(credential));
+        assert(events.find(e=>e.request?.body).request.body.messages[0].content.includes('[redacted]'));
+        cfg.instructions=['https://example.invalid/rules.md'];
         const before=requests.length;
         assert.equal((await probe.run(opts,deps)).status,'UNVERIFIED');assert.equal(requests.length,before);
-    }finally{server.close();server.closeAllConnections();await fs.rm(root,{recursive:true,force:true});}
+    }finally{delete process.env[authVariable];server.close();server.closeAllConnections();await fs.rm(root,{recursive:true,force:true});}
 });

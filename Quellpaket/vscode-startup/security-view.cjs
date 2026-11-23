@@ -4,9 +4,11 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const execute = promisify(execFile);
+const {createReport,runInEditor} = require('./et-report.cjs');
 
 function registerSecurityView(vscode, context, dataDirectory) {
     const root = path.dirname(dataDirectory);
+    const report = createReport(vscode,context);
     const guestChallenge = path.join(process.env.ProgramData, 'LoKiEnte-ET', 'challenge.json');
     const profile = path.join(root, 'security', 'profile.json');
     const event = new vscode.EventEmitter();
@@ -37,6 +39,7 @@ function registerSecurityView(vscode, context, dataDirectory) {
             item(guest?'Guest challenge present':mode,'shield'),
             item('Run E.T. model rule test','beaker','lokiente.security.test','local model'),
             item('Test a custom Kilo rule','checklist','lokiente.security.custom'),
+            ...(report.available?[item('Show latest E.T. report','preview','lokiente.security.report')]:[]),
             ...(guest?[]:[item('Check host capabilities','pulse','lokiente.security.inspect'),item('Choose security profile','settings-gear','lokiente.security.choose')]),
             ...(guest?[item('Check VM isolation','vm','lokiente.security.guestTest')]:[]),
             item('Kilo rules and workflows','book','lokiente.security.rules','Agent Behaviour'),
@@ -93,7 +96,7 @@ function registerSecurityView(vscode, context, dataDirectory) {
     let testing=false;
     async function testModel(customRule) {
         if(!vscode.workspace.isTrusted)throw new Error('Open a trusted managed window to run the local model test.');
-        if(testing)return;
+        if(testing){report.reveal();return;}
         testing=true;
         try{
             const config=JSON.parse(process.env.KILO_CONFIG_CONTENT || '{}');
@@ -113,25 +116,19 @@ function registerSecurityView(vscode, context, dataDirectory) {
                 if(!expected)return;
                 custom={prompt,expected:expected.trim()};
             }
-            const chain=JSON.parse(await fs.readFile(path.join(root,'toolchain.json'),'utf8'));
-            const project=vscode.workspace.workspaceFolders?.find(f=>f.uri.scheme==='file')?.uri.fsPath;
-            const env={...process.env,LOKIENTE_ET_PROJECT:project || '',LOKIENTE_ET_CUSTOM:custom?JSON.stringify(custom):''};
-            output.show(true);
-            output.appendLine('E.T. local model rule test — '+model.alias);
-            await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Checking Kilo permissions and '+model.label},async()=>{
-                const proc=execute(chain.nodeExecutable,[path.join(root,'app','security-probe','local-model.cjs'),model.alias],
-                    {cwd:root,env,windowsHide:true,timeout:1200000,maxBuffer:1024*1024});
-                proc.child.stdout.setEncoding('utf8');
-                proc.child.stdout.on('data',chunk=>output.append(chunk));
-                try{await proc;}
-                catch(e){
-                    if(e.stderr?.trim())throw new Error(e.stderr.trim().slice(0,450));
-                    if(![1,2].includes(e.code) || !e.stdout?.includes('Local report:'))throw new Error('The local model test did not complete.');
-                    void vscode.window.showWarningMessage('Local rule check '+(e.code===1?'failed':'was inconclusive')+'. See LoKiEnte Security for each result.');
-                }
-            });
+            report.begin(model.alias);
+            event.fire();
+            try{
+                const chain=JSON.parse(await fs.readFile(path.join(root,'toolchain.json'),'utf8'));
+                const project=vscode.workspace.workspaceFolders?.find(f=>f.uri.scheme==='file')?.uri.fsPath;
+                const env={...process.env,LOKIENTE_ET_PROJECT:project || '',LOKIENTE_ET_CUSTOM:custom?JSON.stringify(custom):''};
+                await runInEditor(chain.nodeExecutable,path.join(root,'app','security-probe','local-model.cjs'),model.alias,{cwd:root,env},report,context);
+            }catch{
+                report.update({type:'fatal',detail:'Unable to start the provisioned Node runner. Check toolchain.json and reopen LoKiEnte from the desktop shortcut.'});
+            }
         }finally{testing=false;}
     }
+    command('lokiente.security.report',()=>report.available?report.reveal():vscode.window.showInformationMessage('Run an E.T. model rule test first.'));
     command('lokiente.security.test',()=>testModel(false));
     command('lokiente.security.custom',()=>testModel(true));
     command('lokiente.security.guestTest',async()=>{

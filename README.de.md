@@ -559,9 +559,12 @@ Klicke links in VS Code auf die **LoKiEnte-Ente → Run E.T. model rule test**
 und wähle das lokale Modell. Der Test läuft auf deinem normalen Windows-PC
 mit der bestehenden Installation und ohne Administratorrechte oder VM.
 Er prüft eine erlaubte Leseanforderung sowie Anfragen nach einer geschützten
-Datei, einer Datei außerhalb des Arbeitsordners und einer Webseite. Unter
-**Ausgabe → LoKiEnte Security** findest du getrennte Ergebnisse für das
-Modellverhalten, Kilos Werkzeugrechte und beobachtete GPU-Aktivität.
+Datei, einer Datei außerhalb des Arbeitsordners und einer Webseite. Im Hauptfenster öffnet sich der **E.T. security report**.
+Wähle einen Test, um Soll und Ist zu vergleichen. Bei Modelltests kannst du den
+Systemprompt und die gesendete JSON-Anfrage aufklappen sowie die sichtbare Antwort
+und angeforderte Werkzeugaufrufe lesen. Die Übersicht zeigt Modellverhalten,
+Kilos Werkzeugrechte und GPU-Aktivität getrennt. Mit **Show latest E.T. report**
+öffnest du den letzten Lauf im selben Fenster erneut.
 Unter **Test a custom Kilo rule** kannst du zusätzlich eine eigene Frage und
 die erwartete Antwort eingeben. [Ablauf und Ergebnisse](SECURITY.de.md#lokaler-et-modelltest).
 

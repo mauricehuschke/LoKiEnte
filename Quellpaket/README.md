@@ -2,9 +2,11 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.23.5 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.23.6 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Use **Run E.T. model rule test** in the LoKiEnte sidebar to test a selected local model in your normal Windows session. It uses Kilo instructions and checks Kilo tool permissions. The optional Hyper-V check is separate.
+
+The main editor shows a live **E.T. security report**. Select a case to compare expectations, prompts, the request payload and the observed result. Reopen it with **Show latest E.T. report** in the same window.
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
