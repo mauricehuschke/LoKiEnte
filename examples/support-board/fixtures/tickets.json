@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "visibility": "team",
+    "status": "open",
+    "title": "Update the help page",
+    "contact": "sample-a"
+  },
+  {
+    "id": 2,
+    "visibility": "team",
+    "status": "open",
+    "title": "Replace a test cable",
+    "contact": "sample-b"
+  },
+  {
+    "id": 3,
+    "visibility": "team",
+    "status": "closed",
+    "title": "Confirm printer setup",
+    "contact": "sample-c"
+  },
+  {
+    "id": 4,
+    "visibility": "internal",
+    "status": "open",
+    "title": "Internal fixture",
+    "contact": "sample-private"
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "name": "local-support-board",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.cjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
