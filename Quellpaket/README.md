@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.23.1 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.23.2 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
@@ -190,7 +190,7 @@ functional acceptance, commit and push remain your responsibility.
 ### Build the installer from source
 
 On the development machine, update the version above and run
-`python .\Build-LoKiEnte.py 2026.11.23.1` from the repository root. The script
+`python .\Build-LoKiEnte.py 2026.11.23.2` from the repository root. The script
 rebuilds the embedded payload and checksum. The target Windows PC still needs
 only the generated PS1. A separate old ZIP is unnecessary for this process. The
 provisioning report records the version and checksum of the installer actually used.

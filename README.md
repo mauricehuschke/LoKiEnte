@@ -405,6 +405,8 @@ The policy covers **VS Code, Kilo for VS Code (Windows x64), Kilo CLI, LM Studio
 
 The confirmed provisioning run records the choice in `update-policy.json` in the installation directory, including for retries. Omit the option to reuse it. Specify another value to switch. The provisioning report records the policy and target versions. Existing newer tools are kept, including when switching back to LTS or frozen. Old installations with custom `dependency-versions.json` pins that differ from the bundled targets require a one-time explicit policy choice to migrate.
 
+On Windows, `curl --version` reports the upstream version (for example, `8.23.0`). WinGet also tracks a package revision (for example, `8.23.0.9`). LoKiEnte checks the executable in the installed package. If verification fails, the error includes the detected version and executable path.
+
 These rules apply to LoKiEnte provisioning. Applications' own updaters are separate. Integration-specific ripgrep and LanceDB, model files and project libraries follow their existing management paths.
 
 ## All provisioning parameters and options

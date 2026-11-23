@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.23.1 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.23.2 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den
@@ -195,7 +195,7 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.23.1` ausführen. Das Skript baut
+`python .\Build-LoKiEnte.py 2026.11.23.2` ausführen. Das Skript baut
 die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält

@@ -435,6 +435,8 @@ Die Richtlinie umfasst **VS Code, Kilo für VS Code (Windows x64), Kilo CLI, LM 
 
 Die bestätigte Provisionierung speichert die Wahl im Installationsordner in `update-policy.json`, auch für Wiederholungen nach einem Fehler. Ohne Parameter gilt die gespeicherte Auswahl. Zum Wechsel gibst du den Parameter erneut an. Richtlinie und Zielversionen stehen im Provisionierungsbericht. Bereits neuere Werkzeuge bleiben auch beim Wechsel zu LTS oder frozen erhalten. Bei abweichenden eigenen Versionsvorgaben in einer alten `dependency-versions.json` musst du für die Migration einmal ausdrücklich eine Richtlinie wählen.
 
+Unter Windows meldet `curl --version` die Programmversion (z. B. `8.23.0`). WinGet führt zusätzlich eine Paketrevision (z. B. `8.23.0.9`). LoKiEnte prüft die ausführbare Datei im installierten Paket. Schlägt die Prüfung fehl, nennt die Meldung die erkannte Version und den Dateipfad.
+
 Die Regel gilt für die Provisionierung durch LoKiEnte. Programmeigene Updater arbeiten unabhängig. Integrationsgebundene Versionen von ripgrep und LanceDB, Modelldateien und Projektbibliotheken werden weiterhin separat verwaltet.
 
 ## Sämtliche Parameter des Provisionierungsskripts
