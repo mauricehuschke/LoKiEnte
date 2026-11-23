@@ -37,13 +37,14 @@ try{
     $statements=@($main.Body.Statements)
     $start=-1
     for($i=0;$i -lt $statements.Count;$i++){
-        if($statements[$i].Extent.Text -match '^\$lms=Resolve-ShadowSetupLms'){$start=$i;break}
+        if($statements[$i].Extent.Text -match '^if \(\$ModelAction -eq ''Keep''\)'){$start=$i;break}
     }
     if($start -lt 0){throw 'Actual setup does not use the manual initialization guard'}
     $harness=@'
 param($InstallRoot)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+$ModelAction='Configure'
 $report=[ordered]@{schema=1;status='IN_PROGRESS'}
 $studio='C:\Synthetic\LM Studio.exe'
 function Resolve-LocalLmsCommand {throw 'Synthetic CLI missing'}

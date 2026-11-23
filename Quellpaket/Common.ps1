@@ -152,6 +152,37 @@ function Resolve-ShadowNpm {
     throw 'npm-cli.js was not found. The existing Node/npm installation remains unchanged; repair that installation.'
 }
 
+function Install-ShadowNpm {
+    param([string]$NodePath,[string]$Root,[string]$Target)
+    $bundled=Resolve-ShadowNpm -NodePath $NodePath
+    $bundledVersion=(Invoke-ShadowNative $NodePath @($bundled,'--version') -Quiet).StdOut.Trim()
+    if ($bundledVersion -notmatch '^\d+\.\d+\.\d+$' -or $Target -notmatch '^\d+\.\d+\.\d+$') {throw 'Invalid npm version.'}
+
+    $selected=$Target
+    $stateFile=Join-Path $Root 'toolchain.json'
+    if (Test-Path -LiteralPath $stateFile -PathType Leaf) {
+        $saved=(Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json -AsHashtable)['npmVersion']
+        if ($saved -match '^\d+\.\d+\.\d+$' -and [version]$saved -gt [version]$selected) { $selected=$saved }
+    }
+    if ([version]$bundledVersion -ge [version]$selected) {return @{Entry=$bundled;Version=$bundledVersion}}
+    $prefix=Join-Path $Root "tooling/npm-versions/$selected"
+    $entry=Join-Path $prefix 'node_modules/npm/bin/npm-cli.js'
+    if (Test-Path -LiteralPath $entry -PathType Leaf) {
+        $probe=Invoke-ShadowNative $NodePath @($entry,'--version') -AllowFailure -Quiet
+        if ($probe.ExitCode -eq 0 -and $probe.StdOut.Trim() -ceq $selected -and (Test-Path -LiteralPath (Join-Path $prefix 'npm.cmd'))) {
+            return @{Entry=$entry;Version=$selected}
+        }
+    }
+    if ($selected -ne $Target) {throw "Previously active npm $selected is unavailable. Repair that installation before retrying."}
+    $before=[datetime]::UtcNow.AddHours(-48).ToString('o')
+    Write-ShadowMessage "Installing npm $selected for LoKiEnte ..."
+    $null=Invoke-ShadowNative $NodePath @($bundled,'install','--global','--prefix',$prefix,"npm@$selected",'--before',$before,
+        '--registry=https://registry.npmjs.org/','--ignore-scripts','--engine-strict','--no-update-notifier','--no-audit','--no-fund')
+    $actual=(Invoke-ShadowNative $NodePath @($entry,'--version') -Quiet).StdOut.Trim()
+    if ($actual -cne $selected -or !(Test-Path -LiteralPath (Join-Path $prefix 'npm.cmd'))) {throw "npm $selected failed verification."}
+    return @{Entry=$entry;Version=$actual}
+}
+
 function Install-ShadowPackage {
     param([string]$Tool,[string]$PackageId,[string]$WingetPath,[string]$AcceptedVersion)
     $existing=Resolve-ShadowTool -Name $Tool

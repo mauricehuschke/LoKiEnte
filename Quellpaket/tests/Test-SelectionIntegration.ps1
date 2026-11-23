@@ -10,7 +10,7 @@ if($errors.Count){throw 'Setup parser errors'}
 $main=@($ast.EndBlock.Statements|Where-Object {$_ -is [Management.Automation.Language.TryStatementAst]})[0]
 $statements=@($main.Body.Statements)
 $start=-1
-for($i=0;$i -lt $statements.Count;$i++){if($statements[$i].Extent.Text -match '^\$lms=Resolve-ShadowSetupLms'){$start=$i;break}}
+for($i=0;$i -lt $statements.Count;$i++){if($statements[$i].Extent.Text -match '^if \(\$ModelAction -eq ''Keep''\)'){$start=$i;break}}
 if($start -lt 0){throw 'Setup selection entry missing'}
 $body=@($statements[$start..($statements.Count-1)]|ForEach-Object {$_.Extent.Text}) -join "`n"
 $root=Join-Path ([IO.Path]::GetTempPath()) ('shadow-selection-integration-'+[guid]::NewGuid().ToString('N'))
@@ -25,6 +25,7 @@ try{
 param($InstallRoot,$Scenario,$IndexingMode='Automatic')
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+$ModelAction='Configure'
 $report=[ordered]@{schema=1;status='IN_PROGRESS';steps=@();warnings=@()}
 $ModelMode='Dual';$PreferredModel='Auto';$ModelKey='';$IncludeFastModel=$true;$AllowPartialGpuOffload=$true;$AllowUnfitAttempt=$false
 $SkipModelDownload=$false;$ContextLength=32768;$Port=1234;$RouterPort=1235;$ApiTokenEnvironmentVariable='';$studio='fixture'
@@ -35,7 +36,11 @@ function Read-Host {param($Prompt) if($Prompt -like '*Confirm*'){return 'y'};$sc
 '@
     $harness+="`n. '$commonFile'`n. '$runtimeFile'`n. '$selectionFile'`n. '$poolFile'`n. '$indexingFile'`n"
     $harness+=@'
-function Resolve-ShadowSetupLms {param($StudioPath) return 'fixture'}
+if($Scenario -like 'keep-*'){
+    $ModelAction='Keep'
+    $ModelMode=if ($Scenario -eq 'keep-single') {'Single'} else {'Dual'}
+}
+function Resolve-ShadowSetupLms {param($StudioPath) if ($ModelAction -eq 'Keep'){throw 'Keep contacted LM Studio'}; return 'fixture'}
 function Get-LocalNvidiaGpu {param($LogDirectory) return [pscustomobject]@{Gpu=[pscustomobject]@{FreeBytes=19GB};FreeRamBytes=21.6GB}}
 function Get-LrDownloadedModels {param($LmsPath,$LogDirectory) return @()}
 function Install-ShadowSelectedModels {param($Definitions,$LmsPath,$InstallRoot,[switch]$SkipModelDownload) [IO.File]::WriteAllText((Join-Path $InstallRoot 'install-seen'),($Definitions.Count.ToString()))}
@@ -79,6 +84,26 @@ function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPat
        @($report.warnings|Where-Object {$_ -match 'Synthetic insufficient memory'}).Count -ne 1 -or
        @($report.warnings|Where-Object {$_ -match 'Synthetic insufficient RAM'}).Count -ne 1){
         throw "Resource warnings blocked setup or were not recorded: $($warning.StdErr)"
+    }
+    $runtimeDir=Join-Path $root 'runtime'
+    [void][IO.Directory]::CreateDirectory($runtimeDir)
+    $savedOptions=Join-Path $root 'provisioning-options.json'
+    $beforeOptions=[IO.File]::ReadAllText($savedOptions)
+    foreach ($variant in @('single','dual')) {
+        $savedRuntime=if ($variant -eq 'single') {
+            @{Status='Ready';ModelId='saved-model';ApiBaseUrl='http://127.0.0.1:1234/v1';ContextLength=8192;ApiTokenEnvironmentVariable=''}
+        } else {
+            @{Status='Ready';SchemaVersion=2;PrimaryAlias='coder';BackendApiBaseUrl='http://127.0.0.1:1234/v1';RouterApiBaseUrl='http://127.0.0.1:1235/v1';ApiTokenEnvironmentVariable=''
+              Profiles=@(@{Alias='coder';InstanceId='coder-id';ContextLength=8192;ModelPath='a.gguf'},@{Alias='review';InstanceId='review-id';ContextLength=8192;ModelPath='b.gguf'})}
+        }
+        $file=Join-Path $runtimeDir $(if($variant -eq 'single'){'runtime-state.json'}else{'model-pool.json'})
+        $savedJson=$savedRuntime|ConvertTo-Json -Depth 8
+        [IO.File]::WriteAllText($file,$savedJson)
+        $run=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root,'-Scenario',"keep-$variant",'-IndexingMode','Off') -AllowFailure -Quiet
+        if($run.ExitCode){throw "Keep $variant failed: $($run.StdErr)"}
+        $report=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw|ConvertFrom-Json
+        if($report.smokeTests -cne 'NotRun' -or $report.status -ne 'PROVISIONED' -or [IO.File]::ReadAllText($file) -cne $savedJson -or [IO.File]::ReadAllText($savedOptions) -cne $beforeOptions){throw "Keep changed or verified $variant models"}
+        [IO.File]::Delete($file)
     }
     foreach($mode in @('Off','OnDemand')){
         Remove-Item -LiteralPath (Join-Path $root 'embedding-called') -ErrorAction SilentlyContinue

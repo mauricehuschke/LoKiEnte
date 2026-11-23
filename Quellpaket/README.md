@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.23.2 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.23.3 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
@@ -190,7 +190,7 @@ functional acceptance, commit and push remain your responsibility.
 ### Build the installer from source
 
 On the development machine, update the version above and run
-`python .\Build-LoKiEnte.py 2026.11.23.2` from the repository root. The script
+`python .\Build-LoKiEnte.py 2026.11.23.3` from the repository root. The script
 rebuilds the embedded payload and checksum. The target Windows PC still needs
 only the generated PS1. A separate old ZIP is unnecessary for this process. The
 provisioning report records the version and checksum of the installer actually used.
@@ -413,8 +413,7 @@ versioned layouts, without executing an unknown batch file. An unknown layout
 stops. Extension detection uses `--list-extensions --show-versions` and the manifest;
 it does not use `--locate-extension`, which VS Code 1.146.0 does not support.
 
-Kilo help is checked using stdout, stderr and exit code. An npm lifecycle-script
-approval warning alone is not treated as failure. Personal VS Code, Codex, Copilot
+Kilo help is checked using stdout, stderr and exit code. Kilo uses its platform binary without npm lifecycle hooks. Personal VS Code, Codex, Copilot
 and Kilo configurations remain untouched: the managed profile has its own data,
 extensions and Kilo sessions, and does not overwrite global Kilo configuration.
 
@@ -709,7 +708,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1
 | `latest` | The highest eligible numeric release available through each supported package source. |
 | `lts` | The highest eligible release in a supported LTS line for Node.js and PowerShell. Other tools follow `latest`. |
 
-The policy covers **VS Code, Kilo for VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js and curl**. Each target must be **at least 48 hours old**. WinGet targets must have the same manifest tree in the current catalog and a catalog revision at least 48 hours old. Kilo uses npm publication times and Marketplace build timestamps. If a new version is too young, the resolver selects the next eligible version. Missing catalog evidence or an unavailable exact package stops the run with an error.
+**Model maintenance for this run.** For an existing installation with matching model options, provisioning offers two choices. Press Enter or `1` to keep your Single or Dual configuration and indexing mode. Tools, agents and projects update. LoKiEnte skips model selection, downloads, changes to loaded instances and inference tests. Choose `2` to select or update models from the bundled catalog and test them again. Verified model files are reused. First-time setup and changed model parameters require configuration.
+
+Append `-ModelAction Keep` or `-ModelAction Configure` to your usual command to choose explicitly for one run. In a newly opened LoKiEnte terminal, run `npm --version` to see the active npm. When needed, LoKiEnte installs its own Node-compatible npm under `tooling/npm-versions`. The same 48-hour rule applies. Kilo uses its Windows binary package. Its private installation disables npm lifecycle scripts and verifies the CLI afterwards.
+
+The policy covers **VS Code, Kilo for VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js, npm and curl**. Each target must be **at least 48 hours old**. WinGet targets must have the same manifest tree in the current catalog and a catalog revision at least 48 hours old. Kilo uses npm publication times and Marketplace build timestamps. If a new version is too young, the resolver selects the next eligible version. Missing catalog evidence or an unavailable exact package stops the run with an error.
 
 The confirmed provisioning run records the choice in `update-policy.json` in the installation directory, including for retries. Omit the option to reuse it. Specify another value to switch. The provisioning report records the policy and target versions. Existing newer tools are kept, including when switching back to LTS or frozen. Old installations with custom `dependency-versions.json` pins that differ from the bundled targets require a one-time explicit policy choice to migrate.
 

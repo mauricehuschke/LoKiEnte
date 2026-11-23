@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$InstallRoot,
+    [ValidateSet('Keep','Configure')][string]$ModelAction='Configure',
     [ValidateSet('Single','Dual')][string]$ModelMode='Dual',
     [ValidateSet('frozen','latest','lts')][string]$UpdatePolicy='frozen',
     [hashtable]$DependencyPlan,
@@ -294,7 +295,7 @@ function Install-ShadowKilo {
     [IO.Directory]::CreateDirectory($prefix) | Out-Null
     Write-ShadowMessage "Installing Kilo CLI $version in the private tool directory ..."
     $before=[datetime]::UtcNow.AddHours(-48).ToString('o')
-    $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--before',$before,'--prefix',$prefix,"@kilocode/cli@$version",'--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
+    $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--before',$before,'--prefix',$prefix,"@kilocode/cli@$version",'--ignore-scripts','--include=optional','--no-update-notifier','--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
     $entry=Get-ShadowKiloEntry -PackageRoot $privateRoot -NodePath $NodePath
     if (-not $entry -or $entry.kiloVersion -cne $version) { throw 'Installed Kilo version does not match the requested version.' }
     if (-not (Test-ShadowKiloEntry $entry)) { throw 'Installed Kilo CLI could not start or its help does not confirm required agent/JSON options. Check the preceding warning.' }
@@ -316,17 +317,19 @@ try {
     [IO.Directory]::CreateDirectory($InstallRoot) | Out-Null
     $report=[ordered]@{schema=1;bundleVersion=$BundleVersion;payloadSha256=$PayloadSha256;startedUtc=[DateTime]::UtcNow.ToString('o');status='IN_PROGRESS';installRoot=$InstallRoot;steps=@();warnings=@();allowUnfitAttempt=[bool]$AllowUnfitAttempt}
     $versions=if($DependencyPlan){$DependencyPlan}else{Resolve-LoKiEnteDependencyPlan -Policy $UpdatePolicy}
-    foreach($key in @('powerShell','git','node','curl','vsCode','lmStudio','kiloCli','kiloVsCode')){
+    foreach($key in @('powerShell','git','node','npm','curl','vsCode','lmStudio','kiloCli','kiloVsCode')){
         if([string]$versions[$key] -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$'){throw "Missing or invalid policy target for $key."}
     }
     if($versions.nodePackage -notin @('OpenJS.NodeJS','OpenJS.NodeJS.LTS')){throw 'Invalid Node.js package ID.'}
+    $report.modelAction=$ModelAction
+    $report.indexingMode=$IndexingMode
     $report.updatePolicy=$UpdatePolicy
     $report.minimumReleaseAgeHours=48
     $report.acceptedDependencyVersions=$versions
     $inventory=Get-ShadowInventory
     $report.inventoryFile='inventory.json'
     $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'inventory.json') -Content ($inventory|ConvertTo-Json -Depth 15) -BackupRoot (Join-Path $InstallRoot 'backups/inventory')
-    if (-not $inventory.GPU) { throw 'NVIDIA GPU not reachable through nvidia-smi. Graphics drivers will not be replaced automatically.' }
+    if ($ModelAction -eq 'Configure' -and -not $inventory.GPU) { throw 'NVIDIA GPU not reachable through nvidia-smi. Graphics drivers will not be replaced automatically.' }
     $winget=Resolve-ShadowTool -Name winget
     if (-not $winget) { throw 'WinGet missing. Install/update Windows App Installer and rerun this script.' }
     $git=Install-ShadowPackage -Tool git -PackageId 'Git.Git' -WingetPath $winget -AcceptedVersion $versions.git
@@ -336,14 +339,16 @@ try {
     if($curlVersion -notmatch '(?m)^curl \d+\.\d+\.\d+'){throw 'curl exists but cannot be verified as a working curl CLI.'}
     $code=Install-ShadowPackage -Tool code -PackageId 'Microsoft.VisualStudioCode' -WingetPath $winget -AcceptedVersion $versions.vsCode
     $studio=Install-ShadowPackage -Tool lmstudio -PackageId 'ElementLabs.LMStudio' -WingetPath $winget -AcceptedVersion $versions.lmStudio
-    $npm=Resolve-ShadowNpm -NodePath $node
     $nodeVersion=(Invoke-ShadowNative -FilePath $node -ArgumentList @('--version') -Quiet).StdOut.Trim()
     if ($nodeVersion -notmatch '^v(\d+)\.' -or [int]$Matches[1] -lt 20) {
         throw "Existing Node $nodeVersion is too old for this baseline. It was not replaced. Provide a suitable Node LTS version and retry."
     }
+    $npmTool=Install-ShadowNpm -NodePath $node -Root $InstallRoot -Target $versions.npm
+    $npm=$npmTool.Entry
     $kilo=Install-ShadowKilo -NodePath $node -NpmEntry $npm -Root $InstallRoot -AcceptedVersion $versions.kiloCli
     $report.toolVersions=[ordered]@{
         powerShell=$PSVersionTable.PSVersion.ToString()
+        npm=$npmTool.Version
         node=$nodeVersion
         kiloCli=$kilo.kiloVersion
         curl=($curlVersion -split '\r?\n')[0]
@@ -353,7 +358,7 @@ try {
     $toolchain=[ordered]@{
         schema=2;modelMode=$ModelMode;indexingMode=$IndexingMode;allowUnfitAttempt=[bool]$AllowUnfitAttempt;kiloExecutable=$kilo.kiloExecutable;kiloArgumentPrefix=@($kilo.kiloArgumentPrefix)
         kiloVersion=$kilo.kiloVersion;powerShellExecutable=(Get-Process -Id $PID).Path
-        nodeExecutable=$node;npmEntry=$npm;gitExecutable=$git;codeExecutable=$code;curlExecutable=$curl;ripgrepExecutable=$ripgrep
+        nodeExecutable=$node;npmEntry=$npm;npmVersion=$npmTool.Version;gitExecutable=$git;codeExecutable=$code;curlExecutable=$curl;ripgrepExecutable=$ripgrep
     }
 
     $profileRoot=Join-Path $InstallRoot 'vscode-data'
@@ -379,72 +384,95 @@ try {
     $report.steps+=@('Managed VS Code startup and Settings Sync exclusions configured')
     $report.steps+=@('Git/Node/curl/VSCode/LMStudio available','Kilo CLI available','Kilo VS Code extension available','Ripgrep verified')
 
-    $lms=Resolve-ShadowSetupLms -StudioPath $studio
-    $poolPath=Join-Path $InstallRoot 'runtime/model-pool.json'
-    $previousPool=$null
-    if(Test-Path -LiteralPath $poolPath){
-        $previousPool=Get-Content -LiteralPath $poolPath -Raw|ConvertFrom-Json
-    }
-    if($previousPool -and $IndexingMode -ne 'Automatic'){Stop-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $previousPool}
-    $selectedDefinitions=@()
-    if($ModelMode -eq 'Dual' -or ($ModelMode -eq 'Single' -and -not $ModelKey)){
-        $selectionLogs=Join-Path $InstallRoot 'runtime/model-precheck-logs'
-        $hardware=Get-LocalNvidiaGpu -LogDirectory $selectionLogs
-        $downloaded=@(Get-LrDownloadedModels -LmsPath $lms -LogDirectory $selectionLogs)
-        $selectionFile=Join-Path $InstallRoot 'model-selection.json'
-        if(Test-Path -LiteralPath $selectionFile -PathType Leaf){
-            $savedSelection=Get-Content -LiteralPath $selectionFile -Raw|ConvertFrom-Json
-            if((Get-LrProperty $savedSelection 'schema') -ne 1 -or $null -eq $savedSelection.PSObject.Properties['roles'] -or $savedSelection.roles -isnot [array]){
-                throw 'Saved model selection is invalid. Existing files are preserved.'
+    if ($ModelAction -eq 'Keep') {
+        # Rebuild the agent configuration from disk. Do not contact LM Studio,
+        # change a running router/embedding instance, or claim new inference evidence.
+        if ($ModelMode -eq 'Dual') {
+            $pool=Get-Content -LiteralPath (Join-Path $InstallRoot 'runtime/model-pool.json') -Raw | ConvertFrom-Json
+            Assert-SmpPool -Pool $pool -RequireReady
+            $embeddingArguments=@{}
+            $embeddingFile=Join-Path $InstallRoot 'runtime/embedding-status.json'
+            if ($IndexingMode -eq 'Automatic' -and (Test-Path -LiteralPath $embeddingFile -PathType Leaf)) {
+                $savedEmbedding=Get-Content -LiteralPath $embeddingFile -Raw | ConvertFrom-Json
+                $embeddingArguments=Get-ShadowEmbeddingConfigurationArguments -Embedding $savedEmbedding.result -ApiBaseUrl $pool.RouterApiBaseUrl
             }
-            $previousProfiles=@($savedSelection.roles)
-        }else{$previousProfiles=if($previousPool){@(Get-LrProperty $previousPool 'Profiles' @())}else{@()}}
-        $preferredId=switch($PreferredModel){'Qwen27B'{'qwen38-27b'} 'GptOss20B'{'gpt-oss-20b'} default{''}}
-        $selectedDefinitions=@(Select-ShadowModels -Hardware $hardware -Downloaded $downloaded -PreviousProfiles $previousProfiles -IncludeFastModel:$IncludeFastModel -Single:($ModelMode -eq 'Single') -AllowPartialGpuOffload:$AllowPartialGpuOffload -PreferredId $preferredId)
-        $selectedState=[ordered]@{schema=1;roles=@($selectedDefinitions|ForEach-Object {
-            [ordered]@{Alias=$_.Alias;Id=$_.Definition.Id;Name=$_.Name;ExpectedPath=$_.Definition.ExpectedPath}
-        })}
-        $null=Write-ShadowManagedFile -Path $selectionFile -Content ($selectedState|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/model-selection')
-        $downloadDefinitions=@($selectedDefinitions)
-        if($IndexingMode -ne 'Off'){$downloadDefinitions+=@(@{Alias='embedding';Definition=(Get-ShadowEmbeddingDefinition)})}
-        Install-ShadowSelectedModels -Definitions $downloadDefinitions -LmsPath $lms -InstallRoot $InstallRoot -SkipModelDownload:$SkipModelDownload
-    }else{
-        Assert-ShadowSetupModels -LmsPath $lms -InstallRoot $InstallRoot -ModelMode $ModelMode -PreferredModel $PreferredModel -ModelKey $ModelKey -IncludeFastModel:$IncludeFastModel
-    }
-    if($previousPool){
-        Stop-ShadowModelRouter -InstallRoot $InstallRoot -Pool $previousPool
-    }
-    if($ModelMode -eq 'Dual'){
-        $pool=Configure-LocalModelPool -InstallRoot $InstallRoot -ContextLength $ContextLength -Port $Port -RouterPort $RouterPort -IncludeFastModel:$IncludeFastModel -AllowPartialGpuOffload:$AllowPartialGpuOffload -AllowUnfitAttempt:$AllowUnfitAttempt -SelectedDefinitions $selectedDefinitions -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable
-        $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $node -PowerShellPath $toolchain.powerShellExecutable
-        $embedding=if($IndexingMode -ceq 'Automatic'){Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)}else{Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode $IndexingMode}
-        $embeddingArguments=Get-ShadowEmbeddingConfigurationArguments -Embedding $embedding -ApiBaseUrl $router.ApiBaseUrl
-        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments
-        $report.runtime=$pool;$report.router=$router
-        $report.embedding=$embedding
-        $report.indexingMode=$IndexingMode
-        if($IndexingMode -ne 'Off'){Write-Host 'Indexing remains subject to the one-time Kilo project consent. Wait for Complete before relying on semantic search.'}
-        foreach($profile in $pool.Profiles){
-            if($profile.VerificationState -ceq 'Deferred'){$report.warnings+=@("Model $($profile.Alias) is downloaded but unverified: $($profile.VerificationMessage)")}
-            elseif((Get-LrProperty $profile.Estimate 'ReserveOverride' $false)){$report.warnings+=@("Model $($profile.Alias) was tested without LoKiEnte memory reserve.")}
+            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $pool.RouterApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments
+        } else {
+            $runtime=Get-Content -LiteralPath (Join-Path $InstallRoot 'runtime/runtime-state.json') -Raw | ConvertFrom-Json
+            if ($runtime.Status -notin @('Ready','Deferred') -or !$runtime.ModelId) {throw 'Invalid saved single-model state. Rerun with -ModelAction Configure.'}
+            $name=if ($runtime.Status -eq 'Deferred') {'LoKiEnte local [NOT YET VERIFIED]'} else {'LoKiEnte local - verified workflow'}
+            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $name -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
         }
-        if($embedding.Status -ceq 'Deferred'){$report.warnings+=@("CPU embedding model is not ready yet: $($embedding.Message)")}
-        elseif(Get-LrProperty $embedding 'ReserveOverride' $false){$report.warnings+=@('CPU embedding model was tested without LoKiEnte memory reserve.')}
-        $report.smokeTests=@($pool.Profiles|ForEach-Object {@{model=$_.Alias;checks=$_.SmokeTests}})
-    }else{
-        $report.indexingMode='Off';$report.embedding=Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode Off
-        if((Test-Path -LiteralPath $poolPath) -and -not $ModelKey){
-            $alias=if($PreferredModel -eq 'GptOss20B'){'review'}else{[string](Get-LrProperty $previousPool 'PrimaryAlias' 'coder')}
-            $null=Switch-ShadowLocalModel -InstallRoot $InstallRoot -Alias $alias
+        $report.smokeTests='NotRun'
+        $report.steps+=@('Saved model configuration reused; model downloads, runtime changes and inference tests skipped')
+    } else {
+        $lms=Resolve-ShadowSetupLms -StudioPath $studio
+        $poolPath=Join-Path $InstallRoot 'runtime/model-pool.json'
+        $previousPool=$null
+        if(Test-Path -LiteralPath $poolPath){
+            $previousPool=Get-Content -LiteralPath $poolPath -Raw|ConvertFrom-Json
         }
-        $singleProfile=if($selectedDefinitions.Count){$selectedDefinitions[0].Definition}else{$null}
-        $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -PreferredModel $PreferredModel -ModelKey $ModelKey -SelectedProfile $singleProfile -ContextLength $ContextLength -Port $Port -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable -AllowUnfitAttempt:$AllowUnfitAttempt
-        if($runtime.Status -cnotin @('Ready','Deferred')){throw "Unknown model status: $($runtime.Status)"}
-        $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOT YET VERIFIED]'}else{'LoKiEnte local - verified workflow'}
-        if($runtime.Status -ceq 'Deferred'){$report.warnings+=@("Single model is downloaded but unverified: $($runtime.VerificationMessage)")}
-        elseif(Get-LrProperty $runtime.Estimate 'ReserveOverride' $false){$report.warnings+=@('Single model was tested without LoKiEnte memory reserve.')}
-        $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
-        $report.runtime=$runtime;$report.smokeTests=$runtime.SmokeTests
+        if($previousPool -and $IndexingMode -ne 'Automatic'){Stop-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $previousPool}
+        $selectedDefinitions=@()
+        if($ModelMode -eq 'Dual' -or ($ModelMode -eq 'Single' -and -not $ModelKey)){
+            $selectionLogs=Join-Path $InstallRoot 'runtime/model-precheck-logs'
+            $hardware=Get-LocalNvidiaGpu -LogDirectory $selectionLogs
+            $downloaded=@(Get-LrDownloadedModels -LmsPath $lms -LogDirectory $selectionLogs)
+            $selectionFile=Join-Path $InstallRoot 'model-selection.json'
+            if(Test-Path -LiteralPath $selectionFile -PathType Leaf){
+                $savedSelection=Get-Content -LiteralPath $selectionFile -Raw|ConvertFrom-Json
+                if((Get-LrProperty $savedSelection 'schema') -ne 1 -or $null -eq $savedSelection.PSObject.Properties['roles'] -or $savedSelection.roles -isnot [array]){
+                    throw 'Saved model selection is invalid. Existing files are preserved.'
+                }
+                $previousProfiles=@($savedSelection.roles)
+            }else{$previousProfiles=if($previousPool){@(Get-LrProperty $previousPool 'Profiles' @())}else{@()}}
+            $preferredId=switch($PreferredModel){'Qwen27B'{'qwen38-27b'} 'GptOss20B'{'gpt-oss-20b'} default{''}}
+            $selectedDefinitions=@(Select-ShadowModels -Hardware $hardware -Downloaded $downloaded -PreviousProfiles $previousProfiles -IncludeFastModel:$IncludeFastModel -Single:($ModelMode -eq 'Single') -AllowPartialGpuOffload:$AllowPartialGpuOffload -PreferredId $preferredId)
+            $selectedState=[ordered]@{schema=1;roles=@($selectedDefinitions|ForEach-Object {
+                [ordered]@{Alias=$_.Alias;Id=$_.Definition.Id;Name=$_.Name;ExpectedPath=$_.Definition.ExpectedPath}
+            })}
+            $null=Write-ShadowManagedFile -Path $selectionFile -Content ($selectedState|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/model-selection')
+            $downloadDefinitions=@($selectedDefinitions)
+            if($IndexingMode -ne 'Off'){$downloadDefinitions+=@(@{Alias='embedding';Definition=(Get-ShadowEmbeddingDefinition)})}
+            Install-ShadowSelectedModels -Definitions $downloadDefinitions -LmsPath $lms -InstallRoot $InstallRoot -SkipModelDownload:$SkipModelDownload
+        }else{
+            Assert-ShadowSetupModels -LmsPath $lms -InstallRoot $InstallRoot -ModelMode $ModelMode -PreferredModel $PreferredModel -ModelKey $ModelKey -IncludeFastModel:$IncludeFastModel
+        }
+        if($previousPool){
+            Stop-ShadowModelRouter -InstallRoot $InstallRoot -Pool $previousPool
+        }
+        if($ModelMode -eq 'Dual'){
+            $pool=Configure-LocalModelPool -InstallRoot $InstallRoot -ContextLength $ContextLength -Port $Port -RouterPort $RouterPort -IncludeFastModel:$IncludeFastModel -AllowPartialGpuOffload:$AllowPartialGpuOffload -AllowUnfitAttempt:$AllowUnfitAttempt -SelectedDefinitions $selectedDefinitions -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable
+            $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $node -PowerShellPath $toolchain.powerShellExecutable
+            $embedding=if($IndexingMode -ceq 'Automatic'){Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)}else{Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode $IndexingMode}
+            $embeddingArguments=Get-ShadowEmbeddingConfigurationArguments -Embedding $embedding -ApiBaseUrl $router.ApiBaseUrl
+            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments
+            $report.runtime=$pool;$report.router=$router
+            $report.embedding=$embedding
+            $report.indexingMode=$IndexingMode
+            if($IndexingMode -ne 'Off'){Write-Host 'Indexing remains subject to the one-time Kilo project consent. Wait for Complete before relying on semantic search.'}
+            foreach($profile in $pool.Profiles){
+                if($profile.VerificationState -ceq 'Deferred'){$report.warnings+=@("Model $($profile.Alias) is downloaded but unverified: $($profile.VerificationMessage)")}
+                elseif((Get-LrProperty $profile.Estimate 'ReserveOverride' $false)){$report.warnings+=@("Model $($profile.Alias) was tested without LoKiEnte memory reserve.")}
+            }
+            if($embedding.Status -ceq 'Deferred'){$report.warnings+=@("CPU embedding model is not ready yet: $($embedding.Message)")}
+            elseif(Get-LrProperty $embedding 'ReserveOverride' $false){$report.warnings+=@('CPU embedding model was tested without LoKiEnte memory reserve.')}
+            $report.smokeTests=@($pool.Profiles|ForEach-Object {@{model=$_.Alias;checks=$_.SmokeTests}})
+        }else{
+            $report.indexingMode='Off';$report.embedding=Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode Off
+            if((Test-Path -LiteralPath $poolPath) -and -not $ModelKey){
+                $alias=if($PreferredModel -eq 'GptOss20B'){'review'}else{[string](Get-LrProperty $previousPool 'PrimaryAlias' 'coder')}
+                $null=Switch-ShadowLocalModel -InstallRoot $InstallRoot -Alias $alias
+            }
+            $singleProfile=if($selectedDefinitions.Count){$selectedDefinitions[0].Definition}else{$null}
+            $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -PreferredModel $PreferredModel -ModelKey $ModelKey -SelectedProfile $singleProfile -ContextLength $ContextLength -Port $Port -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable -AllowUnfitAttempt:$AllowUnfitAttempt
+            if($runtime.Status -cnotin @('Ready','Deferred')){throw "Unknown model status: $($runtime.Status)"}
+            $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOT YET VERIFIED]'}else{'LoKiEnte local - verified workflow'}
+            if($runtime.Status -ceq 'Deferred'){$report.warnings+=@("Single model is downloaded but unverified: $($runtime.VerificationMessage)")}
+            elseif(Get-LrProperty $runtime.Estimate 'ReserveOverride' $false){$report.warnings+=@('Single model was tested without LoKiEnte memory reserve.')}
+            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
+            $report.runtime=$runtime;$report.smokeTests=$runtime.SmokeTests
+        }
     }
     $report.effectiveConfiguration=Assert-ShadowKiloEffectiveConfig -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot
     $report.effectiveGuiBackendConfiguration=Assert-ShadowKiloEffectiveConfig -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot
@@ -454,10 +482,12 @@ try {
     Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -ConfigJson $searchConfig
     Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $bundledKilo -ConfigJson $searchConfig
     $report.steps+=@('File search verified in Kilo CLI and VS Code extension')
-    if(($ModelMode -eq 'Dual' -and $pool.VerificationStatus -cne 'Verified') -or
-       ($ModelMode -eq 'Single' -and $runtime.Status -ceq 'Deferred')){
-        $report.steps+=@('Local endpoint configured; at least one model test remains pending')
-    }else{$report.steps+=@('Model and local endpoint verified')}
+    if ($ModelAction -eq 'Configure') {
+        if(($ModelMode -eq 'Dual' -and $pool.VerificationStatus -cne 'Verified') -or
+           ($ModelMode -eq 'Single' -and $runtime.Status -ceq 'Deferred')){
+            $report.steps+=@('Local endpoint configured; at least one model test remains pending')
+        }else{$report.steps+=@('Model and local endpoint verified')}
+    }
     $report.steps+=@('Agents/roles/workflows generated and effective CLI configuration verified')
 
     $welcome=Join-Path $InstallRoot 'welcome'
@@ -507,15 +537,17 @@ try {
         }
     }
     $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'toolchain.json') -Content ($toolchain|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/toolchain')
-    $desired=[ordered]@{
-        IndexingMode=$IndexingMode;ModelMode=$ModelMode;IncludeFastModel=[bool]$IncludeFastModel;AllowPartialGpuOffload=[bool]$AllowPartialGpuOffload
-        AllowUnfitAttempt=[bool]$AllowUnfitAttempt;RouterPort=$RouterPort;Port=$Port;ContextLength=$ContextLength
-        PreferredModel=$PreferredModel;ModelKey=$ModelKey;ApiTokenEnvironmentVariable=$ApiTokenEnvironmentVariable
+    if ($ModelAction -eq 'Configure') {
+        $desired=[ordered]@{
+            IndexingMode=$IndexingMode;ModelMode=$ModelMode;IncludeFastModel=[bool]$IncludeFastModel;AllowPartialGpuOffload=[bool]$AllowPartialGpuOffload
+            AllowUnfitAttempt=[bool]$AllowUnfitAttempt;RouterPort=$RouterPort;Port=$Port;ContextLength=$ContextLength
+            PreferredModel=$PreferredModel;ModelKey=$ModelKey;ApiTokenEnvironmentVariable=$ApiTokenEnvironmentVariable
+        }
+        $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-options.json') -Content ($desired|ConvertTo-Json) -BackupRoot (Join-Path $InstallRoot 'backups/provisioning-options')
     }
-    $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-options.json') -Content ($desired|ConvertTo-Json) -BackupRoot (Join-Path $InstallRoot 'backups/provisioning-options')
-    $report.status=if($report.warnings.Count -or ($ModelMode -eq 'Dual' -and ($pool.VerificationStatus -cne 'Verified' -or $embedding.Status -ceq 'Deferred' -or (Get-LrProperty $embedding 'ReserveOverride' $false) -or
+    $report.status=if($report.warnings.Count -or ($ModelAction -eq 'Configure' -and (($ModelMode -eq 'Dual' -and ($pool.VerificationStatus -cne 'Verified' -or $embedding.Status -ceq 'Deferred' -or (Get-LrProperty $embedding 'ReserveOverride' $false) -or
         @($pool.Profiles|Where-Object {(Get-LrProperty $_.Estimate 'ReserveOverride' $false)}).Count)) -or
-        ($ModelMode -eq 'Single' -and ($runtime.Status -ceq 'Deferred' -or (Get-LrProperty $runtime.Estimate 'ReserveOverride' $false)))){
+        ($ModelMode -eq 'Single' -and ($runtime.Status -ceq 'Deferred' -or (Get-LrProperty $runtime.Estimate 'ReserveOverride' $false)))))){
         'PROVISIONED_WITH_WARNINGS'
     }else{'PROVISIONED'}
     $report.finishedUtc=[DateTime]::UtcNow.ToString('o')

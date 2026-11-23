@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.23.2 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.23.3 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den
@@ -195,7 +195,7 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.23.2` ausführen. Das Skript baut
+`python .\Build-LoKiEnte.py 2026.11.23.3` ausführen. Das Skript baut
 die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält
@@ -500,9 +500,7 @@ Das von VS Code 1.146.0 nicht unterstützte `--locate-extension` wird nicht verw
 
 Die Kilo-CLI-Optionsprüfung wertet `stdout` und `stderr` aus und verlangt einen
 erfolgreichen Exitcode. Die CLI kann ihre Hilfe bei umgeleiteter Ausgabe auf
-`stderr` schreiben. Ein npm-Hinweis auf nicht freigegebene Installationsskripte
-ist nicht automatisch ein Fehler; bei weiterhin fehlschlagender CLI-Prüfung
-meldet das Setup den Exitcode oder die fehlenden Optionen und stoppt.
+`stderr` schreiben. Kilo verwendet sein Plattformpaket ohne npm-Installationsskripte.
 
 Die normale persönliche VS-Code-Umgebung einschließlich Codex, Copilot, Settings und Erweiterungen wird nicht umkonfiguriert. Die neue Umgebung verwendet eigene Verzeichnisse für Benutzerdaten, Erweiterungen und Kilo-Sitzungen. Auch vorhandene globale Kilo-Konfiguration wird nicht überschrieben.
 
@@ -802,7 +800,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1
 | `latest` | Die höchste geeignete numerische Version aus der jeweiligen unterstützten Paketquelle. |
 | `lts` | Für Node.js und PowerShell die höchste geeignete Version einer unterstützten LTS-Reihe. Für die übrigen Werkzeuge gilt `latest`. |
 
-Die Richtlinie umfasst **VS Code, Kilo für VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js und curl**. Jede Zielversion muss **mindestens 48 Stunden alt** sein. Bei WinGet muss das Paketmanifest im aktuellen Katalog mit einem mindestens 48 Stunden alten Katalogstand übereinstimmen. Für Kilo gelten die Veröffentlichungszeit bei npm und der Zeitstempel des Marketplace-Builds. Ist die neueste Version zu jung, wählt LoKiEnte die nächste geeignete Version. Fehlende Altersnachweise oder ein nicht verfügbares Zielpaket führen zu einer Fehlermeldung.
+**Modellpflege bei diesem Lauf.** Bei einer bestehenden Installation mit passenden Modelloptionen bietet die Provisionierung zwei Wege an. Enter oder `1` übernimmt die vorhandene Single- oder Dual-Konfiguration samt Indizierung. Werkzeuge, Agenten und Projekte werden aktualisiert. LoKiEnte überspringt die Modellwahl, Downloads, Änderungen an geladenen Instanzen und Inferenztests. Mit `2` kannst du die Modelle aus dem mitgelieferten Katalog auswählen oder aktualisieren und erneut testen. Bereits verifizierte Modelldateien werden wiederverwendet. Eine Erstinstallation oder eine Änderung der Modellparameter führt die Konfiguration durch.
+
+Für die direkte Auswahl ergänze deinen gewohnten Befehl um `-ModelAction Keep` oder `-ModelAction Configure`. Die Wahl gilt nur für diesen Lauf. Im neu geöffneten LoKiEnte-Terminal zeigt `npm --version` das verwendete npm. Bei Bedarf installiert LoKiEnte eine eigene, zur Node-Version passende npm-Version unter `tooling/npm-versions`. Die 48-Stunden-Regel gilt auch hier. Kilo verwendet sein Windows-Binärpaket. Die private Installation deaktiviert npm-Lebenszyklusskripte und prüft danach die CLI.
+
+Die Richtlinie umfasst **VS Code, Kilo für VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js, npm und curl**. Jede Zielversion muss **mindestens 48 Stunden alt** sein. Bei WinGet muss das Paketmanifest im aktuellen Katalog mit einem mindestens 48 Stunden alten Katalogstand übereinstimmen. Für Kilo gelten die Veröffentlichungszeit bei npm und der Zeitstempel des Marketplace-Builds. Ist die neueste Version zu jung, wählt LoKiEnte die nächste geeignete Version. Fehlende Altersnachweise oder ein nicht verfügbares Zielpaket führen zu einer Fehlermeldung.
 
 Die bestätigte Provisionierung speichert die Wahl im Installationsordner in `update-policy.json`, auch für Wiederholungen nach einem Fehler. Ohne Parameter gilt die gespeicherte Auswahl. Zum Wechsel gibst du den Parameter erneut an. Richtlinie und Zielversionen stehen im Provisionierungsbericht. Bereits neuere Werkzeuge bleiben auch beim Wechsel zu LTS oder frozen erhalten. Bei abweichenden eigenen Versionsvorgaben in einer alten `dependency-versions.json` musst du für die Migration einmal ausdrücklich eine Richtlinie wählen.
 

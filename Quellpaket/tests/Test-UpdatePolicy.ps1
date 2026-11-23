@@ -50,10 +50,15 @@ function Get-LoKiEnteJson {
         return
     }
     if ($Uri -match 'metadata.json'){return @{LTSReleaseTag=@('v7.6.3')}}
+    if ($Uri -eq 'https://registry.npmjs.org/npm') {
+        return ('{"dist-tags":{"latest":"12.2.4","latest-11":"11.20.0"},"versions":{"11.20.0":{"engines":{"node":">=20.0.0"}},"12.2.3":{"engines":{"node":"^22.22.2 || >=24.0.0"}},"12.2.4":{"engines":{"node":">=20.0.0"}}},"time":{"11.20.0":"2026-10-01T00:00:00Z","12.2.3":"2027-01-02T12:00:00Z","12.2.4":"2027-01-02T12:00:01Z"}}' | ConvertFrom-Json)
+    }
     if ($Uri -match 'npmjs'){return ('{"dist-tags":{"latest":"2.0.0"},"versions":{"1.0.0":{},"2.0.0":{}},"time":{"1.0.0":"2027-01-01T12:00:00Z","2.0.0":"2027-01-04T11:00:00Z"}}'|ConvertFrom-Json)}
     if ($Uri -match 'marketplace'){return ('{"results":[{"extensions":[{"extensionName":"kilo-code","publisher":{"publisherName":"kilocode"},"versions":[{"version":"3.0.0","targetPlatform":"linux-x64","lastUpdated":"2026-12-01T12:00:00Z"},{"version":"2.0.0","targetPlatform":"win32-x64","lastUpdated":"2027-01-03T12:00:00Z"},{"version":"1.0.0","targetPlatform":"win32-x64","lastUpdated":"2027-01-01T12:00:00Z"}]}]}]}'|ConvertFrom-Json)}
     throw "Unexpected URL $Uri"
 }
+if ((Get-LoKiEnteRegistryTarget npm $cutoff ([version]'26.13.1')) -cne '12.2.3') {throw 'Eligible npm version was skipped'}
+if ((Get-LoKiEnteRegistryTarget npm $cutoff ([version]'22.22.1')) -cne '11.20.0') {throw 'Incompatible npm was accepted'}
 foreach($policy in @('latest','lts')){
     $plan=Resolve-LoKiEnteDependencyPlan $policy $now
     if($plan.git -ne '2.0.0' -or $plan.kiloCli -ne '1.0.0' -or $plan.kiloVsCode -ne '1.0.0'){throw 'Package eligibility selection failed.'}

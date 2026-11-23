@@ -245,6 +245,15 @@ try{
         $shim=Find-BootstrapExecutable 'npm.cmd'
         if($shim){$npm=Join-Path (Split-Path $shim -Parent) 'node_modules\npm\bin\npm-cli.js'}
     }
+    $chainPath=Join-Path $InstallRoot 'toolchain.json'
+    if (Test-Path -LiteralPath $chainPath -PathType Leaf) {
+        $state=ConvertFrom-AuditJson -Json (Get-Content -LiteralPath $chainPath -Raw) -Source 'toolchain'
+        $v=Get-LrProperty $state 'npmVersion'
+        if ($v -match '^\d+\.\d+\.\d+$') {
+            $private=Join-Path $InstallRoot "tooling/npm-versions/$v/node_modules/npm/bin/npm-cli.js"
+            if ([IO.Path]::GetFullPath($private) -eq (Get-LrProperty $state 'npmEntry')) { $npm=$private }
+        }
+    }
     if($tools['node'] -and $npm -and (Test-Path -LiteralPath $npm -PathType Leaf)){
         $tools['npm']=$npm
         Add-AuditCheck 'tool.npm' PASS 'npm callable through the native Node entry point.' @{version=(Invoke-AuditNative $tools['node'] @($npm,'--version'))}
