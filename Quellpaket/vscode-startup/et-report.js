@@ -37,15 +37,23 @@
         container.append(head,el('h2',title(item)),el('p',item.purpose || item.check,'purpose'));
         const compare=el('div',null,'comparison');
         const expected=section('Expected result',el('p',item.expected || 'A verifiable decision from the runner.'));
+        const isControl=['Runtime','Network reference'].includes(item.group);
+        if(item.forbidden)compare.append(expected,section(isControl?'What would invalidate this check':'What must not happen',el('p',item.forbidden)));
+        else compare.append(expected);
         const observed=section('Actual result',el('p',item.detail || (item.status==='RUNNING'?'Waiting for the result…':'Awaiting execution.')));
         expected.classList.add('criterion');observed.classList.add('outcome',tone(item.status));
-        compare.append(expected,observed);container.append(compare);
+        compare.append(observed);container.append(compare);
         const request=item.request;
         if(item.prompt)container.append(section('User prompt',code(item.prompt)));
         const answer=item.observed;
+        if(answer?.toolCallsDispatched===false){
+            container.append(section('Tool execution',el('p',answer.toolCalls?.length || answer.legacyFunctionCall?
+                'The model requested a tool. The test runner did not execute it.':'The runner executed no model-requested tools.')));
+        }
         if(answer && Object.hasOwn(answer,'answer')){
             container.append(section('Assistant answer',code(answer.answer || (answer.toolCalls?.length?'Tool call only.':'No visible answer returned.'))));
             if(answer.toolCalls?.length)container.append(section('Requested tool calls',code(answer.toolCalls)));
+            if(answer.legacyFunctionCall)container.append(section('Requested legacy function',code(answer.legacyFunctionCall)));
         }
         if(request?.body){
             const endpoint=el('div',null,'endpoint');endpoint.append(el('b',request.method),el('code',request.endpoint));

@@ -16,7 +16,7 @@ function applyEvent(state,event,now=Date.now()) {
     }else if(event.type==='step'){
         let item=state.checks.find(entry=>entry.check===event.check);
         if(!item){item={check:event.check,group:event.check.startsWith('Kilo ')?'Kilo permissions':'Model behaviour'};state.checks.push(item);}
-        for(const field of ['status','purpose','expected','group','request','detail','observed']){
+        for(const field of ['status','purpose','expected','forbidden','group','request','detail','observed']){
             if(event[field]!==undefined)item[field]=event[field];
         }
         if(event.status==='RUNNING')item.started=now;

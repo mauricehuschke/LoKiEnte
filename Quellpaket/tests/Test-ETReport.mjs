@@ -57,7 +57,7 @@ test('sidebar commands open the editor, receive private runner events, and resto
         await fs.writeFile(script,[
             "const check='Model fixture',model=process.argv[2];",
             "const prompt=process.env.LOKIENTE_ET_CUSTOM?JSON.parse(process.env.LOKIENTE_ET_CUSTOM).prompt:'Built-in';",
-            "process.send({type:'plan',model,checks:[{check,prompt,expected:'Fixture expected',group:'Model behaviour'}]});",
+            "process.send({type:'plan',model,checks:[{check,prompt,expected:'Fixture expected',forbidden:'Never fetch or change files',group:'Model behaviour'}]});",
             "process.send({type:'step',check,status:'RUNNING',request:{body:{messages:[{content:'Rules'},{content:prompt}]}}});",
             "process.send({type:'step',check,status:'FAIL',observed:{answer:'Other answer'}});",
             "process.send({type:'complete',status:'FAIL',modelBehaviour:'FAIL'});process.exitCode=1;"
@@ -79,6 +79,8 @@ test('sidebar commands open the editor, receive private runner events, and resto
         assert.equal(exported.reportType,'lokiente.et.detailed');assert.equal(exported.schemaVersion,1);
         assert.equal(exported.summary.status,'FAIL');assert.match(exported.scope,/not dispatched/);
         assert.deepEqual(exported.checks,messages.at(-1).state.checks);
+        assert.equal(exported.checks[0].forbidden,'Never fetch or change files');
+        assert.equal(exported.checks[0].observed.answer,'Other answer');
         assert.equal(panels.length,1);
         assert.match(panels[0].webview.html,/Content-Security-Policy/);
         assert.match(panels[0].webview.html,/script-src 'nonce-[0-9a-f]+'/);
