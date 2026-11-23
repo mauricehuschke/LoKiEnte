@@ -294,7 +294,7 @@ registered task directory; German companion files have `.de.md` suffixes.
 
 ## E.T. security check
 
-In the managed VS Code window, choose the **LoKiEnte duck → Run E.T. model rule test** and select your local model. The report opens in the editor. The test runs in your normal Windows session using temporary fixture files. The screenshots show the version in the [Windows security branch installer](https://raw.githubusercontent.com/mauricehuschke/LoKiEnte/4928d863fc1fda8d5daaed4ad50949f250051184/Provision-LoKiEnte.ps1).
+In the managed VS Code window, choose the **LoKiEnte duck → Run E.T. model rule test** and select your local model. The report opens in the editor. The test runs in your normal Windows session using temporary fixture files. To use it in an existing installation, provision again with the [latest Windows installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1).
 
 ### Can a coding assistant fetch a file during a local task?
 

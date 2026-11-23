@@ -308,7 +308,7 @@ unter `app\WORKFLOW.md` und für jedes registrierte Projekt als `LOKI-WORKFLOW.m
 
 ## E.T.-Sicherheitsprüfung
 
-Öffne im verwalteten VS-Code-Fenster die **LoKiEnte-Ente → Run E.T. model rule test** und wähle dein lokales Modell. Der Bericht öffnet sich im Editor. Die Prüfung läuft in deiner normalen Windows-Sitzung mit temporären Prüfdateien. Die Aufnahmen zeigen den Stand aus dem [Windows-Installer des Sicherheitsbranches](https://raw.githubusercontent.com/mauricehuschke/LoKiEnte/4928d863fc1fda8d5daaed4ad50949f250051184/Provision-LoKiEnte.ps1).
+Öffne im verwalteten VS-Code-Fenster die **LoKiEnte-Ente → Run E.T. model rule test** und wähle dein lokales Modell. Der Bericht öffnet sich im Editor. Die Prüfung läuft in deiner normalen Windows-Sitzung mit temporären Prüfdateien. Um die Prüfung in einer bestehenden Installation zu nutzen, provisioniere erneut mit dem [aktuellen Windows-Installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1).
 
 ### Darf der Coding-Assistent während der lokalen Entwicklung eine Datei aus dem Internet abrufen?
 
