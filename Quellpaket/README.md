@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.19.1 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.23.1 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test
@@ -138,7 +138,7 @@ LoKiEnte launch that requests indexing retries it. Corrupt model files, ambiguou
 errors remain explicit failures. Single mode does not currently provision indexing.
 
 This integration was checked with Kilo VS Code extensions 7.8.28 and 7.8.30.
-Version 7.8.30 is approved for new installations and updates. An already newer
+Version 7.8.30 is bundled as the frozen target. An already newer
 version is checked for the required interfaces and settings during provisioning.
 The separately installed Kilo CLI has its own version number.
 
@@ -190,7 +190,7 @@ functional acceptance, commit and push remain your responsibility.
 ### Build the installer from source
 
 On the development machine, update the version above and run
-`python .\Build-LoKiEnte.py 2026.11.19.1` from the repository root. The script
+`python .\Build-LoKiEnte.py 2026.11.23.1` from the repository root. The script
 rebuilds the embedded payload and checksum. The target Windows PC still needs
 only the generated PS1. A separate old ZIP is unnecessary for this process. The
 provisioning report records the version and checksum of the installer actually used.
@@ -695,32 +695,25 @@ tasks receive `-AutoPrepare` and an additional `Workflow Auto` entry. Each reque
 write scope is derived and independently reviewed, not installed as an unlimited
 persistent permission. Unreachable directories remain in the index and report.
 
-The approved Kilo extension is installed without an extra flag when newer than the
-installed version. Further approved exact tool versions can be listed in
-`dependency-versions.json` in the **installation root**. This example includes only
-the bundled extension approval:
+### Choose how development tools update
 
-```json
-{
-  "powerShell": null,
-  "git": null,
-  "node": null,
-  "curl": null,
-  "vsCode": null,
-  "lmStudio": null,
-  "kiloCli": null,
-  "kiloVsCode": "7.8.30"
-}
+Set `-UpdatePolicy` once on the normal provisioning command. For example, run this from the installer folder for an existing installation at `D:\LoKi`:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "D:\LoKi" -UpdatePolicy lts
 ```
 
-Replace a value with an exact approved version. A newer approved release is installed
-and verified on the next run. Without an approval, an existing base tool remains.
-For a missing unpinned base tool, initial installation uses WinGet's default candidate.
-A missing unpinned Kilo CLI is installed and checked for compatibility. CLI updates
-are prepared in a versioned directory and activated in the toolchain index only
-after setup checks. LanceDB, ripgrep and model files retain package-verified versions
-or hashes. `-UpdateManaged` remains accepted for older commands but is no longer
-required. Approvals and selected versions appear in the report.
+| Policy | Target on installation and every subsequent provisioning run |
+| --- | --- |
+| `frozen` (default) | The exact tool targets bundled with this LoKiEnte release. An already newer working installation is retained. |
+| `latest` | The highest eligible numeric release available through each supported package source. |
+| `lts` | The highest eligible release in a supported LTS line for Node.js and PowerShell. Other tools follow `latest`. |
+
+The policy covers **VS Code, Kilo for VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js and curl**. Each target must be **at least 48 hours old**. WinGet targets must have the same manifest tree in the current catalog and a catalog revision at least 48 hours old. Kilo uses npm publication times and Marketplace build timestamps. If a new version is too young, the resolver selects the next eligible version. Missing catalog evidence or an unavailable exact package stops the run with an error.
+
+The confirmed provisioning run records the choice in `update-policy.json` in the installation directory, including for retries. Omit the option to reuse it. Specify another value to switch. The provisioning report records the policy and target versions. Existing newer tools are kept, including when switching back to LTS or frozen. Old installations with custom `dependency-versions.json` pins that differ from the bundled targets require a one-time explicit policy choice to migrate.
+
+These rules apply to LoKiEnte provisioning. Applications' own updaters are separate. Integration-specific ripgrep and LanceDB, model files and project libraries follow their existing management paths.
 
 The installer manages LoKiEnte tooling. Project repository manifests and lockfiles
 remain the project's responsibility. npm metadata accepts a single version string,

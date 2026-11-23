@@ -31,3 +31,7 @@ die Historie bereinigen. Ein Löschcommit allein reicht nicht. Veröffentlichte
 Historie nur koordiniert ersetzen; andere Klone und GitHub-Caches können alte
 Inhalte weiterhin enthalten. Gegebenenfalls GitHub Support zur Entfernung
 zwischengespeicherter sensibler Inhalte kontaktieren.
+
+## Werkzeugupdates
+
+Für jede Update-Richtlinie gilt bei der Provisionierung ein Mindestalter von 48 Stunden. Vor dem Update ermittelt der Installer exakte Zielversionen. Dynamische Richtlinien benötigen einen datierten Katalognachweis. Siehe [Update-Anleitung](README.de.md#updates-für-entwicklungswerkzeuge-wählen).

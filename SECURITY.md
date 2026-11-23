@@ -24,3 +24,7 @@ If credentials were published, revoke/rotate them first and then clean history.
 A deletion commit is insufficient. Coordinate replacement of published history;
 other clones and GitHub caches may retain old contents. Contact GitHub Support
 when necessary to remove cached sensitive content.
+
+## Dependency updates
+
+Provisioning enforces a minimum release age of 48 hours in every update policy. The installer resolves exact versions before updating tools. Dynamic policies require dated catalog evidence. See the [update guide](README.md#choose-how-development-tools-update).

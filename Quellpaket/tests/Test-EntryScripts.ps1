@@ -7,16 +7,17 @@ try{
     [void][IO.Directory]::CreateDirectory($root)
     foreach($name in @('Provision-Run.ps1','Project-Run.ps1')){Copy-Item -LiteralPath (Join-Path $PackageRoot $name) -Destination $root}
     [IO.File]::WriteAllText((Join-Path $root 'Provision-LoKiEnte.ps1'),@'
-param($InstallRoot,[switch]$AuditOnly)
-@{root=$InstallRoot;audit=[bool]$AuditOnly}|ConvertTo-Json -Compress
+param($InstallRoot,[switch]$AuditOnly,$UpdatePolicy)
+@{root=$InstallRoot;audit=[bool]$AuditOnly;policy=$UpdatePolicy;explicitPolicy=$PSBoundParameters.ContainsKey("UpdatePolicy")}|ConvertTo-Json -Compress
 '@)
     $pwsh=(Get-Process -Id $PID).Path
     $result=Invoke-ShadowNative $pwsh @('-NoProfile','-File',(Join-Path $root 'Provision-Run.ps1')) -WorkingDirectory ([IO.Path]::GetTempPath()) -Quiet
-    if(($result.StdOut|ConvertFrom-Json).root -cne 'D:\LoKi'){throw 'Update default target is wrong'}
+    $default=$result.StdOut|ConvertFrom-Json
+    if($default.root -cne 'D:\LoKi' -or $default.explicitPolicy){throw 'Update default target is wrong'}
     $install=Join-Path $root "custom install"
-    $result=Invoke-ShadowNative $pwsh @('-NoProfile','-File',(Join-Path $root 'Provision-Run.ps1'),'-InstallRoot',$install,'-AuditOnly') -WorkingDirectory ([IO.Path]::GetTempPath()) -Quiet
+    $result=Invoke-ShadowNative $pwsh @('-NoProfile','-File',(Join-Path $root 'Provision-Run.ps1'),'-InstallRoot',$install,'-AuditOnly','-UpdatePolicy','latest') -WorkingDirectory ([IO.Path]::GetTempPath()) -Quiet
     $data=$result.StdOut|ConvertFrom-Json
-    if($data.root -cne $install -or -not $data.audit){throw 'Update arguments not preserved'}
+    if($data.root -cne $install -or -not $data.audit -or $data.policy -cne 'latest'){throw 'Update arguments not preserved'}
     [void][IO.Directory]::CreateDirectory((Join-Path $install 'app'))
     [IO.File]::WriteAllText((Join-Path $install 'app/Start-LocalAI.ps1'),@'
 param($InstallRoot,$ProjectPath,[switch]$PauseOnError)

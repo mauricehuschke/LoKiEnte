@@ -76,6 +76,11 @@ function Resolve-ShadowTool {
     param([Parameter(Mandatory)][ValidateSet('git','node','npm','code','pwsh','winget','lmstudio','lms','curl')][string]$Name)
     $candidate=[Collections.Generic.List[string]]::new()
     $command=Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($Name -eq 'curl') {
+        foreach ($directory in @("$env:LOCALAPPDATA/Microsoft/WinGet/Links","$env:ProgramFiles/WinGet/Links")) {
+            $candidate.Add((Join-Path $directory 'curl.exe'))
+        }
+    }
     if ($command) { $candidate.Add($command.Source) }
     switch ($Name) {
         'code' {
@@ -136,8 +141,11 @@ function Install-ShadowPackage {
         return $existing
     }
     $action=if($existing){'upgrade'}else{'install'}
+    # System curl and the other Node channel can exist without this WinGet ID.
+    # WinGet install also upgrades registered packages unless --no-upgrade is set.
+    if ($existing -and $Tool -in @('curl','node')) { $action='install' }
     $arguments=@($action,'--id',$PackageId,'--exact','--source','winget','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
-    if($action -ceq 'install'){$arguments+=@('--no-upgrade')}
+    if(-not $existing){$arguments+=@('--no-upgrade')}
     if($accepted){$arguments+=@('--version',$AcceptedVersion)}
     Write-ShadowMessage "WinGet $action for $PackageId $AcceptedVersion ..."
     $result=Invoke-ShadowNative -FilePath $WingetPath -ArgumentList $arguments -AllowFailure
@@ -160,6 +168,23 @@ function Install-ShadowPackage {
 function Get-ShadowInstalledVersion {
     param([string]$Tool,[string]$Path)
     switch($Tool){
+        'curl' {
+            $file=Get-Item -LiteralPath $Path
+            $binary=$file.FullName
+            if ($file.LinkType -eq 'SymbolicLink') { $binary=$file.ResolveLinkTarget($true).FullName }
+            $value=(Invoke-ShadowNative -FilePath $Path -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut
+            # curl -V omits the WinGet packaging revision; the portable archive names it.
+            if ($binary -match '[\\/]curl-(\d+\.\d+\.\d+)_(\d+)-win64[^\\/]*[\\/]') {
+                $baseVersion=$Matches[1]; $revision=$Matches[2]
+                if ($value -match ('^curl '+[regex]::Escape($baseVersion)+'(?:\s|$)')) { return [version]"$baseVersion.$revision" }
+            }
+        }
+        'git' {
+            $value=(Invoke-ShadowNative -FilePath $Path -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut
+            if ($value -match '(\d+\.\d+\.\d+)\.windows\.(\d+)') {
+                if ([int]$Matches[2] -gt 1) { return [version]($Matches[1]+'.'+$Matches[2]) }
+            }
+        }
         'lmstudio' { $value=(Get-Item -LiteralPath $Path).VersionInfo.ProductVersion }
         'code' { $value=(Invoke-ShadowCodeCli -CodePath $Path -Arguments @('--version')).StdOut }
         default { $value=(Invoke-ShadowNative -FilePath $Path -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut }

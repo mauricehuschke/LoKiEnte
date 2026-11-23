@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.19.1 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.23.1 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den
@@ -138,7 +138,7 @@ LoKiEnte-Start mit angeforderter Indizierung wird sie erneut versucht. Beschädi
 Eigentumsverhältnisse und Authentifizierungsfehler bleiben ausdrücklich Fehler.
 Im Single-Modus wird diese Indexierung derzeit nicht eingerichtet.
 Die Integration ist für die VS-Code-Erweiterungen Kilo 7.8.28 und 7.8.30
-geprüft. 7.8.30 ist der freigegebene Standard für Neuinstallationen und Updates.
+geprüft. 7.8.30 ist das mitgelieferte Ziel für frozen.
 Eine bereits neuere Version wird bei der Provisionierung auf die benötigten
 Schnittstellen und Einstellungen geprüft. Die separat installierte Kilo CLI
 hat eine eigene Versionsnummer.
@@ -195,7 +195,7 @@ Diff, fachliche Abnahme, Commit und Push bleiben bei dir.
 ### Installer aus dem Quellpaket bauen
 
 Auf dem Entwicklungsrechner die Version oben anpassen und
-`python .\Build-LoKiEnte.py 2026.11.19.1` ausführen. Das Skript baut
+`python .\Build-LoKiEnte.py 2026.11.23.1` ausführen. Das Skript baut
 die eingebettete Nutzlast und aktualisiert die Prüfsumme. Der Windows-PC benötigt
 für die Provisionierung weiterhin nur die erzeugte PS1. Die separate alte ZIP
 ist für diesen Ablauf entbehrlich. Der Provisionierungsbericht enthält
@@ -788,36 +788,25 @@ Schreibumfang wird je Auftrag abgeleitet und unabhängig geprüft; er wird nicht
 als neue unbegrenzte Dauerfreigabe übernommen. Unerreichbare Ordner bleiben im Index und
 werden im Bericht genannt.
 
-Die geprüfte Version der Kilo-Erweiterung wird ohne Zusatzschalter installiert,
-wenn sie neuer ist als die installierte. Weitere freigegebene exakte
-Werkzeugversionen können in `dependency-versions.json` im **Installationsordner**
-stehen. Ein Beispiel mit lediglich der mitgelieferten Erweiterungsfreigabe:
+### Updates für Entwicklungswerkzeuge wählen
 
-```json
-{
-  "powerShell": null,
-  "git": null,
-  "node": null,
-  "curl": null,
-  "vsCode": null,
-  "lmStudio": null,
-  "kiloCli": null,
-  "kiloVsCode": "7.8.30"
-}
+Gib `-UpdatePolicy` einmal beim normalen Provisionieren an. Für eine vorhandene Installation unter `D:\LoKi` lautet der Befehl im Ordner des Installers:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "D:\LoKi" -UpdatePolicy lts
 ```
 
-Für ein freigegebenes Update den jeweiligen Wert durch eine exakte
-Versionsnummer ersetzen. Ein neuerer freigegebener Stand wird beim nächsten
-Lauf installiert und anschließend geprüft. Ohne Versionsfreigabe bleibt ein
-vorhandenes Basiswerkzeug erhalten. Bei einer Erstinstallation nutzt WinGet
-für ein fehlendes, nicht gepinntes Basiswerkzeug seinen Standardkandidaten.
-Eine fehlende, nicht gepinnte Kilo CLI wird installiert und auf Kompatibilität
-geprüft. Die Kilo CLI wird in einem Versionsordner vorbereitet und erst nach
-den Setup-Prüfungen im Toolchain-Index aktiviert. LanceDB, ripgrep und die
-Modelldateien behalten ihre vom Paket geprüften Versionen bzw. Hashes.
-`-UpdateManaged` wird für ältere Startbefehle weiterhin akzeptiert und ist
-für Updates nicht mehr nötig. Freigaben und ausgewählte Werkzeugversionen
-stehen im Provisionierungsbericht.
+| Richtlinie | Ziel bei Installation und erneuter Provisionierung |
+| --- | --- |
+| `frozen` (Standard) | Die festen Werkzeugversionen dieses LoKiEnte-Releases. Eine bereits neuere funktionierende Installation bleibt erhalten. |
+| `latest` | Die höchste geeignete numerische Version aus der jeweiligen unterstützten Paketquelle. |
+| `lts` | Für Node.js und PowerShell die höchste geeignete Version einer unterstützten LTS-Reihe. Für die übrigen Werkzeuge gilt `latest`. |
+
+Die Richtlinie umfasst **VS Code, Kilo für VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js und curl**. Jede Zielversion muss **mindestens 48 Stunden alt** sein. Bei WinGet muss das Paketmanifest im aktuellen Katalog mit einem mindestens 48 Stunden alten Katalogstand übereinstimmen. Für Kilo gelten die Veröffentlichungszeit bei npm und der Zeitstempel des Marketplace-Builds. Ist die neueste Version zu jung, wählt LoKiEnte die nächste geeignete Version. Fehlende Altersnachweise oder ein nicht verfügbares Zielpaket führen zu einer Fehlermeldung.
+
+Die bestätigte Provisionierung speichert die Wahl im Installationsordner in `update-policy.json`, auch für Wiederholungen nach einem Fehler. Ohne Parameter gilt die gespeicherte Auswahl. Zum Wechsel gibst du den Parameter erneut an. Richtlinie und Zielversionen stehen im Provisionierungsbericht. Bereits neuere Werkzeuge bleiben auch beim Wechsel zu LTS oder frozen erhalten. Bei abweichenden eigenen Versionsvorgaben in einer alten `dependency-versions.json` musst du für die Migration einmal ausdrücklich eine Richtlinie wählen.
+
+Die Regel gilt für die Provisionierung durch LoKiEnte. Programmeigene Updater arbeiten unabhängig. Integrationsgebundene Versionen von ripgrep und LanceDB, Modelldateien und Projektbibliotheken werden weiterhin separat verwaltet.
 
 Der Installer verwaltet die LoKiEnte-Werkzeuge. Die Manifest- und Lockdateien deiner
 Projekt-Repositories gehören weiterhin zum jeweiligen Repository.

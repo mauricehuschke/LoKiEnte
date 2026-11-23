@@ -387,6 +387,26 @@ See [all parameters](#all-provisioning-parameters-and-options) and the
 The latest link always follows the latest published release. A new commit on
 `main` alone is not an installer update.
 
+### Choose how development tools update
+
+Set `-UpdatePolicy` once on the normal provisioning command. For example, run this from the installer folder for an existing installation at `D:\LoKi`:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "D:\LoKi" -UpdatePolicy lts
+```
+
+| Policy | Target on installation and every subsequent provisioning run |
+| --- | --- |
+| `frozen` (default) | The exact tool targets bundled with this LoKiEnte release. An already newer working installation is retained. |
+| `latest` | The highest eligible numeric release available through each supported package source. |
+| `lts` | The highest eligible release in a supported LTS line for Node.js and PowerShell. Other tools follow `latest`. |
+
+The policy covers **VS Code, Kilo for VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js and curl**. Each target must be **at least 48 hours old**. WinGet targets must have the same manifest tree in the current catalog and a catalog revision at least 48 hours old. Kilo uses npm publication times and Marketplace build timestamps. If a new version is too young, the resolver selects the next eligible version. Missing catalog evidence or an unavailable exact package stops the run with an error.
+
+The confirmed provisioning run records the choice in `update-policy.json` in the installation directory, including for retries. Omit the option to reuse it. Specify another value to switch. The provisioning report records the policy and target versions. Existing newer tools are kept, including when switching back to LTS or frozen. Old installations with custom `dependency-versions.json` pins that differ from the bundled targets require a one-time explicit policy choice to migrate.
+
+These rules apply to LoKiEnte provisioning. Applications' own updaters are separate. Integration-specific ripgrep and LanceDB, model files and project libraries follow their existing management paths.
+
 ## All provisioning parameters and options
 
 These are the public parameters of `Provision-LoKiEnte.ps1`. Switches default to
@@ -410,6 +430,7 @@ over defaults when the parameter was not supplied explicitly.
 | `-Port` | `1234`; 1024–65535 | Local LM Studio API port. |
 | `-ProjectPath` | Empty string array | Register/update additional existing directories. Reachable registered projects update even without this parameter. Welcome test project is added automatically. |
 | `-SkipModelDownload` | Switch | Do not download missing models; setup stops if required files are absent. Does not prevent other tool downloads/updates. |
+| `-UpdatePolicy` | `frozen` (default), `latest`, `lts` | Saved for this installation. All targets must be at least 48 hours old. |
 | `-UpdateManaged` | Switch | Compatibility with older commands; currently no additional effect. Normal runs already update managed files/workspaces. |
 | `-NoShortcut` | Switch | Do not create/refresh the desktop shortcut in this run. Does not delete an existing shortcut. |
 
@@ -417,8 +438,7 @@ Saved model options that can be retained: ModelMode, IncludeFastModel,
 AllowPartialGpuOffload, AllowUnfitAttempt, RouterPort, PreferredModel, ModelKey,
 ApiTokenEnvironmentVariable, ContextLength and Port. ProjectPath, AuditOnly,
 SkipModelDownload, UpdateManaged and NoShortcut are not inherited as model options.
-Dependencies are upgraded to approved versions; a newer installed version is not
-automatically downgraded. This does not mean updating to every arbitrary latest release.
+Dependency upgrades follow the saved `UpdatePolicy`.
 
 For multiple project paths, invoke directly from PowerShell to preserve the array:
 

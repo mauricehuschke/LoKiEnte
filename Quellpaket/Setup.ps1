@@ -3,6 +3,8 @@
 param(
     [Parameter(Mandatory)][string]$InstallRoot,
     [ValidateSet('Single','Dual')][string]$ModelMode='Dual',
+    [ValidateSet('frozen','latest','lts')][string]$UpdatePolicy='frozen',
+    [hashtable]$DependencyPlan,
     [ValidateSet('Off','OnDemand','Automatic')][string]$IndexingMode='Off',
     [switch]$IncludeFastModel,
     [switch]$AllowPartialGpuOffload,
@@ -27,6 +29,7 @@ $PSNativeCommandUseErrorActionPreference=$false
 . (Join-Path $PSScriptRoot 'Common.ps1')
 . (Join-Path $PSScriptRoot 'VsCodeProfile.ps1')
 . (Join-Path $PSScriptRoot 'DependencyVersions.ps1')
+. (Join-Path $PSScriptRoot 'UpdatePolicy.ps1')
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 . (Join-Path $PSScriptRoot 'ModelPool.ps1')
 . (Join-Path $PSScriptRoot 'ModelSelection.ps1')
@@ -89,7 +92,8 @@ function Install-ShadowLanceDb {
             [void][IO.Directory]::CreateDirectory($root)
             [IO.File]::WriteAllText($marker,'shadow-lancedb-0.26.2')
         }
-        $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--prefix',$root,'@lancedb/lancedb@0.26.2','--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
+        $before=[datetime]::UtcNow.AddHours(-48).ToString('o')
+        $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--before',$before,'--prefix',$root,'@lancedb/lancedb@0.26.2','--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
     }
     if(-not(Test-Path -LiteralPath $manifest -PathType Leaf)){throw 'LanceDB manifest missing.'}
     $package=Get-Content -LiteralPath $manifest -Raw|ConvertFrom-Json
@@ -289,7 +293,8 @@ function Install-ShadowKilo {
     if($candidate -and $candidate.kiloVersion -ceq $version -and (Test-ShadowKiloEntry $candidate)){return $candidate}
     [IO.Directory]::CreateDirectory($prefix) | Out-Null
     Write-ShadowMessage "Installing Kilo CLI $version in the private tool directory ..."
-    $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--prefix',$prefix,"@kilocode/cli@$version",'--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
+    $before=[datetime]::UtcNow.AddHours(-48).ToString('o')
+    $null=Invoke-ShadowNative -FilePath $NodePath -ArgumentList @($NpmEntry,'install','--before',$before,'--prefix',$prefix,"@kilocode/cli@$version",'--no-audit','--no-fund','--engine-strict') -TimeoutSeconds 1800
     $entry=Get-ShadowKiloEntry -PackageRoot $privateRoot -NodePath $NodePath
     if (-not $entry -or $entry.kiloVersion -cne $version) { throw 'Installed Kilo version does not match the requested version.' }
     if (-not (Test-ShadowKiloEntry $entry)) { throw 'Installed Kilo CLI could not start or its help does not confirm required agent/JSON options. Check the preceding warning.' }
@@ -310,7 +315,13 @@ try {
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
     [IO.Directory]::CreateDirectory($InstallRoot) | Out-Null
     $report=[ordered]@{schema=1;bundleVersion=$BundleVersion;payloadSha256=$PayloadSha256;startedUtc=[DateTime]::UtcNow.ToString('o');status='IN_PROGRESS';installRoot=$InstallRoot;steps=@();warnings=@();allowUnfitAttempt=[bool]$AllowUnfitAttempt}
-    $versions=Read-ShadowDependencyVersions -InstallRoot $InstallRoot
+    $versions=if($DependencyPlan){$DependencyPlan}else{Resolve-LoKiEnteDependencyPlan -Policy $UpdatePolicy}
+    foreach($key in @('powerShell','git','node','curl','vsCode','lmStudio','kiloCli','kiloVsCode')){
+        if([string]$versions[$key] -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$'){throw "Missing or invalid policy target for $key."}
+    }
+    if($versions.nodePackage -notin @('OpenJS.NodeJS','OpenJS.NodeJS.LTS')){throw 'Invalid Node.js package ID.'}
+    $report.updatePolicy=$UpdatePolicy
+    $report.minimumReleaseAgeHours=48
     $report.acceptedDependencyVersions=$versions
     $inventory=Get-ShadowInventory
     $report.inventoryFile='inventory.json'
@@ -319,7 +330,7 @@ try {
     $winget=Resolve-ShadowTool -Name winget
     if (-not $winget) { throw 'WinGet missing. Install/update Windows App Installer and rerun this script.' }
     $git=Install-ShadowPackage -Tool git -PackageId 'Git.Git' -WingetPath $winget -AcceptedVersion $versions.git
-    $node=Install-ShadowPackage -Tool node -PackageId 'OpenJS.NodeJS.LTS' -WingetPath $winget -AcceptedVersion $versions.node
+    $node=Install-ShadowPackage -Tool node -PackageId $versions.nodePackage -WingetPath $winget -AcceptedVersion $versions.node
     $curl=Install-ShadowPackage -Tool curl -PackageId 'cURL.cURL' -WingetPath $winget -AcceptedVersion $versions.curl
     $curlVersion=(Invoke-ShadowNative -FilePath $curl -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut
     if($curlVersion -notmatch '(?m)^curl \d+\.\d+\.\d+'){throw 'curl exists but cannot be verified as a working curl CLI.'}

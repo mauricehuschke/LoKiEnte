@@ -35,7 +35,7 @@ def main():
             files[file.relative_to(source).as_posix()] = file.read_bytes()
     required = {
         "assets/lokiente.ico", "Setup.ps1", "Start-LocalAI.ps1", "Invoke-SetupRequest.ps1",
-        "Indexing.ps1", "VsCodeProfile.ps1", "vscode-startup/package.json", "vscode-startup/extension.cjs",
+        "UpdatePolicy.ps1", "DependencyVersions.ps1", "Indexing.ps1", "VsCodeProfile.ps1", "vscode-startup/package.json", "vscode-startup/extension.cjs",
         "vscode-startup/sync-guide.cjs",
         "vscode-startup/extension.vsixmanifest", "vscode-startup/[Content_Types].xml",
         "WorkflowPolicy.ps1", "Invoke-ReviewedTask.ps1", "TaskPreparation.ps1",
