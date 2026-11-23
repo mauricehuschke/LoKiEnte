@@ -24,25 +24,29 @@ test('sidebar commands open the editor, receive private runner events, and resto
     const root=await fs.mkdtemp(path.join(os.tmpdir(),'lokiente-report-ui-'));
     const context={extensionUri:root,subscriptions:[]};
     const commands=new Map(),panels=[],messages=[];
-    let tree;
+    let tree,destination;
+    const file=path.join(root,'detailed.json');
+    const fileUri=fsPath=>({scheme:'file',fsPath});
     class Item {constructor(label){this.label=label;}}
     const window={
         createOutputChannel(){return {show(){assert.fail('The local test opened Output');},appendLine(){assert.fail('Unexpected Output');}};},
         registerTreeDataProvider(_id,p){tree=p;},
         showQuickPick:async choices=>choices[0],
         showInputBox:async options=>options.title.startsWith('Your')?'Fixture question':'Fixture expected',
+        async showSaveDialog(options){assert.deepEqual(options.availableFileSystems,['file']);return destination;},
+        showInformationMessage(){},
         createWebviewPanel(_id,_title,column,options){
             assert.equal(column,api.ViewColumn.Active);assert.deepEqual(options.localResourceRoots,[root]);
             let dispose,receive;
             const panel={reveals:0,reveal(){this.reveals++;},onDidDispose(fn){dispose=fn;},dispose(){dispose();},
                 webview:{cspSource:'https://local.invalid',asWebviewUri:uri=>uri,onDidReceiveMessage(fn){receive=fn;},
                     postMessage:async m=>{messages.push(structuredClone(m));return true;}},
-                ready(){receive({type:'ready'});}};
+                ready(){receive({type:'ready'});},export(){return receive({type:'export'});}};
             panels.push(panel);queueMicrotask(()=>panel.ready());return panel;
         }
     };
-    const api={window,ViewColumn:{Active:-1},Uri:{joinPath:path.join},ThemeIcon:Item,TreeItem:Item,
-        workspace:{isTrusted:true},EventEmitter:class {fire(){}},
+    const api={window,ViewColumn:{Active:-1},Uri:{joinPath:path.join,file:fileUri},ThemeIcon:Item,TreeItem:Item,
+        workspace:{isTrusted:true,fs:{writeFile:(uri,data)=>fs.writeFile(uri.fsPath,data)}},EventEmitter:class {fire(){}},
         commands:{registerCommand(id,fn){commands.set(id,fn);},executeCommand:async()=>{}}};
     const prev=process.env.KILO_CONFIG_CONTENT;
     try{
@@ -67,6 +71,14 @@ test('sidebar commands open the editor, receive private runner events, and resto
             assert.equal(latest.checks[0].prompt,kind==='custom'?'Fixture question':'Built-in');
             assert.equal(latest.checks[0].request.body.messages[1].content,latest.checks[0].prompt);
         }
+        await panels[0].export();
+        await assert.rejects(fs.stat(file),{code:'ENOENT'});
+        destination=fileUri(file);
+        await panels[0].export();
+        const exported=JSON.parse(await fs.readFile(file,'utf8'));
+        assert.equal(exported.reportType,'lokiente.et.detailed');assert.equal(exported.schemaVersion,1);
+        assert.equal(exported.summary.status,'FAIL');assert.match(exported.scope,/not dispatched/);
+        assert.deepEqual(exported.checks,messages.at(-1).state.checks);
         assert.equal(panels.length,1);
         assert.match(panels[0].webview.html,/Content-Security-Policy/);
         assert.match(panels[0].webview.html,/script-src 'nonce-[0-9a-f]+'/);

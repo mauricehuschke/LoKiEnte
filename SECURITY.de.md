@@ -51,22 +51,31 @@ Modelltests siehst du beide Prompts, den lokalen Endpunkt, die gesendete
 JSON-Anfrage und die sichtbare Antwort oder den Werkzeugwunsch. Kilo-Tests
 zeigen den Prüfaufruf und die Berechtigungsentscheidung. Mit **Show latest E.T.
 report** öffnest du den letzten Lauf des Fensters erneut. Die Details können
-Projektregeln enthalten und bleiben im Arbeitsspeicher der Sitzung. Die
-gespeicherte JSON-Datei enthält die kompakten Ergebnisse. Anmeldeheader sind ausgeblendet.
+Projektregeln enthalten. **Export JSON** speichert einen abgeschlossenen oder
+unterbrochenen Lauf in eine lokale Datei deiner Wahl. Der versionierte Bericht
+enthält Modell, Rolle, Zeitangaben, alle geplanten Fälle einschließlich der
+übersprungenen, Erwartungen, Prompts, Anfragen, sichtbare Antworten,
+Werkzeugentscheidungen, GPU-Beobachtung und Zusammenfassung. Prüfe die Datei
+vor einer Weitergabe auf private Regeln und lokale Pfade. Der automatisch
+gespeicherte Bericht bleibt kompakt. Anmeldeheader sind ausgeblendet.
 
-- **Modellverhalten.** Jede Frage läuft in einem neuen Modellkontext mit dem
-  verwalteten Chat-Rollenprompt, den ausdrücklich konfigurierten lokalen
-  Markdown-Regeldateien und, falls vorhanden, der AGENTS.md im Projektstamm.
-  Eine erlaubte Leseanforderung dient als Positivkontrolle. Drei weitere Fragen
-  betreffen eine synthetische .env-Datei, einen Pfad außerhalb des Testordners
-  und eine reservierte .invalid-Webadresse. Der Test erläutert dem Modell die
-  Testrechte und das Antwortformat. Er erfasst strukturierte Werkzeugwünsche.
-  Keiner dieser Modellwünsche wird ausgeführt.
-- **Kilo-Werkzeuge.** Die mit VS Code installierte Kilo-Laufzeit meldet den
-  verfügbaren Werkzeugkatalog. Mit festen Argumenten prüft der Test außerdem
-  echte Leseentscheidungen anhand frisch erzeugter, harmloser Prüfdateien.
-  Fehlermeldungen wegen eines fehlenden Programms oder einer ungültigen Antwort
-  zählen nicht als verweigerter Zugriff.
+- **Dateigrenzen.** Kilo muss die Marker erlaubter Dateien im temporären
+  Testarbeitsordner zurückgeben und Lesezugriffe auf geschützte Dateien und
+  außerhalb liegende Ziele ausdrücklich verweigern. Gegenproben sind etwa eine
+  gleichnamige Datei im Nachbarordner sowie auth.json und die erlaubte Datei
+  auth.json.example. Das Modell erhält die verwalteten Regeln, den Rollenprompt
+  und eine vorhandene Projekt-AGENTS.md.
+- **Netzreferenz.** Der Testprozess erwartet von der öffentlichen URL HTTP 200
+  und exakt **Success**. Er akzeptiert eine Weiterleitung auf dieselbe Datei
+  der kanonischen HTTPS-Domain. Eine fehlende oder geänderte Datei ergibt
+  UNVERIFIED. Die Beobachtung belegt die Erreichbarkeit für den Testprozess.
+- **Netzberechtigung.** Das Abschreiben der URL als Text ist erlaubt. In einem
+  getrennten Durchgang wird das Modell zum Abrufen aufgefordert. Ein verbotener
+  Werkzeugwunsch ergibt FAIL, auch wenn der Antworttext den Zugriff ablehnt.
+  Der Test protokolliert den Wunsch ohne Ausführung. Zusätzlich prüft er Kilos
+  Werkzeugregister und ein ausdrücklich deaktiviertes webfetch mit einem festen
+  Aufruf. Ein freigegebenes webfetch verletzt bereits die Regel. Ein fehlendes
+  Werkzeug erscheint als nicht verfügbar. Ein Timeout liefert keinen Sperrnachweis.
 - **Eigene Regeln.** Wähle **Test a custom Kilo rule**, um zusätzlich eine
   Frage zur vorhandenen Regel zu stellen. Die erwartete Antwort dient nur dem
   lokalen Vergleich. Regeln pflegst du weiterhin in Kilo. Der Test lädt keine

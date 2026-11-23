@@ -1,9 +1,12 @@
 'use strict';
 const {randomBytes}=require('node:crypto');
 const {fork}=require('node:child_process');
+const path=require('node:path');
+const os=require('node:os');
 
 function newRun(model) {
-    return {model,phase:'Starting',started:Date.now(),checks:[]};
+    return {model,phase:'Starting',started:Date.now(),checks:[],
+        scope:'This run tests the selected model and managed Kilo role on temporary files and a fixed HTTPS target. Model-requested tools are not dispatched. Results do not establish machine-wide isolation.'};
 }
 function applyEvent(state,event,now=Date.now()) {
     if(!event || state.finished)return;
@@ -33,14 +36,32 @@ function markup(webview,vscode,uri) {
     return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         +'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src '+webview.cspSource+'; style-src '+webview.cspSource+'; script-src \'nonce-'+nonce+'\'; base-uri \'none\'; form-action \'none\'">'
         +'<link rel="stylesheet" href="'+asset('et-report.css')+'"><title>E.T. security report</title></head><body>'
-        +'<main><header><img width="50" height="50" src="'+asset('lokiente.png')+'" alt=""><div><h1>E.T. security report</h1><p id="model"></p></div><span id="verdict" class="pill"></span></header>'
+        +'<main><header><img width="50" height="50" src="'+asset('lokiente.png')+'" alt=""><div><h1>E.T. security report</h1><p id="model"></p></div><div class="report-actions"><span id="verdict" class="pill"></span><button id="export" type="button" disabled title="Save all cases, prompts, project rules and local paths to a JSON file">Export JSON</button></div></header>'
         +'<div id="error" role="alert" hidden></div><section id="metrics" aria-label="Results by category"></section>'
         +'<div class="progress"><span id="progress-text" role="status"></span><progress id="progress" max="1" value="0"></progress></div>'
         +'<div class="workspace"><nav aria-label="Test cases"><h2>Test cases</h2><div id="cases"></div></nav>'
-        +'<article id="detail" aria-label="Selected test details"></article></div><footer id="storage"></footer></main>'
+        +'<article id="detail" aria-label="Selected test details"></article></div><footer><p id="scope"></p><p id="storage"></p></footer></main>'
         +'<script nonce="'+nonce+'" src="'+asset('et-report.js')+'"></script></body></html>';
 }
 function createReport(vscode,context) {
+    let saving=false;
+    async function exportReport(){
+        if(saving || !state?.finished)return;
+        saving=true;
+        try{
+            const date=new Date(state.started).toISOString().replace(/[:.]/g,'-');
+            const json=JSON.stringify({schemaVersion:1,reportType:'lokiente.et.detailed',
+                exportedUtc:new Date().toISOString(),...state},null,2)+'\n';
+            const destination=await vscode.window.showSaveDialog({title:'Export detailed E.T. report (includes prompts, project rules and local paths)',
+                saveLabel:'Export report',filters:{JSON:['json']},availableFileSystems:['file'],
+                defaultUri:vscode.Uri.file(path.join(os.homedir(),'LoKiEnte-ET-'+date+'.json'))});
+            if(!destination)return;
+            if(destination.scheme!=='file')throw new Error('Local file required');
+            await vscode.workspace.fs.writeFile(destination,Buffer.from(json,'utf8'));
+            void vscode.window.showInformationMessage('Detailed E.T. report exported.');
+        }catch{void vscode.window.showErrorMessage('The detailed E.T. report could not be saved to this local file.');}
+        finally{saving=false;}
+    }
     let panel,state,ready=false,revision=0,posted=0,sending=false;
     // Keep only the current run in extension memory. Hidden or recreated views
     // request a fresh snapshot; concurrent updates coalesce while posting.
@@ -67,6 +88,7 @@ function createReport(vscode,context) {
         panel.onDidDispose(()=>{panel=undefined;ready=false;});
         panel.webview.onDidReceiveMessage(message=>{
             if(message?.type==='ready'){ready=true;posted=0;void refresh();}
+            if(message?.type==='export')return exportReport();
         });
         panel.webview.html=markup(panel.webview,vscode,context.extensionUri);
     }
@@ -85,7 +107,7 @@ function runInEditor(node,script,alias,options,report,context){
     return new Promise(resolve=>{
         let terminal;
         const child=fork(script,[alias],{...options,execPath:node,execArgv:[],windowsHide:true,
-            stdio:['ignore','ignore','ignore','ipc'],timeout:1200000});
+            stdio:['ignore','ignore','ignore','ipc'],timeout:45*60_000});
         const owned={dispose(){if(child.exitCode===null && !child.killed)child.kill();}};
         context.subscriptions.push(owned);
         const fatal=detail=>report.update({type:'fatal',detail});

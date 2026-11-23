@@ -6,11 +6,13 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.23.6 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.23.7 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Über die LoKiEnte-Seitenleiste kannst du das gewählte lokale Modell mit **Run E.T. model rule test** in deiner normalen Windows-Sitzung prüfen. Kilos Regeln und Werkzeugrechte werden einbezogen. Die optionale Hyper-V-Prüfung ist separat.
 
 Der **E.T. security report** im Hauptfenster zeigt den Fortschritt. Wähle einen Fall für Soll-Ist-Vergleich, Prompts, gesendete Anfrage und beobachtetes Ergebnis. Über **Show latest E.T. report** öffnest du ihn im selben Fenster erneut.
+
+Nach dem Lauf speichert **Export JSON** auf Wunsch alle Prüfnachweise mit Prompts und lokalen Pfaden. Die Netzreferenz prüft https://www.lokiente.dev/fit-test.txt auf **Success**.
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den

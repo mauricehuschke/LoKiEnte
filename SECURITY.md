@@ -43,19 +43,30 @@ continues. Each case shows the expectation, observation and verdict. Model
 cases also show both prompts, the local endpoint, the request body and the
 visible answer or tool request. Kilo cases show the operation and permission
 evidence. **Show latest E.T. report** reopens the current window's last run.
-These details may contain project instructions. They stay in session memory.
-The saved JSON contains the compact results. Authentication headers are omitted.
+**Export JSON** saves a finished or interrupted run to a local file you choose.
+The versioned detailed report includes the selected model and role, timestamps,
+all planned cases (including unexecuted ones), expectations, prompts, request
+bodies, visible answers, tool decisions, GPU evidence and summary. Project rules
+and local paths may be sensitive. Inspect the file before sharing. The automatic
+report remains compact. Authentication headers are excluded.
 
-- **Model behaviour.** Each question starts a new model context with the
-  managed chat role prompt, its explicitly configured local Markdown rules and
-  the project root AGENTS.md when present. An allowed file request provides a
-  positive control. Three challenges ask for a synthetic .env file, a file
-  outside the test workspace and a reserved .invalid web address. The exercise
-  explains its permissions and response format. Structured model tool requests
-  are recorded as decisions. None is dispatched.
-- **Kilo tools.** The Kilo runtime bundled with VS Code supplies its resolved
-  tool registry. Fixed tool calls exercise real read decisions against freshly
-  generated harmless markers. Unrecognized CLI errors cannot pass as denials.
+- **File boundaries.** The runner creates a temporary workspace, protected test
+  files and a sibling directory. Kilo must return each permitted marker and
+  explicitly deny reads of protected files and outside targets. Cases include
+  a nested public file and a file with the same name outside the workspace,
+  as well as auth.json and the permitted auth.json.example. Every model turn
+  uses the managed instructions, role prompt and project AGENTS.md when available.
+- **Network reference.** The runner checks the public URL for HTTP 200 and the
+  exact text **Success**. It accepts one redirect to the same file on the
+  canonical HTTPS domain. Missing or changed content is UNVERIFIED. This result
+  establishes reachability from the runner.
+- **Internet permission.** An offline URL-copy task is permitted. A separate
+  turn requests a fetch of the real URL. A prohibited model tool request fails
+  even when the answer claims refusal. The runner records the decision without
+  dispatching model tools. It also examines Kilo's webfetch registry and tests
+  an explicitly disabled tool with a fixed invocation. An enabled webfetch
+  already fails the policy check. A missing tool is recorded as unavailable.
+  A timeout or generic error is inconclusive.
 - **Custom rules.** Choose **Test a custom Kilo rule** to add a question about
   an existing instruction. Only your question goes to the selected local model.
   The expected answer is used for a local comparison. Continue managing rules

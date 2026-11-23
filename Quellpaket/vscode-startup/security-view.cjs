@@ -105,7 +105,7 @@ function registerSecurityView(vscode, context, dataDirectory) {
                 alias,label:alias,description:m.name,detail:config.model==='lmstudio/'+alias?'Managed default':undefined
             })).sort((a,b)=>Number(Boolean(b.detail))-Number(Boolean(a.detail)));
             if(!models.length)throw new Error('No provisioned local chat models. Reopen VS Code from the LoKiEnte desktop shortcut.');
-            const model=await vscode.window.showQuickPick(models,{title:'E.T. — choose the local model to test'});
+            const model=await vscode.window.showQuickPick(models,{title:'E.T. — choose the local model to test',placeHolder:'Includes a public HTTPS check of www.lokiente.dev/fit-test.txt.'});
             if(!model)return;
             let custom;
             if(customRule){

@@ -2,7 +2,7 @@
 (() => {
     const vscode=acquireVsCodeApi();
     const byId=id=>document.getElementById(id);
-    const groups=['Kilo permissions','Model behaviour','Runtime'];
+    const groups=['Network reference','Kilo permissions','Model behaviour','Runtime'];
     const labels={PASS:'Passed',FAIL:'Failed',UNVERIFIED:'Unverified',OBSERVED:'Observed',PENDING:'Queued',RUNNING:'Running','NOT RUN':'Not run'};
     let run,selected,pinned=false,previousRun,displayedKey,rendered;
     const el=(tag,text,css)=>{
@@ -69,11 +69,12 @@
         byId('verdict').textContent=state.summary?.status?'Rule check · '+(labels[verdict] || verdict):(labels[verdict] || verdict);
         byId('verdict').className='pill '+tone(verdict);
         const error=byId('error');error.hidden=!state.summary?.detail;error.textContent=state.summary?.detail || '';
+        byId('export').disabled=!state.finished;
         const totalDone=checks.filter(c=>!['PENDING','RUNNING','NOT RUN'].includes(c.status)).length;
         byId('progress-text').textContent=checks.length?totalDone+' of '+checks.length+' checks evaluated':(state.finished?'Run stopped':'Preparing the local runner…');
         byId('progress').max=Math.max(checks.length,1);byId('progress').value=totalDone;
         const metrics=byId('metrics');metrics.replaceChildren();
-        for(const [name,key] of [['Model behaviour','modelBehaviour'],['Kilo permissions','kiloPermissions'],['GPU activity','gpu']]){
+        for(const [name,key] of [['Model behaviour','modelBehaviour'],['Kilo permissions','kiloPermissions'],['Network reference','networkReference'],['GPU activity','gpu']]){
             const members=checks.filter(c=>c.group===(key==='gpu'?'Runtime':name));
             const known=state.summary?.[key] || (members.some(c=>c.status==='FAIL')?'FAIL':members.some(c=>c.status==='RUNNING')?'RUNNING':null);
             const card=el('div',null,'metric '+tone(known));
@@ -95,8 +96,10 @@
             }
         });
         showDetail(checks.find(c=>c.check===selected));
-        byId('storage').textContent=state.summary?.reportFile?'Compact report  ·  '+state.summary.reportFile:'Prompt and response details stay in this VS Code window.';
+        byId('scope').textContent=state.scope || '';
+        byId('storage').textContent=state.summary?.reportFile?'Compact report  ·  '+state.summary.reportFile:'Detailed evidence stays in this window until you export it.';
     }
     window.addEventListener('message',event=>{if(event.data?.type==='state')update(event.data.state);});
+    byId('export').onclick=()=>vscode.postMessage({type:'export'});
     vscode.postMessage({type:'ready'});
 })();

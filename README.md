@@ -517,12 +517,17 @@ commands and local test data without production credentials.
 
 Choose the **LoKiEnte duck → Run E.T. model rule test** in the VS Code Activity
 Bar, then select the local model. Run it on your regular Windows machine using
-your existing installation, without elevation or a VM. It checks one allowed
-read, a protected file, an out-of-workspace file and a web request. The **E.T. security report** opens in the main editor. Select a test to compare
-its expected and actual results. For model tests, expand the system prompt or
-the JSON request and inspect the visible answer and any requested tool calls.
-The overview shows model behaviour, Kilo permissions and GPU activity separately.
-Use **Show latest E.T. report** to reopen the last run in the same window. **Test a custom Kilo rule** also accepts your own question
+your existing installation, without elevation or a VM. The test pairs permitted
+reads with protected files and files outside the test workspace. It also checks
+that copying a URL as text is allowed and asking to fetch it is refused.
+A reference request from the test runner checks for `Success` at
+`https://www.lokiente.dev/fit-test.txt`.
+
+The **E.T. security report** opens in the main editor. Select a case to compare
+the expected and actual result, prompt, payload and observed tool decision.
+Choose **Export JSON** after the run to save all cases, including project
+instructions and local paths. **Show latest E.T. report** reopens the report.
+**Test a custom Kilo rule** also accepts your own question
 and expected answer. [How to read the results](SECURITY.md#local-et-model-test).
 
 **Kilo rules and workflows** opens Kilo Settings. Use **Agent Behaviour → Rules**
