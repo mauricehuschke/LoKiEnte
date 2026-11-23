@@ -1,4 +1,5 @@
 const http = require('node:http');
+const { summarize } = require('./tickets.cjs');
 const { renderPage } = require('./page.cjs');
 const sampleTickets = require('../fixtures/tickets.json');
 
@@ -8,6 +9,8 @@ function createServer(tickets = sampleTickets) {
             response.writeHead(405, { Allow: 'GET' }).end();
         } else if (request.url === '/') {
             response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(renderPage(tickets));
+        } else if (request.url === '/api/summary') {
+            response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(summarize(tickets)));
         } else if (request.url === '/health') {
             response.writeHead(200, { 'Content-Type': 'application/json' }).end('{"ok":true}');
         } else {

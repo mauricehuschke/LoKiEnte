@@ -2,6 +2,12 @@
 
 [English](README.md)
 
+## Fertiges Feature ausführen
+
+Dieser Ordner enthält die geprüfte Referenzimplementierung. Um das Feature selbst mit Kilo zu entwickeln, lade das [Startprojekt als ZIP](https://raw.githubusercontent.com/mauricehuschke/LoKiEnte/main/examples/support-board-starter.zip) herunter. Für die Referenz starte hier zunächst `node --test`, dann `node src/server.cjs`. Der [Prüfbeleg](verification.json) dokumentiert Ergebnisse und Umfang.
+
+## Feature-Auftrag ausprobieren
+
 Diese eigenständige Node.js-Übung verwendet erzeugte Tickets. Öffne eine frische Kopie des Startprojekts über den LoKiEnte-Desktopstarter und gib diesen Auftrag in Kilos `shadow-chat` ein.
 
 > Ergänze das lokale Supportboard um eine Teamübersicht. Zeige auf der Startseite und unter GET /api/summary die Anzahl offener und erledigter Tickets mit Sichtbarkeit „team“. Die Beispieldaten müssen in beiden Ansichten 2 offene und 1 erledigtes Ticket ergeben, eine leere Liste zweimal 0. Interne Tickets dürfen keine Zahl beeinflussen. Weder Titel noch Kontaktdaten dürfen ausgegeben werden. Erhalte GET /health. Ändere nur src/tickets.cjs, src/server.cjs und src/page.cjs sowie separate Unit- und Integrationstests. Nutze den Feature-Workflow mit unabhängiger Testprüfung, Sicherheitsreview, Integrationsreview und Abschlussprüfung. Führe die Tests lokal aus. Keine neuen Abhängigkeiten oder externen Netzaufrufe.

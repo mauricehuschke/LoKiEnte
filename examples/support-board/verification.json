@@ -1,0 +1,94 @@
+{
+  "runnerRevision": "0953dfea4b2c4ceacb9c5503ae5e0445ca51229a",
+  "workflow": "Feature",
+  "method": "Scripted role replies; real LoKiEnte runner, Git scope and fingerprints, frozen tests, Node.js HTTP requests on loopback and verification gates. Fixed Kilo CLI permission probes ran separately in a fresh copy of the same starter.",
+  "rolesInOrder": [
+    "shadow-preparer",
+    "shadow-preparation-reviewer",
+    "shadow-architect",
+    "shadow-test",
+    "shadow-test-reviewer",
+    "shadow-implementer",
+    "shadow-reviewer",
+    "shadow-security",
+    "shadow-integration",
+    "shadow-validator"
+  ],
+  "productionFiles": [
+    "src/tickets.cjs",
+    "src/server.cjs",
+    "src/page.cjs"
+  ],
+  "frozenTestSHA256": {
+    "tests/page.test.cjs": "F9D53395B7DFDCB00462402C57D25750DE2CC7942DBFA4A3B64E329152025304",
+    "tests/api.integration.test.cjs": "715A5C7D7CB81AE844A6D6303065B0B5FB834FBD90251058F5E823403E04403F"
+  },
+  "baseline": [
+    {
+      "check": "loki-node-test",
+      "passed": 1,
+      "failed": 1,
+      "skipped": 0
+    },
+    {
+      "check": "loki-node-integration",
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0
+    }
+  ],
+  "afterImplementation": [
+    {
+      "check": "loki-node-test",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "check": "loki-node-integration",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "specialistVerdicts": {
+    "security": "PASS",
+    "integration": "PASS"
+  },
+  "status": "VERIFIED",
+  "controls": {
+    "securityVeto": {
+      "securityVerdict": "FAIL",
+      "checks": [
+        {
+          "check": "loki-node-test",
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0
+        },
+        {
+          "check": "loki-node-integration",
+          "passed": 3,
+          "failed": 0,
+          "skipped": 0
+        }
+      ],
+      "status": "NOT_VERIFIED"
+    },
+    "unexpectedWrite": {
+      "file": "unapproved-note.txt",
+      "status": "NOT_VERIFIED",
+      "finding": "File changed outside the allowed write scope: unapproved-note.txt. Review the diff manually."
+    }
+  },
+  "kiloPermissions": {
+    "version": "7.8.30",
+    "role": "shadow-chat",
+    "source": "src/tickets.cjs",
+    "read": "allowed",
+    "protectedFixture": ".env.support-board",
+    "protectedRead": "explicitly denied",
+    "publicUrl": "https://www.lokiente.dev/fit-test.txt",
+    "webfetch": "explicitly denied"
+  }
+}
