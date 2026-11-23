@@ -3,7 +3,7 @@
   "displayName": "LoKiEnte",
   "description": "Manage the local LoKiEnte session, Kilo rules and optional Windows isolation.",
   "publisher": "lokiente",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "engines": {
     "vscode": "^1.105.1"
   },
@@ -40,7 +40,7 @@
       },
       {
         "command": "lokiente.security.test",
-        "title": "Run E.T. acceptance test",
+        "title": "Run E.T. model rule test",
         "category": "LoKiEnte",
         "enablement": "lokiente.managedWindow"
       },
@@ -59,6 +59,18 @@
       {
         "command": "lokiente.security.inspect",
         "title": "Check host capabilities",
+        "category": "LoKiEnte",
+        "enablement": "lokiente.managedWindow"
+      },
+      {
+        "command": "lokiente.security.custom",
+        "title": "Test a custom Kilo rule",
+        "category": "LoKiEnte",
+        "enablement": "lokiente.managedWindow"
+      },
+      {
+        "command": "lokiente.security.guestTest",
+        "title": "Check VM isolation",
         "category": "LoKiEnte",
         "enablement": "lokiente.managedWindow"
       }

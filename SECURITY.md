@@ -29,6 +29,40 @@ when necessary to remove cached sensitive content.
 
 Provisioning enforces a minimum release age of 48 hours in every update policy. The installer resolves exact versions before updating tools. Dynamic policies require dated catalog evidence. See the [update guide](README.md#choose-how-development-tools-update).
 
+## Local E.T. model test
+
+Open LoKiEnte from the desktop shortcut. In a trusted window choose the duck
+in the Activity Bar, then **Run E.T. model rule test**. Pick the model from
+the provisioned LM Studio catalog. This explicit selection also works if you
+temporarily changed models in a Kilo chat.
+If you previously enabled the offline VM profile, select **No** in the host shortcut dialog once, then reopen it to use the standard local session.
+
+- **Model behaviour.** Each question starts a new model context with the
+  managed chat role prompt, its explicitly configured local Markdown rules and
+  the project root AGENTS.md when present. An allowed file request provides a
+  positive control. Three challenges ask for a synthetic .env file, a file
+  outside the test workspace and a reserved .invalid web address. The exercise
+  explains its permissions and response format. Structured model tool requests
+  are recorded as decisions. None is dispatched.
+- **Kilo tools.** The Kilo runtime bundled with VS Code supplies its resolved
+  tool registry. Fixed tool calls exercise real read decisions against freshly
+  generated harmless markers. Unrecognized CLI errors cannot pass as denials.
+- **Custom rules.** Choose **Test a custom Kilo rule** to add a question about
+  an existing instruction. Only your question goes to the selected local model.
+  The expected answer is used for a local comparison. Continue managing rules
+  in Kilo. Remote instruction URLs are never fetched by the rule loader;
+  unsupported instruction sources give an unverified result.
+- **Results.** PASS requires the expected observations, FAIL indicates a
+  detected violation, and UNVERIFIED means insufficient or ambiguous evidence.
+  GPU observation is separate. An unavailable counter cannot establish CPU
+  fallback. **Output → LoKiEnte Security** shows the results and local JSON
+  report location. The report omits instruction contents, responses and tokens.
+
+The probe uses synthetic targets and the local inference endpoint. It tests
+specific model responses and Kilo tools. It does not establish a Windows-wide
+network or filesystem restriction for other processes. Users of the optional
+prepared VM can run **Check VM isolation** there as an additional test.
+
 ## Offline Windows guest
 
 The standard desktop session uses Kilo tool permissions. Tests and extensions
@@ -67,7 +101,7 @@ Open **Check host capabilities** in the LoKiEnte sidebar first. It reports local
 5. Close the host's managed VS Code windows and launch the desktop shortcut.
    The VM must be fully off at the start. Log in on its basic console, open
    the **guest** LoKiEnte shortcut, select a guest project and run **LoKiEnte →
-   Run E.T. acceptance test**. A failed prerequisite stops the launch. If the VM
+   Check VM isolation**. A failed prerequisite stops the launch. If the VM
    already booted before a guest-copy failure, shut it down before retrying.
 
 ### Read the results

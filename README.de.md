@@ -555,13 +555,15 @@ Verwende bestätigte Testbefehle und lokale Testdaten ohne Produktionszugänge.
 
 ## Optionales Windows-Sicherheitsprofil
 
-Öffne die **LoKiEnte-Ente** links in der Aktivitätsleiste von VS Code. Unter
-**Choose security profile** wählst du für den nächsten Desktopstart die
-Standardsitzung auf dem Host oder einen isolierten Hyper-V-Gast. **Run E.T.
-acceptance test** prüft im Gast den Zugriff auf eine Host-Prüfdatei, ausgehende
-Verbindungen und tatsächliche GPU-Inferenz. Für den vollständigen Test brauchst
-du eine separat provisionierte Windows-VM mit funktionierendem GPU-Zugriff.
-[Gast einrichten und Ergebnisse auswerten](SECURITY.de.md#isolierter-windows-gast).
+Klicke links in VS Code auf die **LoKiEnte-Ente → Run E.T. model rule test**
+und wähle das lokale Modell. Der Test läuft auf deinem normalen Windows-PC
+mit der bestehenden Installation und ohne Administratorrechte oder VM.
+Er prüft eine erlaubte Leseanforderung sowie Anfragen nach einer geschützten
+Datei, einer Datei außerhalb des Arbeitsordners und einer Webseite. Unter
+**Ausgabe → LoKiEnte Security** findest du getrennte Ergebnisse für das
+Modellverhalten, Kilos Werkzeugrechte und beobachtete GPU-Aktivität.
+Unter **Test a custom Kilo rule** kannst du zusätzlich eine eigene Frage und
+die erwartete Antwort eingeben. [Ablauf und Ergebnisse](SECURITY.de.md#lokaler-et-modelltest).
 
 **Kilo rules and workflows** öffnet Kilos Einstellungen. Unter **Agent Behaviour
 → Rules** siehst du die von LoKiEnte eingetragene `LOCAL-AI-RULES.md`. Eigene

@@ -103,6 +103,7 @@ try {
         $environment['PATH']=$npmPrefix+';'+[IO.Path]::GetDirectoryName($chain.nodeExecutable)+';'+$inheritedPath
     }
     $environment['LOKIENTE_MANAGED_VSCODE']='1'
+    $environment['LOKIENTE_ET_KILO']=$bundledKilo
     $environment['LOKIENTE_VSCODE_DATA_DIR']=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
     $start=[Diagnostics.ProcessStartInfo]::new()
     $start.FileName=[string]$chain.codeExecutable

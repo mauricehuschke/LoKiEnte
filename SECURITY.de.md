@@ -36,6 +36,44 @@ zwischengespeicherter sensibler Inhalte kontaktieren.
 
 Für jede Update-Richtlinie gilt bei der Provisionierung ein Mindestalter von 48 Stunden. Vor dem Update ermittelt der Installer exakte Zielversionen. Dynamische Richtlinien benötigen einen datierten Katalognachweis. Siehe [Update-Anleitung](README.de.md#updates-für-entwicklungswerkzeuge-wählen).
 
+## Lokaler E.T.-Modelltest
+
+Starte LoKiEnte über die Desktopverknüpfung. Öffne in einer vertrauenswürdigen
+Sitzung die Ente links und **Run E.T. model rule test**. Wähle das Modell aus
+dem provisionierten LM-Studio-Katalog. So ist die Auswahl auch dann eindeutig,
+wenn du das Modell im Kilo-Chat vorübergehend gewechselt hast.
+Falls du das VM-Profil bereits aktiviert hattest, wähle einmal **Nein** im Dialog der Desktopverknüpfung und öffne sie anschließend erneut.
+
+- **Modellverhalten.** Jede Frage läuft in einem neuen Modellkontext mit dem
+  verwalteten Chat-Rollenprompt, den ausdrücklich konfigurierten lokalen
+  Markdown-Regeldateien und, falls vorhanden, der AGENTS.md im Projektstamm.
+  Eine erlaubte Leseanforderung dient als Positivkontrolle. Drei weitere Fragen
+  betreffen eine synthetische .env-Datei, einen Pfad außerhalb des Testordners
+  und eine reservierte .invalid-Webadresse. Der Test erläutert dem Modell die
+  Testrechte und das Antwortformat. Er erfasst strukturierte Werkzeugwünsche.
+  Keiner dieser Modellwünsche wird ausgeführt.
+- **Kilo-Werkzeuge.** Die mit VS Code installierte Kilo-Laufzeit meldet den
+  verfügbaren Werkzeugkatalog. Mit festen Argumenten prüft der Test außerdem
+  echte Leseentscheidungen anhand frisch erzeugter, harmloser Prüfdateien.
+  Fehlermeldungen wegen eines fehlenden Programms oder einer ungültigen Antwort
+  zählen nicht als verweigerter Zugriff.
+- **Eigene Regeln.** Wähle **Test a custom Kilo rule**, um zusätzlich eine
+  Frage zur vorhandenen Regel zu stellen. Die erwartete Antwort dient nur dem
+  lokalen Vergleich. Regeln pflegst du weiterhin in Kilo. Der Test lädt keine
+  Regeldateien von einer URL. Nicht unterstützte Regelquellen ergeben einen
+  ungeklärten Test.
+- **Ergebnisse.** PASS erfordert die erwarteten Beobachtungen, FAIL bezeichnet
+  einen erkannten Verstoß, UNVERIFIED fehlende oder mehrdeutige Nachweise. Die
+  GPU-Anzeige steht separat. Ein fehlender Messwert bestätigt keinen CPU-Fallback.
+  Unter **Ausgabe → LoKiEnte Security** siehst du die Ergebnisse und den Pfad
+  zum lokalen JSON-Bericht. Er enthält keine Regeltexte, Antworten oder Tokens.
+
+Der Test arbeitet mit synthetischen Zielen und dem lokalen Modellendpunkt.
+Er prüft konkrete Modellantworten und Kilo-Werkzeuge. Er richtet keine
+Windows-Firewall oder Dateisystemsperre für andere Programme ein. Wer
+zusätzlich eine vorbereitete VM verwendet, kann dort separat **Check VM isolation**
+ausführen.
+
 ## Isolierter Windows-Gast
 
 In der Standardsitzung gelten Kilos Werkzeugrechte. Tests und Erweiterungen
@@ -75,7 +113,7 @@ Prüfe zuerst **Check host capabilities** in der LoKiEnte-Seitenleiste. Die Prü
 5. Schließe die verwalteten VS-Code-Fenster des Hosts. Starte die
    Desktopverknüpfung bei vollständig ausgeschalteter VM. Melde dich an der
    Basiskonsole des Gastes an, öffne dort dessen LoKiEnte-Verknüpfung und
-   wähle ein Gastprojekt. Starte **LoKiEnte → Run E.T. acceptance test**.
+   wähle ein Gastprojekt. Starte **LoKiEnte → Check VM isolation**.
    Fehlt eine Voraussetzung, bricht der Launcher ab. Ist die VM bereits
    gestartet und die Dateiübertragung scheitert, fahre sie vor dem nächsten
    Versuch herunter.

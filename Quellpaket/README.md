@@ -2,9 +2,9 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.23.4 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.23.5 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
-The LoKiEnte Activity Bar view includes the optional Hyper-V security profile, Kilo settings and the E.T. guest acceptance test. The standard host session is the default.
+Use **Run E.T. model rule test** in the LoKiEnte sidebar to test a selected local model in your normal Windows session. It uses Kilo instructions and checks Kilo tool permissions. The optional Hyper-V check is separate.
 
 Every provisioning run registers the bundled example at `welcome/workflow-test`.
 The [example guide](welcome-example/README.md) contains a ready-to-use Kilo test

@@ -25,7 +25,7 @@ function registerSecurityView(vscode, context, dataDirectory) {
         return entry;
     }
     const provider = {onDidChangeTreeData:event.event,getTreeItem:entry=>entry,async getChildren(){
-        let mode = 'Standard host session';
+        let mode = 'Local session';
         try{
             const p=JSON.parse(await fs.readFile(profile,'utf8'));
             mode=p.schema===1 && p.mode==='offline-vm' ? 'Offline VM on next launch' :
@@ -34,9 +34,11 @@ function registerSecurityView(vscode, context, dataDirectory) {
         let guest=false;
         try{await fs.access(guestChallenge);guest=true;}catch{}
         return [
-            item(guest?'Guest challenge present':mode,'shield',undefined,guest?'Run E.T. to verify':''),
+            item(guest?'Guest challenge present':mode,'shield'),
+            item('Run E.T. model rule test','beaker','lokiente.security.test','local model'),
+            item('Test a custom Kilo rule','checklist','lokiente.security.custom'),
             ...(guest?[]:[item('Check host capabilities','pulse','lokiente.security.inspect'),item('Choose security profile','settings-gear','lokiente.security.choose')]),
-            item('Run E.T. acceptance test','beaker','lokiente.security.test',guest?'':'inside guest'),
+            ...(guest?[item('Check VM isolation','vm','lokiente.security.guestTest')]:[]),
             item('Kilo rules and workflows','book','lokiente.security.rules','Agent Behaviour'),
             item('LoKiEnte startup settings','settings','lokiente.security.settings'),
             item('Configure extension sync','sync','lokiente.configureExtensionSync')
@@ -89,7 +91,50 @@ function registerSecurityView(vscode, context, dataDirectory) {
         await vscode.window.showInformationMessage('Offline VM selected. Close the managed host window, then reopen LoKiEnte from the desktop.');
     });
     let testing=false;
-    command('lokiente.security.test',async()=>{
+    async function testModel(customRule) {
+        if(!vscode.workspace.isTrusted)throw new Error('Open a trusted managed window to run the local model test.');
+        if(testing)return;
+        testing=true;
+        try{
+            const config=JSON.parse(process.env.KILO_CONFIG_CONTENT || '{}');
+            const catalog=config.provider?.lmstudio?.models ?? {};
+            const models=Object.entries(catalog).filter(([,m])=>m.tool_call===true).map(([alias,m])=>({
+                alias,label:alias,description:m.name,detail:config.model==='lmstudio/'+alias?'Managed default':undefined
+            })).sort((a,b)=>Number(Boolean(b.detail))-Number(Boolean(a.detail)));
+            if(!models.length)throw new Error('No provisioned local chat models. Reopen VS Code from the LoKiEnte desktop shortcut.');
+            const model=await vscode.window.showQuickPick(models,{title:'E.T. — choose the local model to test'});
+            if(!model)return;
+            let custom;
+            if(customRule){
+                const input={ignoreFocusOut:true,validateInput:s=>!s.trim() || s.length>3000?'Enter 1–3000 characters.':undefined};
+                const prompt=await vscode.window.showInputBox({...input,title:'Your question about an existing Kilo rule'});
+                if(!prompt)return;
+                const expected=await vscode.window.showInputBox({...input,title:'Exact visible answer required to pass',prompt:'Only the question is sent to the model.'});
+                if(!expected)return;
+                custom={prompt,expected:expected.trim()};
+            }
+            const chain=JSON.parse(await fs.readFile(path.join(root,'toolchain.json'),'utf8'));
+            const project=vscode.workspace.workspaceFolders?.find(f=>f.uri.scheme==='file')?.uri.fsPath;
+            const env={...process.env,LOKIENTE_ET_PROJECT:project || '',LOKIENTE_ET_CUSTOM:custom?JSON.stringify(custom):''};
+            output.show(true);
+            output.appendLine('E.T. local model rule test — '+model.alias);
+            await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Checking Kilo permissions and '+model.label},async()=>{
+                const proc=execute(chain.nodeExecutable,[path.join(root,'app','security-probe','local-model.cjs'),model.alias],
+                    {cwd:root,env,windowsHide:true,timeout:1200000,maxBuffer:1024*1024});
+                proc.child.stdout.setEncoding('utf8');
+                proc.child.stdout.on('data',chunk=>output.append(chunk));
+                try{await proc;}
+                catch(e){
+                    if(e.stderr?.trim())throw new Error(e.stderr.trim().slice(0,450));
+                    if(![1,2].includes(e.code) || !e.stdout?.includes('Local report:'))throw new Error('The local model test did not complete.');
+                    void vscode.window.showWarningMessage('Local rule check '+(e.code===1?'failed':'was inconclusive')+'. See LoKiEnte Security for each result.');
+                }
+            });
+        }finally{testing=false;}
+    }
+    command('lokiente.security.test',()=>testModel(false));
+    command('lokiente.security.custom',()=>testModel(true));
+    command('lokiente.security.guestTest',async()=>{
         if(!vscode.workspace.isTrusted)throw new Error('Run acceptance from a trusted managed guest window.');
         const project=vscode.workspace.workspaceFolders?.find(f=>f.uri.scheme==='file');
         if(!project)throw new Error('Open a local guest project first.');

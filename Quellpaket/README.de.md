@@ -6,9 +6,9 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.23.4 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.23.5 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
-Die LoKiEnte-Seitenleiste enthält das optionale Hyper-V-Sicherheitsprofil, Kilos Einstellungen und den E.T.-Abnahmetest für den Gast. Standard ist die normale Host-Sitzung.
+Über die LoKiEnte-Seitenleiste kannst du das gewählte lokale Modell mit **Run E.T. model rule test** in deiner normalen Windows-Sitzung prüfen. Kilos Regeln und Werkzeugrechte werden einbezogen. Die optionale Hyper-V-Prüfung ist separat.
 
 Bei jeder Provisionierung wird das eigene Beispiel unter welcome/workflow-test
 registriert. Die [Beispielanleitung](welcome-example/README.de.md) enthält den

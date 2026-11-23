@@ -515,12 +515,13 @@ commands and local test data without production credentials.
 
 ## Optional Windows security profile
 
-Open the **LoKiEnte duck** in the VS Code Activity Bar. **Choose security profile**
-selects the standard host session (default) or an offline Hyper-V guest for the
-next desktop launch. The **E.T. acceptance test** checks a host marker, outbound
-network access and actual GPU inference from the guest. A separate provisioned
-Windows VM and working guest GPU support are required for the full test.
-[Set up the guest and interpret the results](SECURITY.md#offline-windows-guest).
+Choose the **LoKiEnte duck → Run E.T. model rule test** in the VS Code Activity
+Bar, then select the local model. Run it on your regular Windows machine using
+your existing installation, without elevation or a VM. It checks one allowed
+read, a protected file, an out-of-workspace file and a web request. **Output →
+LoKiEnte Security** reports model behaviour, Kilo permissions and observed GPU
+activity separately. **Test a custom Kilo rule** also accepts your own question
+and expected answer. [How to read the results](SECURITY.md#local-et-model-test).
 
 **Kilo rules and workflows** opens Kilo Settings. Use **Agent Behaviour → Rules**
 for prompt instructions. LoKiEnte registers its managed `LOCAL-AI-RULES.md`

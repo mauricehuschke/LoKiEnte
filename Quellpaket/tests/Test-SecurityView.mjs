@@ -13,6 +13,7 @@ test('the activity bar opens the managed settings view and delegates rules to Ki
     class Item {constructor(label){this.label=label;}}
     const api={EventEmitter:class {fire(){}},ThemeIcon:Item,TreeItem:Item,
         commands:{registerCommand(id,fn){registrations.set(id,fn);},async getCommands(){return ['kilo-code.new.sidebarTitle.settingsButtonClicked'];},async executeCommand(...args){calls.push(args);}},
+        workspace:{isTrusted:true},
         extensions:{getExtension(){return {async activate(){}};}},
         window:{createOutputChannel(){return {};},registerTreeDataProvider(id,p){assert.equal(id,'lokiente.settingsView');tree=p;},async showInformationMessage(){}}
     };
@@ -25,8 +26,20 @@ test('the activity bar opens the managed settings view and delegates rules to Ki
         await writeFile(path.join(root,'security','profile.json'),JSON.stringify({schema:1,mode:'offline-vm'}));
         const items=await tree.getChildren();
         assert(items.some(item=>item.command?.command==='lokiente.security.test'));
-        // The same test can run in a guest with an actual challenge present.
+        assert(items.some(item=>item.command?.command==='lokiente.security.custom'));
+        assert.equal(items.find(item=>item.command?.command==='lokiente.security.test').description,'local model');
         assert(items.some(item=>['Offline VM on next launch','Guest challenge present'].includes(item.label)));
+        const previous=process.env.KILO_CONFIG_CONTENT;
+        try{
+            process.env.KILO_CONFIG_CONTENT=JSON.stringify({model:'lmstudio/quality',provider:{lmstudio:{models:{
+                quick:{name:'Fast',tool_call:true},quality:{name:'Quality',tool_call:true},embeddings:{tool_call:false}
+            }}}});
+            api.window.showQuickPick=async models=>{assert.deepEqual(models.map(m=>m.alias),['quality','quick']);return undefined;};
+            // Cancellation needs no project, VM, guest marker or provisioned toolchain.
+            await registrations.get('lokiente.security.test')();
+        }finally{
+            if(previous===undefined)delete process.env.KILO_CONFIG_CONTENT;else process.env.KILO_CONFIG_CONTENT=previous;
+        }
         await registrations.get('lokiente.security.rules')();
         assert.deepEqual(calls,[['kilo-code.new.sidebarTitle.settingsButtonClicked']]);
     }finally{await rm(root,{recursive:true,force:true});}
