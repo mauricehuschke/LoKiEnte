@@ -417,6 +417,26 @@ und in der [ausführlichen Anleitung](Quellpaket/WORKFLOW.de.md).
 Der Latest-Link liefert immer das neueste veröffentlichte Release. Ein neuer
 Commit auf `main` allein ist noch kein Installer-Update.
 
+### Updates für Entwicklungswerkzeuge wählen
+
+Gib `-UpdatePolicy` einmal beim normalen Provisionieren an. Für eine vorhandene Installation unter `D:\LoKi` lautet der Befehl im Ordner des Installers:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot "D:\LoKi" -UpdatePolicy lts
+```
+
+| Richtlinie | Ziel bei Installation und erneuter Provisionierung |
+| --- | --- |
+| `frozen` (Standard) | Die festen Werkzeugversionen dieses LoKiEnte-Releases. Eine bereits neuere funktionierende Installation bleibt erhalten. |
+| `latest` | Die höchste geeignete numerische Version aus der jeweiligen unterstützten Paketquelle. |
+| `lts` | Für Node.js und PowerShell die höchste geeignete Version einer unterstützten LTS-Reihe. Für die übrigen Werkzeuge gilt `latest`. |
+
+Die Richtlinie umfasst **VS Code, Kilo für VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js und curl**. Jede Zielversion muss **mindestens 48 Stunden alt** sein. Bei WinGet muss das Paketmanifest im aktuellen Katalog mit einem mindestens 48 Stunden alten Katalogstand übereinstimmen. Für Kilo gelten die Veröffentlichungszeit bei npm und der Zeitstempel des Marketplace-Builds. Ist die neueste Version zu jung, wählt LoKiEnte die nächste geeignete Version. Fehlende Altersnachweise oder ein nicht verfügbares Zielpaket führen zu einer Fehlermeldung.
+
+Die bestätigte Provisionierung speichert die Wahl im Installationsordner in `update-policy.json`, auch für Wiederholungen nach einem Fehler. Ohne Parameter gilt die gespeicherte Auswahl. Zum Wechsel gibst du den Parameter erneut an. Richtlinie und Zielversionen stehen im Provisionierungsbericht. Bereits neuere Werkzeuge bleiben auch beim Wechsel zu LTS oder frozen erhalten. Bei abweichenden eigenen Versionsvorgaben in einer alten `dependency-versions.json` musst du für die Migration einmal ausdrücklich eine Richtlinie wählen.
+
+Die Regel gilt für die Provisionierung durch LoKiEnte. Programmeigene Updater arbeiten unabhängig. Integrationsgebundene Versionen von ripgrep und LanceDB, Modelldateien und Projektbibliotheken werden weiterhin separat verwaltet.
+
 ## Sämtliche Parameter des Provisionierungsskripts
 
 Die Standards gelten für eine neue Einrichtung. Gespeicherte Modelloptionen
@@ -441,6 +461,7 @@ Setup-Parameter.
 | `-Port` | `1234`; 1024–65535 | Lokaler LM-Studio-API-Port. |
 | `-ProjectPath` | leeres String-Array | Zusätzliche vorhandene Projektordner registrieren/aktualisieren. Bereits registrierte erreichbare Projekte werden auch ohne diesen Parameter aktualisiert. Welcome-Testprojekt wird automatisch ergänzt. |
 | `-SkipModelDownload` | Schalter | Fehlende Modelldateien nicht herunterladen; bei fehlenden benötigten Dateien stoppt die Einrichtung. Verhindert nicht Downloads/Updates anderer Werkzeuge. |
+| `-UpdatePolicy` | `frozen` (Standard), `latest`, `lts` | Gilt dauerhaft für diese Installation. Alle Zielversionen müssen mindestens 48 Stunden alt sein. |
 | `-UpdateManaged` | Schalter | Kompatibilität mit älteren Startbefehlen; aktuell keine zusätzliche Wirkung. Der normale Lauf aktualisiert verwaltete Dateien/Arbeitsbereiche ohnehin. |
 | `-NoShortcut` | Schalter | Desktopverknüpfung in diesem Lauf nicht erzeugen/erneuern. Eine bestehende Verknüpfung wird dadurch nicht gelöscht. |
 
@@ -449,9 +470,7 @@ ModelMode, IncludeFastModel, AllowPartialGpuOffload, AllowUnfitAttempt,
 RouterPort, PreferredModel, ModelKey, ApiTokenEnvironmentVariable,
 ContextLength und Port. ProjectPath, AuditOnly, SkipModelDownload,
 UpdateManaged und NoShortcut werden nicht als Modelloptionen übernommen.
-Abhängigkeiten werden auf freigegebene Versionen angehoben; eine höhere
-installierte Version wird nicht automatisch heruntergestuft. Ein automatisches
-Update auf jede beliebige neueste Version ist damit nicht gemeint.
+Für Werkzeugupdates gilt die gespeicherte `UpdatePolicy`.
 
 Für mehrere Projektpfade das Skript direkt aus einer PowerShell aufrufen,
 damit das Array erhalten bleibt:
