@@ -513,6 +513,21 @@ commands and local test data without production credentials.
 - [Report a bug or suggest an improvement](https://github.com/mauricehuschke/LoKiEnte/issues)
 - [Customize or contribute to LoKiEnte itself](docs/development/README.md)
 
+## Optional Windows security profile
+
+Open the **LoKiEnte duck** in the VS Code Activity Bar. **Choose security profile**
+selects the standard host session (default) or an offline Hyper-V guest for the
+next desktop launch. The **E.T. acceptance test** checks a host marker, outbound
+network access and actual GPU inference from the guest. A separate provisioned
+Windows VM and working guest GPU support are required for the full test.
+[Set up the guest and interpret the results](SECURITY.md#offline-windows-guest).
+
+**Kilo rules and workflows** opens Kilo Settings. Use **Agent Behaviour → Rules**
+for prompt instructions. LoKiEnte registers its managed `LOCAL-AI-RULES.md`
+there. Keep personal project instructions in `AGENTS.md`. Under **Workflows**
+the shipped commands delegate to `shadow-chat`; they inherit the local model
+selection. “Use server default” requires no manual model selection.
+
 ## License
 
 [Apache License 2.0 with Commons Clause 1.0](LICENSE.txt) permits cloning,

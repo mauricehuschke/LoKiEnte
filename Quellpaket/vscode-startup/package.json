@@ -1,19 +1,67 @@
 {
   "name": "managed-startup",
-  "displayName": "LoKiEnte Managed Startup",
-  "description": "Open Kilo in the local environment started by the LoKiEnte desktop launcher.",
+  "displayName": "LoKiEnte",
+  "description": "Manage the local LoKiEnte session, Kilo rules and optional Windows isolation.",
   "publisher": "lokiente",
-  "version": "0.1.2",
-  "engines": { "vscode": "^1.105.1" },
+  "version": "0.2.0",
+  "engines": {
+    "vscode": "^1.105.1"
+  },
   "license": "SEE LICENSE IN LICENSE.txt",
   "main": "./extension.cjs",
-  "activationEvents": ["onStartupFinished"],
-  "extensionKind": ["ui"],
-  "capabilities": { "untrustedWorkspaces": { "supported": true } },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
   "contributes": {
     "commands": [
-      { "command": "lokiente.openKilo", "title": "Open Kilo", "category": "LoKiEnte" },
-      { "command": "lokiente.configureExtensionSync", "title": "Configure Extension Sync", "category": "LoKiEnte" }
+      {
+        "command": "lokiente.openKilo",
+        "title": "Open Kilo",
+        "category": "LoKiEnte"
+      },
+      {
+        "command": "lokiente.configureExtensionSync",
+        "title": "Configure Extension Sync",
+        "category": "LoKiEnte"
+      },
+      {
+        "command": "lokiente.security.choose",
+        "title": "Choose security profile",
+        "category": "LoKiEnte",
+        "enablement": "lokiente.managedWindow"
+      },
+      {
+        "command": "lokiente.security.test",
+        "title": "Run E.T. acceptance test",
+        "category": "LoKiEnte",
+        "enablement": "lokiente.managedWindow"
+      },
+      {
+        "command": "lokiente.security.rules",
+        "title": "Open Kilo rules and workflows",
+        "category": "LoKiEnte",
+        "enablement": "lokiente.managedWindow"
+      },
+      {
+        "command": "lokiente.security.settings",
+        "title": "Open startup settings",
+        "category": "LoKiEnte",
+        "enablement": "lokiente.managedWindow"
+      },
+      {
+        "command": "lokiente.security.inspect",
+        "title": "Check host capabilities",
+        "category": "LoKiEnte",
+        "enablement": "lokiente.managedWindow"
+      }
     ],
     "configuration": {
       "title": "LoKiEnte",
@@ -25,6 +73,25 @@
           "description": "Open the Kilo view once when a window starts through the LoKiEnte launcher. Disable to keep the restored layout."
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "lokiente",
+          "title": "LoKiEnte",
+          "icon": "lokiente.png"
+        }
+      ]
+    },
+    "views": {
+      "lokiente": [
+        {
+          "id": "lokiente.settingsView",
+          "name": "Settings",
+          "when": "lokiente.managedWindow"
+        }
+      ]
     }
-  }
+  },
+  "icon": "lokiente.png"
 }

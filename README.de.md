@@ -553,6 +553,22 @@ Verwende bestätigte Testbefehle und lokale Testdaten ohne Produktionszugänge.
 - [Fehler melden oder Verbesserungen vorschlagen](https://github.com/mauricehuschke/LoKiEnte/issues)
 - [LoKiEnte selbst anpassen oder dazu beitragen](docs/development/README.de.md)
 
+## Optionales Windows-Sicherheitsprofil
+
+Öffne die **LoKiEnte-Ente** links in der Aktivitätsleiste von VS Code. Unter
+**Choose security profile** wählst du für den nächsten Desktopstart die
+Standardsitzung auf dem Host oder einen isolierten Hyper-V-Gast. **Run E.T.
+acceptance test** prüft im Gast den Zugriff auf eine Host-Prüfdatei, ausgehende
+Verbindungen und tatsächliche GPU-Inferenz. Für den vollständigen Test brauchst
+du eine separat provisionierte Windows-VM mit funktionierendem GPU-Zugriff.
+[Gast einrichten und Ergebnisse auswerten](SECURITY.de.md#isolierter-windows-gast).
+
+**Kilo rules and workflows** öffnet Kilos Einstellungen. Unter **Agent Behaviour
+→ Rules** siehst du die von LoKiEnte eingetragene `LOCAL-AI-RULES.md`. Eigene
+Projektregeln gehören in die `AGENTS.md` des Projekts. Unter **Workflows** übergeben
+die mitgelieferten Befehle den Auftrag an `shadow-chat` und erben die lokale
+Modellauswahl. Bei „Use server default“ musst du kein Modell nachtragen.
+
 ## Lizenz
 
 [Apache License 2.0 mit Commons Clause 1.0](LICENSE.txt) erlaubt unter ihren
