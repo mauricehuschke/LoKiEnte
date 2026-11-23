@@ -4,6 +4,7 @@ param(
     [string]$InstallRoot=(Split-Path -Parent $PSScriptRoot),
     [string]$ProjectPath,
     [switch]$StartIndexing,
+    [switch]$ResetSecurityProfile,
     [switch]$PauseOnError
 )
 Set-StrictMode -Version Latest
@@ -28,6 +29,25 @@ function Get-ShadowVsCodeLaunchArguments {
 try {
     if(-not $IsWindows){throw 'This launcher is designed for Windows.'}
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
+    $securityScript=Join-Path $PSScriptRoot 'SecurityProfile.ps1'
+    if($ResetSecurityProfile){& $securityScript -Action Disable -InstallRoot $InstallRoot;return}
+    $policyFile=Join-Path $InstallRoot 'security/profile.json'
+    if(Test-Path -LiteralPath $policyFile -ErrorAction Stop){
+        $policy=Get-Content -LiteralPath $policyFile -Raw | ConvertFrom-Json -ErrorAction Stop
+        if($policy.schema -ne 1 -or $policy.mode -cnotin @('standard','offline-vm')){throw 'Invalid security profile. Repair it or explicitly reset the profile.'}
+        if($policy.mode -ceq 'offline-vm'){
+            if($PauseOnError){
+                Add-Type -AssemblyName System.Windows.Forms
+                $choice=[Windows.Forms.MessageBox]::Show(
+                    "Open your isolated guest now?"+[Environment]::NewLine+"Yes: start the guest. No: reset to Standard for the next launch. Cancel: close.",
+                    'LoKiEnte security profile','YesNoCancel','Question','Button1')
+                if($choice -eq 'Cancel'){return}
+                if($choice -eq 'No'){& $securityScript -Action Disable -InstallRoot $InstallRoot;return}
+            }
+            & $securityScript -Action Launch -InstallRoot $InstallRoot
+            return
+        }
+    }
     $ProjectPath=Select-ShadowProject -InstallRoot $InstallRoot -ProjectPath $ProjectPath
     if(-not $ProjectPath){
         Write-Host 'Startup cancelled. No model environment started.'
@@ -83,6 +103,7 @@ try {
         $environment['PATH']=$npmPrefix+';'+[IO.Path]::GetDirectoryName($chain.nodeExecutable)+';'+$inheritedPath
     }
     $environment['LOKIENTE_MANAGED_VSCODE']='1'
+    $environment['LOKIENTE_ET_KILO']=$bundledKilo
     $environment['LOKIENTE_VSCODE_DATA_DIR']=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
     $start=[Diagnostics.ProcessStartInfo]::new()
     $start.FileName=[string]$chain.codeExecutable

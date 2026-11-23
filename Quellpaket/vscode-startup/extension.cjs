@@ -14,6 +14,7 @@ async function activate(context) {
     const output = vscode.window.createOutputChannel('LoKiEnte Startup', { log: true });
     let disposed = false;
     context.subscriptions.push(output, { dispose() { disposed = true; } });
+    await require('./security-view.cjs').registerSecurityView(vscode, context, dataDirectory);
     void registerSyncGuide(vscode, context, output);
     const openKilo = async () => {
         try {

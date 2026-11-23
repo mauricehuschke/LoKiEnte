@@ -36,7 +36,9 @@ def main():
     required = {
         "assets/lokiente.ico", "Setup.ps1", "Start-LocalAI.ps1", "Invoke-SetupRequest.ps1",
         "UpdatePolicy.ps1", "DependencyVersions.ps1", "Indexing.ps1", "VsCodeProfile.ps1", "vscode-startup/package.json", "vscode-startup/extension.cjs",
-        "vscode-startup/sync-guide.cjs",
+        "vscode-startup/sync-guide.cjs", "vscode-startup/security-view.cjs",
+        "vscode-startup/et-report.cjs", "vscode-startup/et-report.css", "vscode-startup/et-report.js", "vscode-startup/lokiente.png",
+        "SecurityProfile.ps1", "Invoke-ETCheck.ps1", "security-probe/et.test.cjs", "security-probe/local-model.cjs", "security-probe/network-reference.cjs", "security-probe/gpu-sample.cjs", "security-probe/Measure-Gpu.ps1",
         "vscode-startup/extension.vsixmanifest", "vscode-startup/[Content_Types].xml",
         "WorkflowPolicy.ps1", "Invoke-ReviewedTask.ps1", "TaskPreparation.ps1",
         "WorkflowProgress.ps1", "KiloWorkflowTools.mjs", "WorkflowJob.mjs",

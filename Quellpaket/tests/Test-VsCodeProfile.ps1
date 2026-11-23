@@ -53,8 +53,8 @@ try{
     $vsix=New-ShadowVsCodeStartupVsix -InstallRoot $managed
     $archive=[IO.Compression.ZipFile]::OpenRead($vsix)
     try{
-        Assert-Profile ($archive.Entries.Count -eq 6) 'VSIX must contain only the expected source and metadata files'
-        foreach($entryName in @('extension/extension.cjs','extension/sync-guide.cjs','extension/package.json','extension/LICENSE.txt')){
+        Assert-Profile ($archive.Entries.Count -eq 11 -and $null -ne $archive.GetEntry('extension/lokiente.png')) 'VSIX must contain only the expected source and metadata files'
+        foreach($entryName in @('extension/security-view.cjs','extension/et-report.cjs','extension/et-report.css','extension/et-report.js','extension/extension.cjs','extension/sync-guide.cjs','extension/package.json','extension/LICENSE.txt')){
             $entry=$archive.GetEntry($entryName)
             $reader=[IO.StreamReader]::new($entry.Open())
             try{$actual=$reader.ReadToEnd()}finally{$reader.Dispose()}

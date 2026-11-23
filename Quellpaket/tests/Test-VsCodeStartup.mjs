@@ -26,7 +26,7 @@ function fixture({ managed = true, open = true, available = true, focus = true, 
         workspace: { getConfiguration(section) { assert.equal(section, 'lokiente.startup'); return { get: () => open }; } },
     };
     const sandbox = { module: { exports: {} }, process: { env: managed ? { LOKIENTE_MANAGED_VSCODE: '1', LOKIENTE_VSCODE_DATA_DIR: dataDirectory } : {} },
-        require(id) { if (id === 'node:path') return path; if (id === './sync-guide.cjs') return { registerSyncGuide() {} }; assert.equal(id, 'vscode'); return api; } };
+        require(id) { if (id === 'node:path') return path; if (id === './security-view.cjs') return { registerSecurityView() {} }; if (id === './sync-guide.cjs') return { registerSyncGuide() {} }; assert.equal(id, 'vscode'); return api; } };
     vm.runInNewContext(source, sandbox);
     return { run: () => sandbox.module.exports.activate(context), context, calls, warnings, lines, registrations };
 }
