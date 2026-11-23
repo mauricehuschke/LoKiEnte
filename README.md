@@ -401,9 +401,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1
 | `latest` | The highest eligible numeric release available through each supported package source. |
 | `lts` | The highest eligible release in a supported LTS line for Node.js and PowerShell. Other tools follow `latest`. |
 
-The policy covers **VS Code, Kilo for VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js and curl**. Each target must be **at least 48 hours old**. WinGet targets must have the same manifest tree in the current catalog and a catalog revision at least 48 hours old. Kilo uses npm publication times and Marketplace build timestamps. If a new version is too young, the resolver selects the next eligible version. Missing catalog evidence or an unavailable exact package stops the run with an error.
+**Model maintenance for this run.** For an existing installation with matching model options, provisioning offers two choices. Press Enter or `1` to keep your Single or Dual configuration and indexing mode. Tools, agents and projects update. LoKiEnte skips model selection, downloads, changes to loaded instances and inference tests. Choose `2` to select or update models from the bundled catalog and test them again. Verified model files are reused. First-time setup and changed model parameters require configuration.
+
+Append `-ModelAction Keep` or `-ModelAction Configure` to your usual command to choose explicitly for one run. In a newly opened LoKiEnte terminal, run `npm --version` to see the active npm. When needed, LoKiEnte installs its own Node-compatible npm under `tooling/npm-versions`. The same 48-hour rule applies. Kilo uses its Windows binary package. Its private installation disables npm lifecycle scripts and verifies the CLI afterwards.
+
+The policy covers **VS Code, Kilo for VS Code (Windows x64), Kilo CLI, LM Studio, PowerShell 7, Git, Node.js, npm and curl**. Each target must be **at least 48 hours old**. WinGet targets must have the same manifest tree in the current catalog and a catalog revision at least 48 hours old. Kilo uses npm publication times and Marketplace build timestamps. If a new version is too young, the resolver selects the next eligible version. Missing catalog evidence or an unavailable exact package stops the run with an error.
 
 The confirmed provisioning run records the choice in `update-policy.json` in the installation directory, including for retries. Omit the option to reuse it. Specify another value to switch. The provisioning report records the policy and target versions. Existing newer tools are kept, including when switching back to LTS or frozen. Old installations with custom `dependency-versions.json` pins that differ from the bundled targets require a one-time explicit policy choice to migrate.
+
+On Windows, `curl --version` reports the upstream version (for example, `8.23.0`). WinGet also tracks a package revision (for example, `8.23.0.9`). LoKiEnte checks the executable in the installed package. If verification fails, the error includes the detected version and executable path.
 
 These rules apply to LoKiEnte provisioning. Applications' own updaters are separate. Integration-specific ripgrep and LanceDB, model files and project libraries follow their existing management paths.
 
@@ -430,6 +436,7 @@ over defaults when the parameter was not supplied explicitly.
 | `-Port` | `1234`; 1024–65535 | Local LM Studio API port. |
 | `-ProjectPath` | Empty string array | Register/update additional existing directories. Reachable registered projects update even without this parameter. Welcome test project is added automatically. |
 | `-SkipModelDownload` | Switch | Do not download missing models; setup stops if required files are absent. Does not prevent other tool downloads/updates. |
+| `-ModelAction` | `Keep`, `Configure` | Select model maintenance for this run. Enter keeps a matching existing installation. |
 | `-UpdatePolicy` | `frozen` (default), `latest`, `lts` | Saved for this installation. All targets must be at least 48 hours old. |
 | `-UpdateManaged` | Switch | Compatibility with older commands; currently no additional effect. Normal runs already update managed files/workspaces. |
 | `-NoShortcut` | Switch | Do not create/refresh the desktop shortcut in this run. Does not delete an existing shortcut. |

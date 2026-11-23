@@ -68,6 +68,7 @@ try{
     function Invoke-ShadowNative {
         param($FilePath,$ArgumentList,$TimeoutSeconds)
         if($ArgumentList -notcontains '@kilocode/cli@7.8.30' -or $ArgumentList -notcontains 'install'){throw 'npm must use the approved version directly'}
+        if ($ArgumentList -notcontains '--ignore-scripts' -or $ArgumentList -notcontains '--include=optional') {throw 'Unsafe Kilo install flags'}
         $beforeIndex=[array]::IndexOf($ArgumentList,'--before')
         if ($beforeIndex -lt 0 -or [datetimeoffset]$ArgumentList[$beforeIndex+1] -gt [datetimeoffset]::UtcNow.AddHours(-48)) {throw 'npm must apply the release age to its dependency tree'}
         $script:npmInstalled=$true

@@ -27,7 +27,7 @@ $report=[ordered]@{schema=1;status='IN_PROGRESS';steps=@();warnings=@()}
 $configuration=[pscustomobject]@{Config=@{}}
 $kilo=@{kiloExecutable='cli-fixture';kiloArgumentPrefix=@('entry-fixture')}
 $bundledKilo='gui-fixture';$toolchain=@{powerShellExecutable='pwsh-fixture'}
-$ModelMode='Dual';$pool=[pscustomobject]@{VerificationStatus='Verified';Profiles=@()};$embedding=[pscustomobject]@{Status='Ready'}
+$ModelAction='Configure';$ModelMode='Dual';$pool=[pscustomobject]@{VerificationStatus='Verified';Profiles=@()};$embedding=[pscustomobject]@{Status='Ready'}
 if($Scenario -eq 'deferred'){$pool.VerificationStatus='Partial';$embedding.Status='Deferred';$report.warnings=@('Synthetic unverified model')}
 if($Scenario -eq 'single-deferred'){$ModelMode='Single';$runtime=[pscustomobject]@{Status='Deferred';Estimate=$null};$report.warnings=@('Synthetic unverified model')}
 if($Scenario -eq 'reserve'){$pool.Profiles=@([pscustomobject]@{Estimate=[pscustomobject]@{ReserveOverride=$true}});$report.warnings=@('Synthetic reserve override')}

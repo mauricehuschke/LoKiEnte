@@ -74,6 +74,14 @@ try {
     $null=Assert-ShadowKiloEffectiveConfig -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $workingDirectory
     $null=Assert-ShadowKiloWorkflowTools -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $workingDirectory
     $environment=Get-ShadowLocalEnvironment -InstallRoot $InstallRoot -ConfigJson ($configuration.Config|ConvertTo-Json -Depth 40 -Compress)
+    if ($chain['npmVersion']) {
+        # Both the Node installer and a Windows npm global prefix place the shims
+        # three directories above node_modules/npm/bin/npm-cli.js.
+        $npmBin=[IO.Path]::GetDirectoryName($chain.npmEntry)
+        $npmPrefix=[IO.Directory]::GetParent($npmBin).Parent.Parent.FullName
+        $inheritedPath=if ($environment.Contains('PATH')) {$environment['PATH']} else {$env:PATH}
+        $environment['PATH']=$npmPrefix+';'+[IO.Path]::GetDirectoryName($chain.nodeExecutable)+';'+$inheritedPath
+    }
     $environment['LOKIENTE_MANAGED_VSCODE']='1'
     $environment['LOKIENTE_VSCODE_DATA_DIR']=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
     $start=[Diagnostics.ProcessStartInfo]::new()

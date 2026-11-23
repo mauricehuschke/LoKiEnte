@@ -72,13 +72,40 @@ function Update-ShadowProcessPath {
     }
 }
 
+function Get-ShadowCurlPackageRegistration {
+    # WinGet identifies portable installations by package ID and source ID.
+    $productCode='cURL.cURL_Microsoft.Winget.Source_8wekyb3d8bbwe'
+    foreach ($hive in 'HKCU:','HKLM:') {
+        $key="$hive\Software\Microsoft\Windows\CurrentVersion\Uninstall\$productCode"
+        $entry=Get-ItemProperty -LiteralPath $key -Name InstallLocation,DisplayVersion -ErrorAction SilentlyContinue
+        if ($entry -and $entry.InstallLocation -and $entry.DisplayVersion -match '^\d+\.\d+\.\d+(?:\.\d+)?$') {
+            $entry
+        }
+    }
+}
+
 function Resolve-ShadowTool {
     param([Parameter(Mandatory)][ValidateSet('git','node','npm','code','pwsh','winget','lmstudio','lms','curl')][string]$Name)
     $candidate=[Collections.Generic.List[string]]::new()
     $command=Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($Name -eq 'curl') {
+        # A portable package may have no Links alias, and System32 usually comes
+        # first in PATH. Use the exact executable named by the registered package.
+        $packages=@(Get-ShadowCurlPackageRegistration | Sort-Object { [version]$_.DisplayVersion } -Descending)
+        foreach ($package in $packages) {
+            $version=[version]$package.DisplayVersion
+            $archiveName='curl-'+$version.ToString(3)
+            if ($version.Revision -gt 0) { $archiveName+='_'+$version.Revision }
+            $candidate.Add((Join-Path $package.InstallLocation "$archiveName-win64-mingw/bin/curl.exe"))
+        }
         foreach ($directory in @("$env:LOCALAPPDATA/Microsoft/WinGet/Links","$env:ProgramFiles/WinGet/Links")) {
             $candidate.Add((Join-Path $directory 'curl.exe'))
+        }
+        # WinGet can expose the nested bin directory directly through PATH.
+        foreach ($application in @(Get-Command curl.exe -All -CommandType Application -ErrorAction SilentlyContinue)) {
+            if ($application.Source -match '[\\/]curl-\d+\.\d+\.\d+(?:_\d+)?-win64-mingw[\\/]bin[\\/]curl\.exe$') {
+                $candidate.Add($application.Source)
+            }
         }
     }
     if ($command) { $candidate.Add($command.Source) }
@@ -125,6 +152,37 @@ function Resolve-ShadowNpm {
     throw 'npm-cli.js was not found. The existing Node/npm installation remains unchanged; repair that installation.'
 }
 
+function Install-ShadowNpm {
+    param([string]$NodePath,[string]$Root,[string]$Target)
+    $bundled=Resolve-ShadowNpm -NodePath $NodePath
+    $bundledVersion=(Invoke-ShadowNative $NodePath @($bundled,'--version') -Quiet).StdOut.Trim()
+    if ($bundledVersion -notmatch '^\d+\.\d+\.\d+$' -or $Target -notmatch '^\d+\.\d+\.\d+$') {throw 'Invalid npm version.'}
+
+    $selected=$Target
+    $stateFile=Join-Path $Root 'toolchain.json'
+    if (Test-Path -LiteralPath $stateFile -PathType Leaf) {
+        $saved=(Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json -AsHashtable)['npmVersion']
+        if ($saved -match '^\d+\.\d+\.\d+$' -and [version]$saved -gt [version]$selected) { $selected=$saved }
+    }
+    if ([version]$bundledVersion -ge [version]$selected) {return @{Entry=$bundled;Version=$bundledVersion}}
+    $prefix=Join-Path $Root "tooling/npm-versions/$selected"
+    $entry=Join-Path $prefix 'node_modules/npm/bin/npm-cli.js'
+    if (Test-Path -LiteralPath $entry -PathType Leaf) {
+        $probe=Invoke-ShadowNative $NodePath @($entry,'--version') -AllowFailure -Quiet
+        if ($probe.ExitCode -eq 0 -and $probe.StdOut.Trim() -ceq $selected -and (Test-Path -LiteralPath (Join-Path $prefix 'npm.cmd'))) {
+            return @{Entry=$entry;Version=$selected}
+        }
+    }
+    if ($selected -ne $Target) {throw "Previously active npm $selected is unavailable. Repair that installation before retrying."}
+    $before=[datetime]::UtcNow.AddHours(-48).ToString('o')
+    Write-ShadowMessage "Installing npm $selected for LoKiEnte ..."
+    $null=Invoke-ShadowNative $NodePath @($bundled,'install','--global','--prefix',$prefix,"npm@$selected",'--before',$before,
+        '--registry=https://registry.npmjs.org/','--ignore-scripts','--engine-strict','--no-update-notifier','--no-audit','--no-fund')
+    $actual=(Invoke-ShadowNative $NodePath @($entry,'--version') -Quiet).StdOut.Trim()
+    if ($actual -cne $selected -or !(Test-Path -LiteralPath (Join-Path $prefix 'npm.cmd'))) {throw "npm $selected failed verification."}
+    return @{Entry=$entry;Version=$actual}
+}
+
 function Install-ShadowPackage {
     param([string]$Tool,[string]$PackageId,[string]$WingetPath,[string]$AcceptedVersion)
     $existing=Resolve-ShadowTool -Name $Tool
@@ -159,8 +217,12 @@ function Install-ShadowPackage {
         # silently accepted. Re-running reuses it after the operator has seen it.
         throw "WinGet returned $($result.ExitCode) for $PackageId. Program found, but installation status is unconfirmed. Check the output and retry."
     }
-    if($accepted -and (Get-ShadowInstalledVersion -Tool $Tool -Path $resolved) -lt $accepted){
-        throw "$Tool does not meet approved version $AcceptedVersion after WinGet. Check restart requirements or executable path."
+    if($accepted){
+        $observed=Get-ShadowInstalledVersion -Tool $Tool -Path $resolved
+        if(-not $observed -or $observed -lt $accepted){
+            $display=if($observed){$observed.ToString()}else{'unknown'}
+            throw "$Tool does not meet approved version $AcceptedVersion after WinGet. Detected $display at '$resolved' (WinGet exit $($result.ExitCode))."
+        }
     }
     return $resolved
 }
@@ -173,11 +235,14 @@ function Get-ShadowInstalledVersion {
             $binary=$file.FullName
             if ($file.LinkType -eq 'SymbolicLink') { $binary=$file.ResolveLinkTarget($true).FullName }
             $value=(Invoke-ShadowNative -FilePath $Path -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut
-            # curl -V omits the WinGet packaging revision; the portable archive names it.
-            if ($binary -match '[\\/]curl-(\d+\.\d+\.\d+)_(\d+)-win64[^\\/]*[\\/]') {
-                $baseVersion=$Matches[1]; $revision=$Matches[2]
-                if ($value -match ('^curl '+[regex]::Escape($baseVersion)+'(?:\s|$)')) { return [version]"$baseVersion.$revision" }
-            }
+            if ($value -notmatch '^curl (\d+\.\d+\.\d+)(?:\s|$)') { return $null }
+            $baseVersion=$Matches[1]
+            $revision=0
+            # Only the verified executable's own archive layout supplies its
+            # packaging revision. Never transfer a receipt to another curl.exe.
+            if ($binary -match '[\\/]curl-(\d+\.\d+\.\d+)_(\d+)-win64-mingw[\\/]bin[\\/]curl\.exe$' -and
+                $Matches[1] -eq $baseVersion) { $revision=$Matches[2] }
+            return [version]"$baseVersion.$revision"
         }
         'git' {
             $value=(Invoke-ShadowNative -FilePath $Path -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut

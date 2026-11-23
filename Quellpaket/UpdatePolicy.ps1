@@ -1,6 +1,7 @@
 # Shared by the Windows PowerShell bootstrap and PowerShell 7 setup.
 function Get-LoKiEnteJson {
     param([string]$Uri, [string]$Body)
+    $ProgressPreference='SilentlyContinue'
     $request = @{Uri=$Uri; TimeoutSec=45; UseBasicParsing=$true; ErrorAction='Stop'
         Headers=@{'User-Agent'='LoKiEnte-Provision'; Accept='application/json'}}
     if ($Body) { $request.Method='Post'; $request.Body=$Body; $request.ContentType='application/json' }
@@ -46,6 +47,40 @@ function Get-LoKiEnteWingetCandidates {
     }
 }
 
+# npm publishes its supported Node lines as caret ranges and open-ended minima.
+# Only accept alternatives whose meaning we can establish. npm checks engines again at install.
+function Test-LoKiEnteNpmNodeRange {
+    param([version]$NodeVersion,[string]$Range)
+    $actual=[version]$NodeVersion.ToString(3)
+    foreach ($alternative in $Range -split '\s*\|\|\s*') {
+        if ($alternative.Trim() -notmatch '^(\^|>=)(\d+\.\d+\.\d+)$') {continue}
+        $operator=$Matches[1]; $minimum=[version]$Matches[2]
+        if ($actual -ge $minimum -and ($operator -eq '>=' -or ($minimum.Major -gt 0 -and $actual.Major -eq $minimum.Major))) { return $true }
+    }
+    return $false
+}
+
+function Get-LoKiEnteRegistryTarget {
+    param([string]$Package,[datetimeoffset]$Cutoff,[version]$NodeVersion)
+    $npm = Get-LoKiEnteJson "https://registry.npmjs.org/$Package"
+    $stableTag = [string]$npm.'dist-tags'.latest
+    if ($stableTag -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid latest tag for $Package." }
+    $otherTags = @($npm.'dist-tags'.PSObject.Properties | Where-Object { $_.Value -ne $stableTag -and ($Package -ne 'npm' -or $_.Name -notmatch '^latest-\d+$') } | ForEach-Object { $_.Value })
+    $cli = foreach ($entry in $npm.time.PSObject.Properties) {
+        if ($entry.Name -match '^\d+\.\d+\.\d+$' -and [version]$entry.Name -le [version]$stableTag -and
+            $entry.Name -notin $otherTags -and $npm.versions.PSObject.Properties[$entry.Name]) {
+            $release=$npm.versions.PSObject.Properties[$entry.Name].Value
+            if ($release.PSObject.Properties['deprecated'] -and $release.deprecated) { continue }
+            if ($NodeVersion) {
+                if (!$release.PSObject.Properties['engines'] -or !$release.engines.PSObject.Properties['node']) { continue }
+                if (!(Test-LoKiEnteNpmNodeRange $NodeVersion $release.engines.node)) { continue }
+            }
+            [pscustomobject]@{Version=$entry.Name; Date=$entry.Value}
+        }
+    }
+    return (Get-LoKiEnteEligibleVersion $cli $Cutoff $Package).Version
+}
+
 function Resolve-LoKiEnteDependencyPlan {
     param([ValidateSet('frozen','latest','lts')][string]$Policy='frozen', [datetimeoffset]$Now=[datetimeoffset]::UtcNow)
     $cutoff = $Now.ToUniversalTime().AddHours(-48)
@@ -53,7 +88,7 @@ function Resolve-LoKiEnteDependencyPlan {
     # npm and the Windows x64 Marketplace build of Kilo 7.8.30 were published November 16.
     if ($Policy -eq 'frozen') {
         if ($cutoff -lt [datetimeoffset]'2026-11-20T00:00:00Z') { throw 'Frozen targets have not cleared the 48-hour cutoff. Check the system clock.' }
-        return [ordered]@{powerShell='7.6.10.0'; git='2.56.0.4'; node='26.13.1'; curl='8.23.0.8'; vsCode='1.146.0'
+        return [ordered]@{powerShell='7.6.10.0'; git='2.56.0.4'; node='26.13.1'; npm='11.20.0'; curl='8.23.0.8'; vsCode='1.146.0'
             lmStudio='0.4.0'; kiloCli='7.8.30'; kiloVsCode='7.8.30'; nodePackage='OpenJS.NodeJS.LTS'}
     }
 
@@ -81,19 +116,8 @@ function Resolve-LoKiEnteDependencyPlan {
         if ($tool -eq 'node') { $plan.nodePackage = $selected.PackageId }
     }
 
-    $npm = Get-LoKiEnteJson 'https://registry.npmjs.org/@kilocode%2fcli'
-    $stableTag = [string]$npm.'dist-tags'.latest
-    if ($stableTag -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid npm latest tag for Kilo CLI.' }
-    $otherTags = @($npm.'dist-tags'.PSObject.Properties | Where-Object { $_.Value -ne $stableTag } | ForEach-Object { $_.Value })
-    $cli = foreach ($entry in $npm.time.PSObject.Properties) {
-        if ($entry.Name -match '^\d+\.\d+\.\d+$' -and [version]$entry.Name -le [version]$stableTag -and
-            $entry.Name -notin $otherTags -and $npm.versions.PSObject.Properties[$entry.Name]) {
-            $release=$npm.versions.PSObject.Properties[$entry.Name].Value
-            if ($release.PSObject.Properties['deprecated'] -and $release.deprecated) { continue }
-            [pscustomobject]@{Version=$entry.Name; Date=$entry.Value}
-        }
-    }
-    $plan.kiloCli = (Get-LoKiEnteEligibleVersion $cli $cutoff 'Kilo CLI').Version
+    $plan.npm = Get-LoKiEnteRegistryTarget 'npm' $cutoff ([version]$plan.node)
+    $plan.kiloCli = Get-LoKiEnteRegistryTarget '@kilocode%2fcli' $cutoff
 
     $body = @{filters=@(@{criteria=@(@{filterType=7; value='kilocode.kilo-code'})}); flags=17} | ConvertTo-Json -Depth 6
     $gallery = Get-LoKiEnteJson 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery?api-version=7.2-preview.1' $body
