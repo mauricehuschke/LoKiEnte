@@ -28,6 +28,8 @@ Ein eigener Auftragsdatei- oder JSON-Schritt ist im normalen Ablauf nicht nötig
 
 Der Runner übergibt jeder Rolle ihren Auftrag über die Standardeingabe. So erhält der Agent seine Anweisungen auch dann, wenn die Installation und die Laufprotokolle außerhalb des erlaubten Projektordners liegen.
 
+Wenn Git vor dem ersten Spezialisten ein fehlendes `GIT_CONFIG_VALUE_0` meldet, führe die Provisionierung mit dem aktuellen Installer erneut aus. Schließe alle verwalteten VS-Code-Fenster, öffne die Desktopverknüpfung und sende den Auftrag erneut. Der Starter erhält absichtlich leere Git-Einstellungen für Kilo und seine Kindprozesse.
+
 ## 2. Einen kleinen Auftrag formulieren
 
 Beschreibe gewünschtes Verhalten, Randbedingungen und Grenzen, beispielsweise:

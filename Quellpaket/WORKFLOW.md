@@ -23,6 +23,8 @@ place in its bounded agent phases. No separate task-file or JSON step is normall
 
 The runner sends each role its task over standard input. The role can read its instructions even when the installation and its run logs are outside the allowed project directory.
 
+If Git reports a missing `GIT_CONFIG_VALUE_0` before the first specialist starts, rerun provisioning with the current installer. Close all managed VS Code windows, reopen the desktop shortcut and submit the task again. The launcher preserves intentionally empty Git settings for Kilo and its child processes.
+
 ## 2. Describe a small task
 
 Describe expected behavior, constraints and boundaries, for example:
