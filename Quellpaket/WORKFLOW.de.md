@@ -26,6 +26,8 @@ lesen, beraten und über `loki_start` den kontrollierten Entwicklungsablauf star
 Die eigentlichen Dateiänderungen erfolgen in dessen begrenzten Agentenphasen.
 Ein eigener Auftragsdatei- oder JSON-Schritt ist im normalen Ablauf nicht nötig.
 
+Der Runner übergibt jeder Rolle ihren Auftrag über die Standardeingabe. So erhält der Agent seine Anweisungen auch dann, wenn die Installation und die Laufprotokolle außerhalb des erlaubten Projektordners liegen.
+
 ## 2. Einen kleinen Auftrag formulieren
 
 Beschreibe gewünschtes Verhalten, Randbedingungen und Grenzen, beispielsweise:

@@ -69,12 +69,12 @@ function Invoke-WorkflowAgent {
     [void](Assert-ShadowKiloEffectiveConfig -KiloExecutable $KiloExecutable -KiloArgumentPrefix $KiloArgumentPrefix -InstallRoot $InstallRoot -Config $Config -WorkingDirectory $ProjectPath)
     $promptPath=Join-Path $RunPath ($StageName+'.prompt.md')
     Write-ShadowUtf8File -Path $promptPath -Text $Prompt
-    $argsList=@($KiloArgumentPrefix)+@('run','Read the attached task and follow the requested output format.','--agent',$Role,'--model',$roleModel.Reference,'--format','json','--dir',$ProjectPath,'--file',$promptPath)
+    $argsList=@($KiloArgumentPrefix)+@('run','--agent',$Role,'--model',$roleModel.Reference,'--format','json','--dir',$ProjectPath)
     Write-Host "Agent: $StageName ($Role); model: $($roleModel.Reference)"
     Write-ShadowWorkflowProgress -Phase $StageName -Role $Role -Model $roleModel.Reference -State 'running' -Message 'Agent session started'
     $environment=Get-ShadowLocalEnvironment $InstallRoot ($Config|ConvertTo-Json -Depth 40 -Compress)
     $environment.LOKI_WORKFLOW_CHILD='1'
-    $result=Invoke-ShadowNativeProcess -FilePath $KiloExecutable -ArgumentList $argsList -WorkingDirectory $ProjectPath -StdoutPath (Join-Path $RunPath ($StageName+'.events.jsonl')) -StderrPath (Join-Path $RunPath ($StageName+'.stderr.log')) -TimeoutSeconds $AgentTimeoutSeconds -Environment $environment -OnStdoutLine {
+    $result=Invoke-ShadowNativeProcess -FilePath $KiloExecutable -ArgumentList $argsList -StandardInputText $Prompt -WorkingDirectory $ProjectPath -StdoutPath (Join-Path $RunPath ($StageName+'.events.jsonl')) -StderrPath (Join-Path $RunPath ($StageName+'.stderr.log')) -TimeoutSeconds $AgentTimeoutSeconds -Environment $environment -OnStdoutLine {
         param($line)
         Write-ShadowAgentProgress -Line $line -Phase $StageName -Role $Role -Model $roleModel.Reference
     }

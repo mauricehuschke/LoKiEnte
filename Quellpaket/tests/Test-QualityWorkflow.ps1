@@ -39,7 +39,9 @@ if(args[0]==='debug'&&args[1]==='config'){process.stdout.write(JSON.stringify(co
 if(args[0]!=='run')process.exit(2);
 const get=k=>args[args.indexOf(k)+1],role=get('--agent'),model=get('--model'),project=get('--dir'),mode=process.env.SHADOW_TEST_MODE||'';
 fs.appendFileSync(process.env.SHADOW_TEST_CALLS,JSON.stringify({role,model})+'\n');
-const prompt=fs.readFileSync(get('--file'),'utf8');
+if(args.includes('--file'))throw new Error('Managed prompts must not require external file access');
+const prompt=fs.readFileSync(0,'utf8');
+if(!prompt.trim())throw new Error('Workflow role received an empty prompt');
 const generated=mode==='auto-generated',checkName=generated?'loki-node-test':'unit',testId=generated?'test::returns-two':'returns-two';
 let text=JSON.stringify({summary:'Return two, preserve architecture.',changeTypes:['other']});
 if(role==='shadow-preparer'){

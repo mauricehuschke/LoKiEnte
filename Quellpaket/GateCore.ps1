@@ -21,7 +21,8 @@ function Invoke-ShadowNativeProcess {
         [ValidateRange(1,86400)][int]$TimeoutSeconds = 1800,
         [hashtable]$Environment = @{},
         [switch]$CleanEnvironment,
-        [scriptblock]$OnStdoutLine
+        [scriptblock]$OnStdoutLine,
+        [AllowEmptyString()][string]$StandardInputText
     )
     if ([IO.Path]::GetExtension($FilePath) -in @('.cmd','.bat','.ps1')) {
         throw "A native executable is required: $FilePath. Use node.exe plus its script, or pwsh.exe -File."
@@ -30,6 +31,9 @@ function Invoke-ShadowNativeProcess {
     $start.FileName = $FilePath
     $start.WorkingDirectory = $WorkingDirectory
     $start.UseShellExecute = $false
+    $sendInput = $PSBoundParameters.ContainsKey('StandardInputText')
+    $start.RedirectStandardInput = $sendInput
+    if($sendInput){$start.StandardInputEncoding = [Text.UTF8Encoding]::new($false)}
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
     $start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
@@ -47,7 +51,7 @@ function Invoke-ShadowNativeProcess {
     try {
         if (-not $process.Start()) { throw "Cannot start $FilePath" }
         $started=$true
-        if($OnStdoutLine){
+        if($OnStdoutLine -or $sendInput){
             # Drain both streams while making whole lines visible to the controller.
             # A callback failure must never leave an editing child running.
             foreach($path in @($StdoutPath,$StderrPath)){Write-ShadowUtf8File -Path $path -Text ''}
@@ -56,11 +60,23 @@ function Invoke-ShadowNativeProcess {
             $outWriter.AutoFlush=$true;$errWriter.AutoFlush=$true
             try{
                 $outTask=$process.StandardOutput.ReadLineAsync();$errTask=$process.StandardError.ReadLineAsync()
+                # Write through the pipe concurrently with stdout/stderr. A child that never
+                # reads stdin must still be subject to the normal timeout and tree cleanup.
+                $inputTask=$null
+                if($sendInput){
+                    $bytes=[Text.Encoding]::UTF8.GetBytes($StandardInputText)
+                    $inputTask=$process.StandardInput.BaseStream.WriteAsync($bytes,0,$bytes.Length)
+                }
                 $outDone=$false;$errDone=$false;$drainDeadline=[double]::PositiveInfinity
                 while(-not $outDone -or -not $errDone -or -not $process.HasExited){
+                    if($null -ne $inputTask -and $inputTask.IsCompleted){
+                        if(-not $timedOut){[void]$inputTask.GetAwaiter().GetResult()}
+                        $process.StandardInput.Close()
+                        $inputTask=$null
+                    }
                     if(-not $outDone -and $outTask.IsCompleted){
                         $line=$outTask.GetAwaiter().GetResult()
-                        if($null -eq $line){$outDone=$true}else{$outWriter.WriteLine($line);& $OnStdoutLine $line | Out-Null;$outTask=$process.StandardOutput.ReadLineAsync()}
+                        if($null -eq $line){$outDone=$true}else{$outWriter.WriteLine($line);if($OnStdoutLine){& $OnStdoutLine $line | Out-Null};$outTask=$process.StandardOutput.ReadLineAsync()}
                     }
                     if(-not $errDone -and $errTask.IsCompleted){
                         $line=$errTask.GetAwaiter().GetResult()
