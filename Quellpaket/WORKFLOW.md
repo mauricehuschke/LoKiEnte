@@ -38,6 +38,8 @@ examines the project, existing tests and rules. It derives the workflow, accepta
 criteria `AC-1`, `AC-2`, …, change types and exact production/test files. Test commands
 come from locally detected templates or existing checks; it cannot invent arbitrary shell commands.
 
+If the preparer returns unreadable JSON, Kilo starts one fresh read-only preparation attempt. Both answers appear in the run directory. A second unreadable answer stops the task before any project change. A substantive rejection or a request for clarification is passed back to the user.
+
 An independent **preparation review** checks alignment with the original request,
 scope and test selection. Only after PASS is checks.json backed up and extended.
 Unclear requirements, missing tools or conflicts stop the workflow with a specific
