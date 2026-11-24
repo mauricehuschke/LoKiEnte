@@ -14,6 +14,3 @@ The five existing tests and the three new tests pass.
 
 00:00:28.000 --> 00:00:35.000
 Scripted role replies and real Git and test gates. The reference run is VERIFIED.
-
-00:00:35.000 --> 00:00:42.000
-E.T.: Kilo blocks the fixed web request. The local model still requests webfetch.

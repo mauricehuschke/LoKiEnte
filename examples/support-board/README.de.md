@@ -10,7 +10,7 @@ Lade den [Ausgangsstand als ZIP](../support-api-head-starter.zip) herunter, entp
 
 > Erweitere den bestehenden Node.js-Server um HEAD /api/summary. Status, Content-Type und Content-Length in Bytes müssen mit GET übereinstimmen. Der Body bleibt leer. Erhalte den JSON-Vertrag von GET und das Verhalten von /health. Nur die Summary-Route soll GET, HEAD ankündigen. Extrahiere die gemeinsame Antwort nach src/summary-response.cjs. Ergänze HTTP-Integrationstests auf Loopback, führe die bestehende Testsuite aus und fordere unabhängige Sicherheits- und Integrationsreviews an. Keine neuen Abhängigkeiten oder externen Netzwerkzugriffe.
 
-**Kurzvideo:** 42 Sekunden mit den Originalaufnahmen aus Prompt, Planung, Diff, Tests, Review und E.T. [MP4](../../assets/screenshots/developer-workflow.mp4) · [Deutsche Untertitel](../../assets/screenshots/developer-workflow.de.vtt)
+**Kurzvideo:** 35 Sekunden vom Auftrag in Kilo über die Implementierung und HTTP-Tests bis zur unabhängigen Codeprüfung. [MP4](../../assets/screenshots/developer-workflow.mp4) · [Deutsche Untertitel](../../assets/screenshots/developer-workflow.de.vtt)
 
 ## Vom Prompt zum Review
 

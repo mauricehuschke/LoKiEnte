@@ -10,7 +10,7 @@ Download the [starting revision as a ZIP](../support-api-head-starter.zip), extr
 
 > Extend the existing Node.js server with HEAD /api/summary. Return the same status, Content-Type and byte Content-Length as GET, with an empty body. Preserve GET's JSON contract and /health. Only the summary route should advertise GET, HEAD. Extract the shared response into src/summary-response.cjs. Add loopback HTTP integration tests, run the existing suite and request independent security and integration reviews. No new dependencies or external network calls.
 
-**Video walkthrough:** 42 seconds of original captures covering the prompt, plan, diff, tests, review and E.T. [MP4](../../assets/screenshots/developer-workflow.mp4) · [English captions](../../assets/screenshots/developer-workflow.en.vtt)
+**Video walkthrough:** 35 seconds from the request in Kilo through implementation and HTTP tests to independent code review. [MP4](../../assets/screenshots/developer-workflow.mp4) · [English captions](../../assets/screenshots/developer-workflow.en.vtt)
 
 ## From the prompt to review
 
