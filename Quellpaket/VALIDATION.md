@@ -6,6 +6,19 @@ This document preserves the validation history and its original limitations.
 Older sections describe the behavior and evidence of their stated release, not
 necessarily the current defaults. Current usage is documented in [README.md](README.md).
 
+## Local 9B model in the managed Kilo IDE
+
+On 24 November 2026 a developer entered an ordinary feature request in the Kilo Code 7.8.30 sidebar of the managed VS Code workspace. LM Studio ran Qwen3.5 9B Q4_K_M locally with a 16,384-token context. Each row is a separate chat submission. No scripted model replies were used. The task was to add HEAD support to the existing summary API, preserve GET response headers and the health endpoint, and add integration coverage.
+
+| Request | Last observed phase | Outcome |
+| --- | --- | --- |
+| `09b33099` | Workflow startup | Git rejected a missing inherited configuration value. No specialist started. Fixed in [PR #13](https://github.com/mauricehuschke/LoKiEnte/pull/13). |
+| `7f225dc0` | `shadow-preparer` | The agent inspected the application and returned malformed JSON. The runner stopped before any write. [PR #14](https://github.com/mauricehuschke/LoKiEnte/pull/14) added a single read-only retry. |
+| `6b370348` | `shadow-architect` | The retry produced a contract and an independent agent approved it. The planning prompt then named a missing AGENTS.md. The architect returned a plan, but its failed file read invalidated the phase. No implementation or feature tests ran. |
+| `fd50cc55` | `shadow-preparer` (retry) | With the updated planning prompt installed, neither preparation attempt delivered an accepted contract. The runner stopped at the retry with zero feature checks executed. The working tree stayed clean. |
+
+The independent baseline probe returned 405 for HEAD and 200 for GET. All four native sessions ended in `NOT_VERIFIED`. The furthest reached an approved contract and the architecture phase. The [separate successful reference run](https://github.com/mauricehuschke/LoKiEnte/blob/main/examples/support-board/head-verification.json) used scripted role replies, real Git checks and loopback HTTP tests. Six of eight tests passed before implementation and all eight passed afterwards. The [tour](https://lokiente.dev/#in-action) labels the two outcomes separately.
+
 ## Optional indexing start policy — package 2026.11.19.1
 
 Indexing now defaults to Off, including existing projects and installations.

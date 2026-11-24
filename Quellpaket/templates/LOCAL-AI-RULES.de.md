@@ -6,8 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Antworte standardmaessig auf Englisch. Arbeite an klar abgegrenzten Teilaufgaben. Lies zuerst vorhandene
-AGENTS.md, README, SSOT und relevante Architekturentscheidungen. Erhalte bestehende
+Antworte standardmaessig auf Englisch. Arbeite an klar abgegrenzten Teilaufgaben. Ermittle anhand der Projektübersicht oder einer Dateiliste, welche Projektanweisungen, README, SSOT und Architekturentscheidungen vorhanden sind. Lies die gefundenen Dateien. Erhalte bestehende
 Anforderungen und Benutzerarbeit. Weite einen Auftrag nicht ohne fachlichen Grund aus.
 
 ## Ressourcen und Kontext

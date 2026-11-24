@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.24.4 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.24.5 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Über die LoKiEnte-Seitenleiste kannst du das gewählte lokale Modell mit **Run E.T. model rule test** in deiner normalen Windows-Sitzung prüfen. Kilos Regeln und Werkzeugrechte werden einbezogen. Die optionale Hyper-V-Prüfung ist separat.
 

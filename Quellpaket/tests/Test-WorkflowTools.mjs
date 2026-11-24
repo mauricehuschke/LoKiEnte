@@ -154,6 +154,8 @@ try {
     const before = Date.now();
     const status = await tools.statusTool.execute({ runId }, { ...context, abort: abort.signal });
     assert.ok(Date.now() - before < 1000); assert.match(status, /RUNNING/);
+    assert.match(status, /shadow-coder/);
+    assert.doesNotMatch(status, /Automatic task preparation is running/);
     assert.equal((await state(runId)).status, 'RUNNING');
     assert.match(await tools.cancelTool.execute({ runId }, context), /cancellation/i);
     const done = await finish(runId); assert.equal(done.status, 'CANCELLED', JSON.stringify(done));
