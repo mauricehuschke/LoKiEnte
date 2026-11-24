@@ -31,6 +31,8 @@ and its results, and decide which changes to commit.
 
 **Extend an existing API in VS Code.** Ask Kilo to implement `HEAD /api/summary` in a working Node.js server. Follow planning, implementation and specialist review in LoKiEnte, inspect the diff and check eight HTTP and regression tests. Finish with the E.T. report to see which tool requests Kilo permits. [Follow the developer workflow](#first-test-task)
 
+[See the original prompt and observed roles in the managed Kilo sidebar](https://lokiente.dev/#in-action). The screenshots identify the recorded session and its actual outcome. The eight-test example below is a reproducible reference with scripted specialist replies.
+
 ## Requirements
 
 - **Windows x64** on a PC, workstation or suitable VM. The installer does not

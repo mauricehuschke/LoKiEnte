@@ -44,6 +44,8 @@ Workflow, Akzeptanzkriterien `AC-1`, `AC-2`, …, Änderungsarten und exakte
 Produktions-/Testdateien ab. Testbefehle wählt er aus lokal erkannten Vorlagen
 oder vorhandenen Projektchecks; er darf keine freien Shellbefehle erfinden.
 
+Liefert der Vorbereitungsagent unlesbares JSON, startet Kilo einen zweiten Versuch mit denselben Leserechten. Beide Antworten stehen im Laufverzeichnis. Ist auch die zweite Antwort unlesbar, endet der Auftrag vor der ersten Projektänderung. Fachliche Ablehnungen und Rückfragen gehen direkt an den Nutzer.
+
 Ein unabhängiger **Vorbereitungsreview** prüft die Zuordnung zum Originalauftrag,
 die Grenzen und die Testauswahl. Erst nach dessen `PASS` wird `checks.json`
 gesichert und ergänzt. Bei unklaren Anforderungen, fehlenden Werkzeugen oder

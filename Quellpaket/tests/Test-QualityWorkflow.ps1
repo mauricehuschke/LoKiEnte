@@ -47,6 +47,7 @@ let text=JSON.stringify({summary:'Return two, preserve architecture.',changeType
 if(role==='shadow-preparer'){
  if(process.env.LOKI_WORKFLOW_CHILD!=='1'||config.agent[role].permission.loki_start!=='deny')process.exit(5);
  text=JSON.stringify(mode==='prep-needs-input'?{needsInput:'What behavior is expected?'}:{workflow:'Bugfix',acceptanceCriteria:[{id:'AC-1',description:'App returns two'}],changeTypes:['other'],writePaths:['app.cjs'],testWritePaths:['tests/app.test.cjs'],checkIds:[generated?'loki-node-test':'existing:unit'],regressionCheckId:generated?'loki-node-test':'existing:unit'});
+ if(mode==='prep-malformed' || (mode==='prep-retry' && !prompt.includes('FORMAT RETRY:')))text='{"workflow" "Bugfix"}';
  if(mode==='prep-outside')fs.writeFileSync(path.join(project,'app.cjs'),'module.exports=()=>3;');
 }
 if(role==='shadow-test'){
@@ -159,6 +160,14 @@ process.stdout.write(JSON.stringify({type:'text',sessionID:mode==='reused-sessio
         $progress=Get-Content -LiteralPath (Join-Path $root ('runs/'+$receipt.run_id+'/workflow-events.jsonl')) | ConvertFrom-Json
         Assert-True (@($progress | Where-Object {$_.role -ceq 'shadow-preparation-reviewer' -and $_.state -ceq 'passed'}).Count -eq 1 -and $progress[-1].state -ceq 'finished') 'Missing structured progress/result'
     }
+    $retry=Invoke-FixtureRun -Mode 'prep-retry' -Auto -Workflow Auto
+    Assert-True ($retry.status -ceq 'VERIFIED' -and $retry.preparation_review.Valid) 'Recovered contract bypassed independent review or failed the workflow'
+    $roles=@((Get-Content -LiteralPath $script:calls | ConvertFrom-Json).role)
+    Assert-True (($roles[0..2] -join ',') -ceq 'shadow-preparer,shadow-preparer,shadow-preparation-reviewer') 'Format recovery did not run as fresh preparation before review'
+    $invalid=Invoke-FixtureRun -Mode 'prep-malformed' -Auto -Workflow Auto
+    Assert-True ($invalid.status -ceq 'NOT_VERIFIED' -and $invalid.error -like '*twice*') 'Repeated malformed output must stop'
+    $roles=@((Get-Content -LiteralPath $script:calls | ConvertFrom-Json).role)
+    Assert-True (($roles -join ',') -ceq 'shadow-preparer,shadow-preparer' -and (Get-FileHash -LiteralPath $checks).Hash -ceq $script:checksBefore) 'Rejected preparation continued or overwrote user policy'
     foreach($mode in @('prep-review-fail','prep-needs-input','prep-outside')){
         $receipt=Invoke-FixtureRun -Mode $mode -Auto -Workflow Auto
         Assert-True ($receipt.status -ceq 'NOT_VERIFIED') "$mode unexpectedly verified"
