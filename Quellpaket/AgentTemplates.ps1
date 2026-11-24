@@ -1,6 +1,39 @@
 # Configuration templates for the isolated LoKiEnte profile. Requires PowerShell 7.
 Set-StrictMode -Version Latest
 
+function Get-ShadowGitEnvironmentOverlay {
+    param([Parameter(Mandatory)][Collections.IDictionary]$Inherited)
+
+    $overlay = @{}
+    if (-not $Inherited.Contains('GIT_CONFIG_COUNT')) { return $overlay }
+    $count = 0
+    if (-not [int]::TryParse([string]$Inherited['GIT_CONFIG_COUNT'], [ref]$count) -or $count -lt 0) {
+        throw 'Invalid GIT_CONFIG_COUNT in the launching process.'
+    }
+    $firstEmpty = -1
+    for ($i = 0; $i -lt $count; $i++) {
+        foreach ($name in @("GIT_CONFIG_KEY_$i", "GIT_CONFIG_VALUE_$i")) {
+            if (-not $Inherited.Contains($name)) { throw "Missing $name in the launching process." }
+        }
+        if ($firstEmpty -lt 0 -and $Inherited["GIT_CONFIG_VALUE_$i"] -ceq '') { $firstEmpty = $i }
+    }
+    if ($firstEmpty -lt 0) { return $overlay }
+
+    # Electron/Kilo children can omit an empty Windows environment entry. Git
+    # reads indexed pairs first, then its own quoted command-scope parameters.
+    # Move the affected suffix, preserving duplicates, explicit empties and order.
+    $parameters = [Collections.Generic.List[string]]::new()
+    for ($i = $firstEmpty; $i -lt $count; $i++) {
+        $key = ([string]$Inherited["GIT_CONFIG_KEY_$i"]).Replace("'", "'\''")
+        $value = ([string]$Inherited["GIT_CONFIG_VALUE_$i"]).Replace("'", "'\''")
+        $parameters.Add("'$key'='$value'")
+    }
+    if ($Inherited['GIT_CONFIG_PARAMETERS']) { $parameters.Add([string]$Inherited['GIT_CONFIG_PARAMETERS']) }
+    $overlay['GIT_CONFIG_COUNT'] = [string]$firstEmpty
+    $overlay['GIT_CONFIG_PARAMETERS'] = $parameters -join ' '
+    return $overlay
+}
+
 function Get-ShadowLocalEnvironment {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$InstallRoot, [Parameter(Mandatory)][string]$ConfigJson)
@@ -19,6 +52,8 @@ function Get-ShadowLocalEnvironment {
         XDG_CACHE_HOME=(Join-Path $profile 'cache')
         XDG_STATE_HOME=(Join-Path $profile 'state')
     }
+    $gitOverlay=Get-ShadowGitEnvironmentOverlay ([Environment]::GetEnvironmentVariables('Process'))
+    foreach($key in $gitOverlay.Keys){ $environment[$key]=$gitOverlay[$key] }
     $bin=Join-Path $profile 'cache/kilo/bin'
     $processPath=[Environment]::GetEnvironmentVariable('PATH','Process')
     $pathEntries=@($processPath -split [regex]::Escape([string][IO.Path]::PathSeparator))
