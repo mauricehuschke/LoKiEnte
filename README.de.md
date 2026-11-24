@@ -31,7 +31,9 @@ und die Ergebnisse und entscheidest selbst, was du committest.
 
 **Eine bestehende API in VS Code erweitern.** Gib Kilo den Auftrag, `HEAD /api/summary` in einen vorhandenen Node.js-Server einzubauen. Verfolge Planung, Implementierung und Spezialistenreview in LoKiEnte, lies den Diff und prüfe die acht HTTP- und Regressionstests. Zum Abschluss zeigt der E.T.-Bericht, welche Zugriffe Kilo zulässt. [Zur Entwicklerstrecke](#erster-testauftrag)
 
-[Originalprompt und beobachtete Rollen in der verwalteten Kilo-Seitenleiste ansehen](https://lokiente.dev/#in-action). Die Aufnahmen nennen die Sitzung und ihren tatsächlichen Ausgang. Das Beispiel mit acht Tests weiter unten ist eine reproduzierbare Referenz mit vorgegebenen Spezialistenantworten.
+[Originalprompt und beobachtete Rollen in der verwalteten Kilo-Seitenleiste ansehen](https://lokiente.dev/#in-action). Die Aufnahmen nennen die Sitzung und ihren tatsächlichen Ausgang. Das Beispiel mit acht Tests weiter unten ist eine reproduzierbare Referenz mit vorgegebenen Spezialistenantworten. [Testbericht zum 9B-Modell](Quellpaket/VALIDATION.de.md#lokales-9b-modell-in-der-verwalteten-kilo-ide)
+
+![Kilo-Seitenleiste und Livebericht zu Auftrag 6b370348. Der unabhängige Vorbereitungsreview ist bestanden und der Architekt gestartet.](assets/screenshots/kilo-9b-architecture.png)
 
 ## Voraussetzungen
 

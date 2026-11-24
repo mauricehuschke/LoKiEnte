@@ -6,6 +6,19 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
+## Lokales 9B-Modell in der verwalteten Kilo-IDE
+
+Am 24. November 2026 wurde derselbe Featureauftrag über die Seitenleiste von Kilo Code 7.8.30 im verwalteten VS-Code-Workspace eingegeben. LM Studio führte Qwen3.5 9B Q4_K_M lokal mit einem Kontextfenster von 16.384 Tokens aus. Jede Zeile gehört zu einer eigenen Chat-Sitzung. Das Modell erzeugte seine Antworten selbst. Der Auftrag war, die bestehende Summary-API um HEAD zu erweitern, GET-Header und Health-Endpunkt zu erhalten und Integrationstests zu ergänzen.
+
+| Auftrag | Letzte beobachtete Phase | Ergebnis |
+| --- | --- | --- |
+| `09b33099` | Workflowstart | Git meldete einen fehlenden geerbten Konfigurationswert. Kein Spezialist startete. Behoben in [PR #13](https://github.com/mauricehuschke/LoKiEnte/pull/13). |
+| `7f225dc0` | `shadow-preparer` | Der Agent untersuchte die Anwendung und lieferte syntaktisch ungültiges JSON. Der Runner stoppte vor der ersten Änderung. [PR #14](https://github.com/mauricehuschke/LoKiEnte/pull/14) ergänzte einen zweiten Versuch mit Leserechten. |
+| `6b370348` | `shadow-architect` | Der zweite Versuch lieferte einen Vertrag, den ein eigener Agent freigab. Der Architekturauftrag verlangte anschließend eine fehlende AGENTS.md. Der Architekt lieferte einen Plan, aber der fehlgeschlagene Lesezugriff machte die Phase ungültig. Implementierung und Featuretests wurden nicht gestartet. |
+| `fd50cc55` | `shadow-preparer` (zweiter Versuch) | Mit dem aktualisierten Architekturauftrag lieferte keiner der beiden Vorbereitungsversuche einen akzeptierten Vertrag. Der Runner beendete den zweiten Versuch. Es liefen keine Featuretests. Der Arbeitsstand in Git blieb sauber. |
+
+Die unabhängige Ausgangsmessung ergab 405 für HEAD und 200 für GET. Alle vier Sitzungen in der IDE endeten mit `NOT_VERIFIED`. Der am weitesten fortgeschrittene Lauf erreichte nach Freigabe des Vertrags die Architekturphase. Der [separate erfolgreiche Referenzlauf](https://github.com/mauricehuschke/LoKiEnte/blob/main/examples/support-board/head-verification.json) nutzte vorgegebene Rollenantworten, echte Git-Prüfungen und lokale HTTP-Tests. Vor der Implementierung bestanden sechs von acht Tests, danach alle acht. Die [Tour](https://lokiente.dev/#in-action) kennzeichnet beide Ergebnisse getrennt.
+
 ## Optionale Startart der Indizierung — Paket 2026.11.19.1
 
 Die Indizierung ist jetzt standardmäßig aus, auch für bestehende Projekte und
