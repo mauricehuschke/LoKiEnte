@@ -13,18 +13,22 @@ try{
     $script=Join-Path $root 'child.cjs';$marker=Join-Path $root 'marker';$pidFile=Join-Path $root 'child.pid'
     [IO.File]::WriteAllText($script,@'
 const fs=require('node:fs');const [marker,pid,mode]=process.argv.slice(2);fs.writeFileSync(pid,String(process.pid));
+if(mode==='echo'){process.stdout.write(fs.readFileSync(0));return;}
 if(mode==='wait'){setInterval(()=>{},1000);return;}
 process.stderr.write('x'.repeat(128*1024)+'\n');console.log('first');
 const timer=setTimeout(()=>process.exit(9),5000);
 const poll=setInterval(()=>{if(fs.existsSync(marker)){clearTimeout(timer);clearInterval(poll);console.log('last');}},20);
 '@)
+    $payload=("Unicode Grüße 🦆 and quotes ' --file"+"`n")*2500
+    $result=Invoke-ShadowNativeProcess -FilePath $node -ArgumentList @($script,$marker,$pidFile,'echo') -WorkingDirectory $root -StandardInputText $payload -StdoutPath (Join-Path $root 'out') -StderrPath (Join-Path $root 'err') -TimeoutSeconds 20
+    Assert ($result.ExitCode -eq 0 -and [IO.File]::ReadAllText((Join-Path $root 'out')).Replace("`r`n","`n") -ceq $payload) 'Large multiline UTF-8 stdin did not arrive intact'
     $result=Invoke-ShadowNativeProcess -FilePath $node -ArgumentList @($script,$marker,$pidFile,'stream') -WorkingDirectory $root -StdoutPath (Join-Path $root 'out') -StderrPath (Join-Path $root 'err') -TimeoutSeconds 10 -OnStdoutLine {
         param($line)
         if($line -ceq 'first'){[IO.File]::WriteAllText($marker,'callback before exit')}
     }
     Assert ($result.ExitCode -eq 0 -and [IO.File]::ReadAllText((Join-Path $root 'out')).Contains('last')) 'Stdout callback was not delivered before child exit'
     Assert ((Get-Item -LiteralPath (Join-Path $root 'err')).Length -gt 128000) 'Stderr was not concurrently drained'
-    $result=Invoke-ShadowNativeProcess -FilePath $node -ArgumentList @($script,$marker,$pidFile,'wait') -WorkingDirectory $root -StdoutPath (Join-Path $root 'out') -StderrPath (Join-Path $root 'err') -TimeoutSeconds 1 -OnStdoutLine {param($line)}
+    $result=Invoke-ShadowNativeProcess -FilePath $node -ArgumentList @($script,$marker,$pidFile,'wait') -WorkingDirectory $root -StdoutPath (Join-Path $root 'out') -StderrPath (Join-Path $root 'err') -TimeoutSeconds 1 -StandardInputText $payload -OnStdoutLine {param($line)}
     Assert ($result.TimedOut -and $result.ExitCode -eq 124) 'Streaming timeout missing'
     $childId=[int][IO.File]::ReadAllText($pidFile)
     Assert (-not(Get-Process -Id $childId -ErrorAction SilentlyContinue)) 'Timed-out own child still running'

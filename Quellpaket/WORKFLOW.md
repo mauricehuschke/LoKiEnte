@@ -21,6 +21,8 @@ Select `shadow-chat` in Kilo and enter your request directly. Chat can read, adv
 and start the controlled workflow through `loki_start`. Actual file changes take
 place in its bounded agent phases. No separate task-file or JSON step is normally required.
 
+The runner sends each role its task over standard input. The role can read its instructions even when the installation and its run logs are outside the allowed project directory.
+
 ## 2. Describe a small task
 
 Describe expected behavior, constraints and boundaries, for example:
