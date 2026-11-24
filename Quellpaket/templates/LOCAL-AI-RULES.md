@@ -2,8 +2,7 @@
 
 [Deutsch](LOCAL-AI-RULES.de.md)
 
-Answer in English by default. Work on clearly bounded subtasks. First read existing
-AGENTS.md, README, SSOT and relevant architecture decisions. Preserve existing
+Answer in English by default. Work on clearly bounded subtasks. Use the project inventory or list files to locate applicable instructions, README, SSOT and architecture decisions. Read the files you find. Preserve existing
 requirements and user work. Do not expand scope without a substantive reason.
 
 ## Resources and context

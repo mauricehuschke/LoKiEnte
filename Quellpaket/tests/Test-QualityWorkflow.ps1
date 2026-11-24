@@ -44,6 +44,13 @@ const prompt=fs.readFileSync(0,'utf8');
 if(!prompt.trim())throw new Error('Workflow role received an empty prompt');
 const generated=mode==='auto-generated',checkName=generated?'loki-node-test':'unit',testId=generated?'test::returns-two':'returns-two';
 let text=JSON.stringify({summary:'Return two, preserve architecture.',changeTypes:['other']});
+if(role==='shadow-architect'){
+ const scope=JSON.parse(/^PROJECT SCOPE: (.+)$/m.exec(prompt)?.[1]??'null');
+ if(!scope || !Array.isArray(scope.rootGuides))throw Error('Missing planning scope');
+ for(const doc of ['AGENTS.md','README.md'])if(scope.rootGuides.includes(doc)!==fs.existsSync(path.join(project,doc)))throw Error('Incorrect listed project guide');
+ if(mode==='arch-read-error')console.log(JSON.stringify({type:'tool_use',part:{state:{status:'error',error:'Unable to read the requested file'}}}));
+ if(prompt.includes('Read AGENTS.md,') || (scope.productionFiles.length && !scope.productionFiles.includes('app.cjs')))throw Error('Unbounded planning prompt');
+}
 if(role==='shadow-preparer'){
  if(process.env.LOKI_WORKFLOW_CHILD!=='1'||config.agent[role].permission.loki_start!=='deny')process.exit(5);
  text=JSON.stringify(mode==='prep-needs-input'?{needsInput:'What behavior is expected?'}:{workflow:'Bugfix',acceptanceCriteria:[{id:'AC-1',description:'App returns two'}],changeTypes:['other'],writePaths:['app.cjs'],testWritePaths:['tests/app.test.cjs'],checkIds:[generated?'loki-node-test':'existing:unit'],regressionCheckId:generated?'loki-node-test':'existing:unit'});
@@ -160,10 +167,18 @@ process.stdout.write(JSON.stringify({type:'text',sessionID:mode==='reused-sessio
         $progress=Get-Content -LiteralPath (Join-Path $root ('runs/'+$receipt.run_id+'/workflow-events.jsonl')) | ConvertFrom-Json
         Assert-True (@($progress | Where-Object {$_.role -ceq 'shadow-preparation-reviewer' -and $_.state -ceq 'passed'}).Count -eq 1 -and $progress[-1].state -ceq 'finished') 'Missing structured progress/result'
     }
+    $failedRead=Invoke-FixtureRun -Mode 'arch-read-error' -Workflow Feature
+    Assert-True ($failedRead.status -ceq 'NOT_VERIFIED' -and $failedRead.error -like '*00-plan*') 'A real architecture tool error was ignored'
+    [IO.File]::WriteAllText((Join-Path $project 'AGENTS.md'),'Use only the scoped files.')
+    [IO.File]::WriteAllText((Join-Path $project 'README.md'),'Local fixture instructions.')
     $retry=Invoke-FixtureRun -Mode 'prep-retry' -Auto -Workflow Auto
     Assert-True ($retry.status -ceq 'VERIFIED' -and $retry.preparation_review.Valid) 'Recovered contract bypassed independent review or failed the workflow'
     $roles=@((Get-Content -LiteralPath $script:calls | ConvertFrom-Json).role)
     Assert-True (($roles[0..2] -join ',') -ceq 'shadow-preparer,shadow-preparer,shadow-preparation-reviewer') 'Format recovery did not run as fresh preparation before review'
+    $history=Get-Content -LiteralPath (Join-Path $root ('runs/'+$retry.run_id+'/workflow-events.jsonl')) | ConvertFrom-Json
+    $first=@($history | Where-Object phase -ceq '00-prepare')[-1]
+    $second=@($history | Where-Object phase -ceq '00-prepare-retry')[-1]
+    Assert-True ($first.state -ceq 'failed' -and $second.state -ceq 'passed') 'Live report must preserve the failed attempt and credit the accepted retry'
     $invalid=Invoke-FixtureRun -Mode 'prep-malformed' -Auto -Workflow Auto
     Assert-True ($invalid.status -ceq 'NOT_VERIFIED' -and $invalid.error -like '*twice*') 'Repeated malformed output must stop'
     $roles=@((Get-Content -LiteralPath $script:calls | ConvertFrom-Json).role)

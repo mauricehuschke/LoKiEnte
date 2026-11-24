@@ -75,7 +75,7 @@ export async function runJob(root, runId) {
   const claim = await managedPath(root, path.join(paths.job, 'worker.claim.json'), { missing: true });
   try { await fs.writeFile(claim, JSON.stringify({ runId, workerPid: process.pid, createdUtc: new Date().toISOString() }), { flag: 'wx' }); }
   catch (error) { if (error.code === 'EEXIST') throw new Error('This task already has a worker. Status and project lock remain unchanged.'); throw error; }
-  let state = { schemaVersion: 1, runId, status: 'RUNNING', workerPid: process.pid, updatedUtc: new Date().toISOString(), heartbeatUtc: new Date().toISOString(), events: [], phaseSummary: [], summary: 'Automatic task preparation is running.' };
+  let state = { schemaVersion: 1, runId, status: 'RUNNING', workerPid: process.pid, updatedUtc: new Date().toISOString(), heartbeatUtc: new Date().toISOString(), events: [], phaseSummary: [], summary: '' };
   let child, finished = false, cancelled = false, exitCode = null, receiptPath = '', stdoutTail = '', stdoutBytes = 0, stderrBytes = 0;
   let cancelAttemptAt = 0, cancelError = '';
   let outHandle, errHandle, closed, processError, streamError;

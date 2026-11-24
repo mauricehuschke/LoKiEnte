@@ -280,7 +280,7 @@ try {
         $receipt.preparation=@{proposal=$proposal;task_hash=$prepared.TaskHash;project_checks=$ChecksFile}
         $ChecksFile=Join-Path $runRoot 'prepared-checks.json'
         Write-ShadowUtf8File -Path $ChecksFile -Text ($prepared.RunPolicy|ConvertTo-Json -Depth 40)
-        Write-ShadowWorkflowProgress -Phase '00-prepare' -Role 'shadow-preparer' -Model $preparer.RequestedModel -State 'passed' -Message 'Task and checks.json created automatically and independently reviewed'
+        Write-ShadowWorkflowProgress -Phase $stageName -Role 'shadow-preparer' -Model $preparer.RequestedModel -State 'passed' -Message 'Task and checks.json created automatically and independently reviewed'
     }
     $checks=@();$checkConfig=@{}
     if($ChecksFile){
@@ -329,7 +329,11 @@ try {
     }
     foreach($type in (Get-ShadowPathChangeTypes (@($writePaths)+@((Get-ShadowDirtyFiles $ProjectPath).Keys)))){[void]$types.Add($type)}
     $criteriaText=ConvertTo-Json -InputObject $criteria -Depth 8 -Compress
-    $planPrompt="Workflow: $Workflow`nTASK:`n$task`nFIXED ACCEPTANCE CRITERIA:`n$criteriaText`nRead AGENTS.md, architecture and affected code. Preserve user work. Return JSON {`"summary`":`"bounded plan, constraints and risks`",`"changeTypes`":[`"other`"]}. Classify security (auth, permissions, file access, external inputs), ui, api, other; multiple values allowed. Do not edit or execute. Do not omit or redefine fixed criteria."
+    $rootGuides = @('AGENTS.md', 'README.md' | Where-Object {
+        Test-Path -LiteralPath (Join-Path $ProjectPath $_) -PathType Leaf
+    })
+    $planScope = [ordered]@{ rootGuides=$rootGuides; productionFiles=$writePaths; testFiles=$testPaths } | ConvertTo-Json -Compress
+    $planPrompt="Workflow: $Workflow`nTASK:`n$task`nFIXED ACCEPTANCE CRITERIA:`n$criteriaText`nPROJECT SCOPE: $planScope`nRead the listed root guides and affected code. Discover additional applicable architecture or project instructions by listing files before opening them. For implementation, plan within the approved productionFiles and testFiles. Preserve user work. Return JSON {`"summary`":`"bounded plan, constraints and risks`",`"changeTypes`":[`"other`"]}. Classify security (auth, permissions, file access, external inputs), ui, api, other; multiple values allowed. Do not edit or execute. Do not omit or redefine fixed criteria."
     $plan=Invoke-WorkflowAgent -Role 'shadow-architect' -Prompt $planPrompt -StageName '00-plan' -Config $baseConfig -RunPath $runRoot
     Assert-FreshStage $plan
     $planning=ConvertFrom-ShadowJsonObject $plan.Transcript.FinalText
