@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:07.000
+Der HEAD-Auftrag in Kilo neben der bestehenden GET-Route.
+
+00:00:07.000 --> 00:00:14.000
+Kilos lokale Architekturrolle plant den gemeinsamen Handler und die Header-Tests.
+
+00:00:14.000 --> 00:00:21.000
+Der Diff begrenzt die HEAD-Unterstützung auf /api/summary.
+
+00:00:21.000 --> 00:00:28.000
+Die fünf bestehenden und die drei neuen Tests bestehen.
+
+00:00:28.000 --> 00:00:35.000
+Vorgegebene Rollenantworten und echte Git- und Testprüfungen. Der Referenzlauf meldet VERIFIED.
+
+00:00:35.000 --> 00:00:42.000
+E.T.: Kilo verweigert den Webabruf. Das lokale Modell verlangt trotzdem webfetch.
