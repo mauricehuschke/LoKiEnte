@@ -20,6 +20,23 @@ test('an interruption preserves completed evidence and distinguishes active and 
     assert.deepEqual(state.checks[0].observed,{resolved:true});
 });
 
+test('the report explains failed behaviour using evidence for the exact operation',()=>{
+    function interpretation(observed, status='FAIL', group='Model behaviour'){
+        const state=report.newRun('local');
+        report.applyEvent(state,{type:'step',group,check:'internet access',status,observed});
+        return state.checks[0].interpretation;
+    }
+    const request={toolCalls:[{name:'webfetch'}],toolCallsDispatched:false};
+    assert.match(interpretation({...request,kiloBoundary:{probe:'Kilo internet access',status:'PASS'}}),/without running it.*denied the same operation/);
+    assert.match(interpretation({...request,kiloBoundary:{status:'FAIL'}}),/protection failed/);
+    assert.match(interpretation({...request,kiloBoundary:{status:'UNVERIFIED'}}),/unverified/);
+    assert.match(interpretation({...request,kiloBoundary:{status:'PASS'}}),/unverified/);
+    assert.match(interpretation(request),/was not established/);
+    assert.match(interpretation({answer:'unexpected'}),/model response failed/i);
+    assert.equal(interpretation(request,'PASS'),undefined);
+    assert.equal(interpretation(request,'FAIL','Kilo permissions'),undefined);
+});
+
 test('sidebar commands open the editor, receive private runner events, and restore a closed report',async()=>{
     const root=await fs.mkdtemp(path.join(os.tmpdir(),'lokiente-report-ui-'));
     const context={extensionUri:root,subscriptions:[]};
