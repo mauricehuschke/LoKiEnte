@@ -1,0 +1,124 @@
+{
+  "baseRevision": "c7980b974947499afa65e5505d9c19812b81805e",
+  "task": "Extend the existing Node.js API with HEAD /api/summary. Return the same status, Content-Type and byte Content-Length as GET, with an empty body. Keep GET's public JSON contract and /health unchanged. Advertise GET, HEAD only on the summary route. Extract the shared response into src/summary-response.cjs. Add local HTTP integration tests and run the existing suite. Review API compatibility and disclosure of internal data. No new dependencies or external network calls.",
+  "method": "LoKiEnte Feature runner with scripted role replies. Real Git scope, frozen tests and loopback HTTP. This record measures the deterministic workflow.",
+  "workflow": "Feature",
+  "roles": [
+    "shadow-preparer",
+    "shadow-preparation-reviewer",
+    "shadow-architect",
+    "shadow-test",
+    "shadow-test-reviewer",
+    "shadow-implementer",
+    "shadow-reviewer",
+    "shadow-security",
+    "shadow-integration",
+    "shadow-validator"
+  ],
+  "files": [
+    "src/server.cjs",
+    "src/summary-response.cjs"
+  ],
+  "testFiles": {
+    "tests/summary-head.integration.test.cjs": "907F610AF5776278F1534EEC0CCD434377FD2310AA677A23F8243A6CDC70115C"
+  },
+  "baseline": {
+    "loki-node-test": {
+      "passed": 2,
+      "failed": 0,
+      "cases": [
+        {
+          "Id": "test::shows-team-counts",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::protects-ticket-details",
+          "Status": "passed"
+        }
+      ]
+    },
+    "loki-node-integration": {
+      "passed": 4,
+      "failed": 2,
+      "cases": [
+        {
+          "Id": "test::serves-summary",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::empty-queue",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::preserves-health",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::head-matches-get",
+          "Status": "failed"
+        },
+        {
+          "Id": "test::summary-allow",
+          "Status": "failed"
+        },
+        {
+          "Id": "test::public-representation",
+          "Status": "passed"
+        }
+      ]
+    }
+  },
+  "after": {
+    "loki-node-test": {
+      "passed": 2,
+      "failed": 0,
+      "cases": [
+        {
+          "Id": "test::shows-team-counts",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::protects-ticket-details",
+          "Status": "passed"
+        }
+      ]
+    },
+    "loki-node-integration": {
+      "passed": 6,
+      "failed": 0,
+      "cases": [
+        {
+          "Id": "test::serves-summary",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::empty-queue",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::preserves-health",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::head-matches-get",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::summary-allow",
+          "Status": "passed"
+        },
+        {
+          "Id": "test::public-representation",
+          "Status": "passed"
+        }
+      ]
+    }
+  },
+  "status": "VERIFIED",
+  "review": {
+    "security": "PASS",
+    "integration": "PASS",
+    "review": "PASS",
+    "validation": "PASS"
+  }
+}

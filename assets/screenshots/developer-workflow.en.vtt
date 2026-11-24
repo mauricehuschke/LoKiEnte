@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:07.000
+Kilo shows the HEAD request beside the existing GET route.
+
+00:00:07.000 --> 00:00:14.000
+The local Kilo architect proposes a shared handler and header checks.
+
+00:00:14.000 --> 00:00:21.000
+The routing diff isolates HEAD handling to /api/summary.
+
+00:00:21.000 --> 00:00:28.000
+The five existing tests and the three new tests pass.
+
+00:00:28.000 --> 00:00:35.000
+Scripted role replies and real Git and test gates. The reference run is VERIFIED.
+
+00:00:35.000 --> 00:00:42.000
+E.T.: Kilo blocks the fixed web request. The local model still requests webfetch.
