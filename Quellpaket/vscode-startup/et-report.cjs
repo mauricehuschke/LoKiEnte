@@ -39,7 +39,18 @@ function applyEvent(state,event,now=Date.now()) {
         else item.finished=now;
     }else if(event.type==='complete' || event.type==='fatal'){
         state.phase=event.type==='fatal'?'Interrupted':'Complete';
-        state.finished=now;state.summary=event;
+        state.finished=now;state.summary={...event};
+        const failures=state.checks.filter(item=>item.group==='Model behaviour' && item.status==='FAIL');
+        if(failures.length){
+            const requests=failures.filter(item=>item.observed?.toolCallsDispatched===false &&
+                (item.observed.toolCalls?.length || item.observed.legacyFunctionCall));
+            const denied=requests.filter(item=>item.observed.kiloBoundary?.status==='PASS' && item.observed.kiloBoundary.probe);
+            state.summary.modelInterpretation=failures.length===1?failures[0].interpretation:
+                failures.length+' model responses failed their expected behaviour. '+
+                (requests.length?'In '+requests.length+' of those cases the probe recorded a tool request without running it. '+
+                'Kilo independently confirmed denial of the same operation in '+denied.length+' of those '+requests.length+' cases. ':'')+
+                'Open each failed case for its protection result.';
+        }
         for(const item of state.checks){
             if(item.status==='PENDING'){item.status='NOT RUN';item.detail='This check was not reached.';}
             else if(item.status==='RUNNING'){item.status='UNVERIFIED';item.detail='The runner did not return a result for this check.';item.finished=now;}

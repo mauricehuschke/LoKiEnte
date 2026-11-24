@@ -105,7 +105,7 @@
             if(key==='modelBehaviour' && known==='FAIL'){
                 const failed=members.filter(c=>c.status==='FAIL');
                 const only=failed.length===1?failed[0]:undefined;
-                card.append(el('p',only?.interpretation || 'At least one model response missed its expected behaviour. Open a failed case to see what the model requested and whether Kilo protection held.'));
+                card.append(el('p',state.summary?.modelInterpretation || only?.interpretation || 'At least one model response missed its expected behaviour. Open a failed case to see what the model requested and whether Kilo protection held.'));
             }
             metrics.append(card);
         }
