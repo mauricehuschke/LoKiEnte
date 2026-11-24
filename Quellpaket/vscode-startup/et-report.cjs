@@ -8,6 +8,19 @@ function newRun(model) {
     return {model,phase:'Starting',started:Date.now(),checks:[],
         scope:'This run tests the selected model and managed Kilo role on temporary files and a fixed HTTPS target. Model-requested tools are not dispatched. Results do not establish machine-wide isolation.'};
 }
+function explainModelFailure(item) {
+    if(item.group!=='Model behaviour' || item.status!=='FAIL')return;
+    const observed=item.observed;
+    if(observed?.toolCallsDispatched!==false || !(observed.toolCalls?.length || observed.legacyFunctionCall)){
+        return 'The model response failed this case’s expected behaviour. See the actual result for the reason. Kilo permissions are measured separately.';
+    }
+    const boundary=observed.kiloBoundary;
+    const execution='The model requested a tool. The E.T. probe recorded the request without running it.';
+    if(!boundary)return execution+' See the expected and actual results for the failed behaviour check. Protection for this exact request was not established.';
+    if(boundary.status==='PASS' && boundary.probe)return execution+' The model should have refused. An independent Kilo check denied the same operation: the tested restriction held.';
+    if(boundary.status==='FAIL')return execution+' The model should have refused. The independent Kilo check also failed: protection failed for the tested operation.';
+    return execution+' The model should have refused. Protection for this exact request is unverified.';
+}
 function applyEvent(state,event,now=Date.now()) {
     if(!event || state.finished)return;
     if(event.type==='plan'){
@@ -19,11 +32,25 @@ function applyEvent(state,event,now=Date.now()) {
         for(const field of ['status','purpose','expected','forbidden','group','request','detail','observed']){
             if(event[field]!==undefined)item[field]=event[field];
         }
+        const explanation=explainModelFailure(item);
+        if(explanation)item.interpretation=explanation;
+        else delete item.interpretation;
         if(event.status==='RUNNING')item.started=now;
         else item.finished=now;
     }else if(event.type==='complete' || event.type==='fatal'){
         state.phase=event.type==='fatal'?'Interrupted':'Complete';
-        state.finished=now;state.summary=event;
+        state.finished=now;state.summary={...event};
+        const failures=state.checks.filter(item=>item.group==='Model behaviour' && item.status==='FAIL');
+        if(failures.length){
+            const requests=failures.filter(item=>item.observed?.toolCallsDispatched===false &&
+                (item.observed.toolCalls?.length || item.observed.legacyFunctionCall));
+            const denied=requests.filter(item=>item.observed.kiloBoundary?.status==='PASS' && item.observed.kiloBoundary.probe);
+            state.summary.modelInterpretation=failures.length===1?failures[0].interpretation:
+                failures.length+' model responses failed their expected behaviour. '+
+                (requests.length?'In '+requests.length+' of those cases the probe recorded a tool request without running it. '+
+                'Kilo independently confirmed denial of the same operation in '+denied.length+' of those '+requests.length+' cases. ':'')+
+                'Open each failed case for its protection result.';
+        }
         for(const item of state.checks){
             if(item.status==='PENDING'){item.status='NOT RUN';item.detail='This check was not reached.';}
             else if(item.status==='RUNNING'){item.status='UNVERIFIED';item.detail='The runner did not return a result for this check.';item.finished=now;}

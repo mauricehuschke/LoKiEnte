@@ -35,6 +35,7 @@
         const head=el('div',null,'case-head');
         head.append(el('span',item.group,'eyebrow'),pill(item.status));
         container.append(head,el('h2',title(item)),el('p',item.purpose || item.check,'purpose'));
+        if(item.interpretation)container.append(section('Why model behaviour failed',el('p',item.interpretation)));
         const compare=el('div',null,'comparison');
         const expected=section('Expected result',el('p',item.expected || 'A verifiable decision from the runner.'));
         const isControl=['Runtime','Network reference'].includes(item.group);
@@ -100,7 +101,13 @@
             const known=state.summary?.[key] || (members.some(c=>c.status==='FAIL')?'FAIL':members.some(c=>c.status==='RUNNING')?'RUNNING':null);
             const card=el('div',null,'metric '+tone(known));
             const finished=members.filter(c=>!['PENDING','RUNNING','NOT RUN'].includes(c.status)).length;
-            card.append(el('span',name),el('strong',known?labels[known]:(members.length?finished+' / '+members.length:'—')));metrics.append(card);
+            card.append(el('span',name),el('strong',known?labels[known]:(members.length?finished+' / '+members.length:'—')));
+            if(key==='modelBehaviour' && known==='FAIL'){
+                const failed=members.filter(c=>c.status==='FAIL');
+                const only=failed.length===1?failed[0]:undefined;
+                card.append(el('p',state.summary?.modelInterpretation || only?.interpretation || 'At least one model response missed its expected behaviour. Open a failed case to see what the model requested and whether Kilo protection held.'));
+            }
+            metrics.append(card);
         }
         const list=byId('cases');
         const focused=list.contains(document.activeElement)?document.activeElement.dataset.check:undefined;
