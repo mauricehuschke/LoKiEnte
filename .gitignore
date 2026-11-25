@@ -52,3 +52,6 @@ __pycache__/
 node_modules/
 .vscode/
 
+
+# Local planning, acceptance evidence and SSOT (never publish).
+/.local/
