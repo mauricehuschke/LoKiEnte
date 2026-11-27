@@ -129,13 +129,19 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
         const installed = path.join(root, 'vscode-extensions', 'kilocode.kilo-code-synthetic'); await mkdir(installed, { recursive: true });
         await writeFile(path.join(installed, 'package.json'), JSON.stringify({ publisher: 'kilocode', name: 'kilo-code', version: 'synthetic' }));
         await writeFile(path.join(root, 'toolchain.json'), '{}');
-        let visible = false, activations = 0, hanging = false;
+        let visible = false, activations = 0, hanging = false, configurationFailure = false;
         const kilo = { extensionPath: installed, async activate() { activations++; if (hanging) await new Promise(() => {}); throw new Error('SYNTHETIC_STOP_BEFORE_NATIVE_OR_INFERENCE'); } };
         const sandbox = { module: { exports: {} }, __dirname: path.resolve('Quellpaket/vscode-startup'), setTimeout, clearTimeout, setInterval, clearInterval, AbortController,
             process: { versions: { electron: 'synthetic', node: process.versions.node } },
             require(id) {
                 if (id === './acceptance-project.cjs') return { prepareAcceptanceProject: async () => ({ project: path.join(root, 'diagnostics', 'toolchain', 'a'.repeat(32), 'project'), head: 'b'.repeat(40) }) };
-                if (id === './acceptance-configuration.cjs') return { verifyAcceptanceConfiguration: async () => ({ boundary: 'synthetic only' }) };
+                if (id === './acceptance-configuration.cjs') return { verifyAcceptanceConfiguration: async ({ evidence }) => {
+                    if (configurationFailure) {
+                        evidence.settingsChanges = [{ key: 'editor.fontSize', change: 'modified' }];
+                        throw new Error('Synthetic production configuration mismatch: editor.fontSize');
+                    }
+                    return { boundary: 'synthetic only' };
+                } };
                 if (id === './kilo-startup.cjs') { const real = realRequire(id); return { ...real, waitForKilo: args => real.waitForKilo({ ...args, timeoutMs: 1000, pollMs: 5 }) }; }
                 return realRequire(id);
             } };
@@ -151,6 +157,14 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
         assert.equal(report.cases.find(c => c.id === 'kilo-activation').status, 'FAIL');
         assert.equal(report.status, 'FAIL'); assert.equal(report.nativeCommands.length, 0); assert.ok(!report.waitingFor);
         assert.match(JSON.stringify(report), /SYNTHETIC_STOP_BEFORE_NATIVE/); assert.doesNotMatch(JSON.stringify(report), /Kilo Code is not installed/);
+        configurationFailure = true;
+        const mismatch = await sandbox.module.exports.checkToolchain(options);
+        assert.equal(mismatch.status, 'FAIL'); assert.equal(mismatch.productionConfiguration.status, 'FAIL');
+        assert.equal(mismatch.productionConfiguration.settingsChanges[0].key, 'editor.fontSize');
+        assert.equal(mismatch.cases.find(c => c.id === 'kilo-activation').status, 'BLOCKED'); assert.equal(activations, 1);
+        const persisted = JSON.parse(await readFile(mismatch.reportPath, 'utf8'));
+        assert.equal(persisted.productionConfiguration.settingsChanges[0].change, 'modified');
+        assert.equal(persisted.nativeCommands.length, 0); configurationFailure = false;
         hanging = true;
         const keepAlive = setInterval(() => {}, 100);
         try {

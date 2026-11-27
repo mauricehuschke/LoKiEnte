@@ -2,6 +2,44 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Settings parity and retained failure evidence - package 2026.11.27.8
+
+The supplied text attachment contains a completed FAIL report from helper 0.3.5.
+Real VS Code, Workspace Trust, matching helper modules, generated Git project and
+Kilo discovery passed. Production configuration then failed on settings.json's
+raw SHA-256 comparison. All activation/dependency/model checks were BLOCKED and
+no inference was established. No report-persistence error appears in this run.
+The report does not include the baseline/current settings difference, so it cannot
+establish whether formatting or an actual value change caused the mismatch.
+
+The settings file now requires the same full set of JSONC keys/values as the
+prelaunch production baseline. BOM, comments, trailing commas, indentation and key
+order can change without changing configuration. Added, removed and modified
+values still fail, as do effective setting/scope overrides and changed Kilo
+configuration. The other five configuration/source files retain exact byte checks.
+Both byte hashes and settings semantic hashes are recorded. Partial parity
+evidence survives failure: checked file hashes, changed key names and effective
+scope mismatches are retained without copying setting values into differences.
+No baseline is refreshed from potentially altered settings and no trust policy
+is relaxed. The test continues to use the actual production profile.
+
+The combined 14-file JavaScript run passes 102 tests without skips/failures.
+The nine configuration cases cover JSONC formatting, real added/removed/changed
+values, malformed content, source-byte changes, effective-scope overrides and
+owned-project/profile identity. The acceptance-runner regression also proves a
+configuration failure and its partial key-level evidence are persisted before
+activation/inference is blocked (mocked host/configuration boundary).
+All eight selected PowerShell suites pass: production launch (56 checks), policy,
+provisioning integration, native deadlines, profile/VSIX, desktop collector,
+provisioning report and automatic options. These checks do not establish real
+target GPU/model/GUI success. Earlier clone/junction host limitations are unchanged.
+
+The original target's precise setting change remains unknown without its baseline
+and current settings. If a real change remains, the next report must identify its
+keys instead of hiding it. A successful target model/GUI acceptance remains
+UNVERIFIED; rerun this exact package there before PR, main merge or release.
+Docker and Hyper-V are not required.
+
 ## Windows acceptance report replacement - package 2026.11.27.7
 
 The next target run stopped immediately after Workspace Trust with EPERM while

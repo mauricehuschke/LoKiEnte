@@ -251,8 +251,10 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         delete report.waitingFor; await save();
         if (discovery.status !== 'PASS') throw blocked('Kilo was not discovered; dependent checks were not executed. See kiloDiscovery and Extension Host logs.');
         const configuration = await check('production-configuration', 'VS Code -> LoKiEnte', async () => {
-            report.productionConfiguration = await verifyAcceptanceConfiguration({ vscode, root, runId, env, kilo });
-            return 'The actual work profile and installed extension directory are in use. File hashes and effective user/workspace settings match the shared desktop launch baseline.';
+            report.productionConfiguration = {};
+            try { Object.assign(report.productionConfiguration, await verifyAcceptanceConfiguration({ vscode, root, runId, env, kilo, evidence: report.productionConfiguration })); }
+            catch (error) { report.productionConfiguration.status = 'FAIL'; throw error; }
+            return 'The actual work profile and installed extension directory are in use. Settings values, source/configuration hashes and effective user/workspace scopes match the shared desktop launch baseline.';
         });
         if (configuration.status !== 'PASS') throw blocked('Production configuration parity was not established. No model acceptance was claimed.');
         const activation = await check('kilo-activation', 'Kilo Code', async () => {

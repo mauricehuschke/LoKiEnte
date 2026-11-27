@@ -1,3 +1,44 @@
+## Einstellungsgleichheit und erhaltene Fehlernachweise - Paket 2026.11.27.8
+
+Der gelieferte Textanhang enthält einen abgeschlossenen FAIL-Bericht von Helfer
+0.3.5. Echtes VS Code, Workspace Trust, passende Helfermodule, erzeugtes Git-Projekt
+und Kilo-Erkennung bestanden. Die Produktionskonfiguration scheiterte danach am
+rohen SHA-256-Vergleich von settings.json. Alle Aktivierungs-, Abhängigkeits- und
+Modellprüfungen wurden BLOCKED; Inferenz wurde nicht belegt. Ein Schreibfehler
+des Berichts ist in diesem Lauf nicht erfasst. Der Bericht enthält keine Differenz
+zwischen ursprünglichen und aktuellen Einstellungen. Daher belegt er nicht, ob
+Formatierung oder tatsächlich geänderte Werte den Hashunterschied auslösten.
+
+Die Einstellungsdatei muss nun dieselben vollständigen JSONC-Schlüssel/Werte wie
+die vor dem Start erfasste Arbeitskonfiguration enthalten. BOM, Kommentare,
+abschließende Kommas, Einrückung und Schlüsselreihenfolge dürfen sich bei gleichen
+Werten ändern. Neue, entfernte und geänderte Werte führen weiterhin zu FAIL,
+ebenso wirksame Wert-/Bereichsüberschreibungen und geänderte Kilo-Konfiguration.
+Die fünf anderen Konfigurations-/Quelldateien behalten exakte Byte-Prüfungen.
+Beide Byte-Prüfsummen und semantische Einstellungsprüfsummen werden erfasst.
+Teilnachweise bleiben bei Fehlern erhalten: geprüfte Datei-Hashes, geänderte
+Schlüsselnamen und abweichende Einstellungsbereiche, ohne Werte in die Differenz
+zu kopieren. Keine Baseline wird aus möglicherweise geänderten Einstellungen
+erneuert; die Vertrauensrichtlinie bleibt erhalten. Der Test nutzt das Arbeitsprofil.
+
+Der gemeinsame JavaScript-Lauf mit 14 Dateien besteht 102 Tests ohne übersprungene
+oder fehlgeschlagene Fälle. Die neun Konfigurationsfälle prüfen JSONC-Formatierung,
+echte neue/entfernte/geänderte Werte, ungültige Inhalte, geänderte Quellbytes,
+wirksame Bereichsüberschreibungen sowie Projekt-/Profilidentität. Die Runner-
+Regression belegt außerdem die gespeicherte Konfigurationsfehlermeldung samt
+Schlüsseldifferenz vor blockierter Aktivierung/Inferenz (synthetische Host- und
+Konfigurationsgrenze). Alle acht ausgewählten PowerShell-Suiten bestehen:
+Produktionsstart (56 Checks), Richtlinien, Provisioning-Integration, native Fristen,
+Profil/VSIX, Desktop-Sammler, Provisioning-Bericht und automatische Optionen.
+Echte GPU-/Modell-/GUI-Erfolge auf dem Zielsystem sind damit nicht belegt.
+Frühere Hosteinschränkungen bei Klon/Junction bleiben unverändert.
+
+Die genaue Einstellungsänderung des Ziellaufs bleibt ohne ursprüngliche und
+aktuelle Einstellungen unbekannt. Bleibt eine echte Änderung bestehen, muss der
+nächste Bericht ihre Schlüssel benennen. Eine erfolgreiche Modell-/GUI-Zielabnahme
+bleibt UNVERIFIED. Dieses exakte Paket vor PR, Main-Merge oder Release dort erneut
+prüfen. Docker und Hyper-V sind nicht erforderlich.
+
 ## Austausch des Windows-Abnahmeberichts - Paket 2026.11.27.7
 
 Der nächste Ziellauf brach direkt nach Workspace Trust mit EPERM beim Umbenennen
