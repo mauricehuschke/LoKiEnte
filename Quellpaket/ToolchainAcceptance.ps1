@@ -48,9 +48,77 @@ function Read-ShadowAcceptanceState {
     return Read-ShadowAcceptanceJson -Path $Path -AsHashtable:$AsHashtable
 }
 
+function Protect-ShadowAcceptanceText {
+    param([AllowEmptyString()][string]$Text)
+    foreach($entry in [Environment]::GetEnvironmentVariables('Process').GetEnumerator()){
+        if($entry.Key -match '(?i)token|key|password|secret' -and ([string]$entry.Value).Length -gt 3){$Text=$Text.Replace([string]$entry.Value,'[REDACTED]')}
+    }
+    return ($Text -replace '(?i)(Bearer\s+|Basic\s+)[A-Za-z0-9+/_=.:-]+','$1[REDACTED]' -replace '(?i)((?:api[_-]?key|password|authorization|auth_token|access_token|refresh_token)\s*["'']?\s*[:=]\s*["'']?)[^\s"'',;}]+','$1[REDACTED]' -replace '(?i)([?&](?:token|key|password|auth_token)=)[^&\s]+','$1[REDACTED]')
+}
+
+function Write-ShadowAcceptanceProgress {
+    param($State,$DependencyState,[Parameter(Mandatory)][hashtable]$Tracker,[datetime]$Now=[DateTime]::UtcNow,[int]$HeartbeatSeconds=15)
+    if((Get-LrProperty $State 'runId') -cne $Tracker.runId){return}
+    if(-not $Tracker.ContainsKey('seen')){$Tracker.seen=@{};$Tracker.active=@{};$Tracker.lastMessageUtc=$Now}
+    $pending=[Collections.Generic.List[object]]::new()
+    foreach($stream in @('host','dependency')){
+        $value=if($stream -eq 'host'){$State}else{$DependencyState}
+        if(-not $value -or (Get-LrProperty $value 'runId') -cne $Tracker.runId){continue}
+        $events=@(Get-LrProperty $value 'progress' @())
+        foreach($event in $events){$pending.Add(@{stream=$stream;key=($stream+'/event/'+$event.sequence);event=$event})}
+        # Older reports and the persistence-failure fallback can contain results
+        # without progress events. Those results must also reach the terminal.
+        $fallbackSequence=$events.Count
+        foreach($case in @(Get-LrProperty $value 'cases' @())){
+            if(@($events|Where-Object {$_.id -ceq $case.id -and $_.status -cne 'RUNNING'}).Count){continue}
+            $fallbackSequence++
+            $pending.Add(@{stream=$stream;key=($stream+'/case/'+$case.id);event=@{sequence=$fallbackSequence;id=$case.id;component=(Get-LrProperty $case 'component' (Get-LrProperty $case 'name' 'LoKiEnte'));status=$case.status;evidence=(Get-LrProperty $case 'evidence' '');utc=(Get-LrProperty $value 'finishedAtUtc' (Get-LrProperty $value 'startedAtUtc' $Now.ToString('o')))}})
+        }
+    }
+    $elapsed=[Math]::Max(0,($Now-$Tracker.startedAtUtc).TotalSeconds)
+    foreach($item in @($pending|Sort-Object {[datetime]$_.event.utc},{$_.event.sequence})){
+        if($Tracker.seen.ContainsKey($item.key)){continue}
+        $event=$item.event;$status=[string]$event.status
+        if($status -notin @('RUNNING','PASS','FAIL','BLOCKED','SKIPPED','NOT_APPLICABLE')){continue}
+        $Tracker.seen[$item.key]=$true
+        $key=$item.stream+'/'+$event.id
+        if($status -ceq 'RUNNING'){$Tracker.active[$key]=$event}else{$Tracker.active.Remove($key)}
+        $label=if($status -ceq 'RUNNING'){'START'}else{$status}
+        $duration=Get-LrProperty $event 'durationMs'
+        $detail=if($status -ceq 'RUNNING'){''}else{': '+[string](Get-LrProperty $event 'evidence' '')}
+        if($null -ne $duration){$detail+=' ('+([double]$duration/1000).ToString('0.0',[Globalization.CultureInfo]::InvariantCulture)+'s)'}
+        $message=Protect-ShadowAcceptanceText ("[Test +{0:0}s] {1}: {2} / {3}{4}" -f $elapsed,$label,$event.component,$event.id,$detail)
+        Write-ShadowMessage ($message -replace '[\x00-\x1F\x7F]+',' ') $(if($status -eq 'PASS'){'OK'}elseif($status -in @('FAIL','BLOCKED','SKIPPED')){'WARN'}else{'INFO'})
+        $Tracker.lastMessageUtc=$Now
+    }
+    if((Get-LrProperty $State 'status') -ne 'RUNNING'){return}
+    if($DependencyState -and (Get-LrProperty $DependencyState 'runId') -ceq $Tracker.runId -and (Get-LrProperty $DependencyState 'status') -ne 'RUNNING'){
+        foreach($key in @($Tracker.active.Keys|Where-Object {$_ -like 'dependency/*'})){$Tracker.active.Remove($key)}
+    }
+    $waiting=[string](Get-LrProperty $State 'waitingFor')
+    $guidance=if($waiting -like 'workspace-trust*' -or $waiting -like 'kilo-visible-response*'){'Continue in the VS Code test window.'}else{'Waiting for component readiness.'}
+    if($waiting -and (Get-LrProperty $Tracker 'waitingFor') -cne $waiting){
+        Write-ShadowMessage "[Test +$([int]$elapsed)s] Waiting for: $waiting. $guidance"
+        $Tracker.lastMessageUtc=$Now
+    }
+    $Tracker.waitingFor=$waiting
+    if(($Now-$Tracker.lastMessageUtc).TotalSeconds -ge $HeartbeatSeconds){
+        $current=@($Tracker.active.Values|Sort-Object {[datetime]$_.utc} -Descending|Select-Object -First 1)
+        $step=if($current.Count){$current[0].component+' / '+$current[0].id}else{'VS Code startup / acceptance initialization'}
+        $running=if($current.Count){[Math]::Max(0,($Now-[datetime]$current[0].utc).TotalSeconds)}else{$elapsed}
+        $done=@(Get-LrProperty $State 'cases' @()).Count+@(Get-LrProperty $DependencyState 'cases' @()).Count
+        $message="[Test +$([int]$elapsed)s] RUNNING: $step ($([int]$running)s in this step); $done results recorded."
+        if($waiting){$message+=" Waiting for: $waiting. $guidance"}
+        Write-ShadowMessage (Protect-ShadowAcceptanceText $message)
+        $Tracker.lastMessageUtc=$Now
+    }
+}
+
 function Test-ShadowToolchainDependencies {
-    param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$WorkingDirectory)
+    param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$WorkingDirectory,[string]$ResultPath)
     $cases=[Collections.Generic.List[object]]::new()
+    $report=[ordered]@{schema=1;kind='installed-toolchain-dependencies';runId=[Environment]::GetEnvironmentVariable('LOKIENTE_TOOLCHAIN_RUN_ID');status='RUNNING';startedAtUtc=[DateTime]::UtcNow.ToString('o');cases=@();progress=@()}
+    if($ResultPath){Write-ShadowAcceptanceJson -Path $ResultPath -Value $report}
     $chain=Get-Content -LiteralPath (Join-Path $InstallRoot 'toolchain.json') -Raw|ConvertFrom-Json -AsHashtable
     $config=Get-Content -LiteralPath (Join-Path $InstallRoot 'kilo-managed/kilo.json') -Raw|ConvertFrom-Json -AsHashtable
     $bundled=$null
@@ -66,18 +134,28 @@ function Test-ShadowToolchainDependencies {
         @{Id='embedded-tools';Name='Embedded Kilo LoKiEnte tool imports';Action={if(-not $bundled){throw 'Embedded Kilo is unavailable.'};Assert-ShadowKiloWorkflowTools -KiloExecutable $bundled -InstallRoot $InstallRoot -Config $config -WorkingDirectory $WorkingDirectory}},
         @{Id='embedded-search';Name='Embedded Kilo actual file search';Action={if(-not $bundled){throw 'Embedded Kilo is unavailable.'};Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $bundled -ConfigJson ($config|ConvertTo-Json -Depth 40 -Compress)}}
     )){
+        $clock=[Diagnostics.Stopwatch]::StartNew()
+        $report.progress+=@{sequence=$report.progress.Count+1;utc=[DateTime]::UtcNow.ToString('o');id=$spec.Id;component=$spec.Name;status='RUNNING';evidence=''}
+        if($ResultPath){Write-ShadowAcceptanceJson -Path $ResultPath -Value $report}
         try{
             Write-ShadowMessage "Acceptance: $($spec.Name)"
             $value=& $spec.Action
             if($spec.Id -eq 'embedded-kilo'){$bundled=[string]$value}
-            $cases.Add([ordered]@{id=$spec.Id;name=$spec.Name;status='PASS';evidence='Executed against installed binaries and the prepared configuration.'})
+            $cases.Add([ordered]@{id=$spec.Id;name=$spec.Name;status='PASS';evidence='Executed against installed binaries and the prepared configuration.';durationMs=$clock.ElapsedMilliseconds})
             Write-ShadowMessage "PASS: $($spec.Name)" 'OK'
         }catch{
-            $cases.Add([ordered]@{id=$spec.Id;name=$spec.Name;status='FAIL';evidence=$_.Exception.Message})
-            Write-ShadowMessage "FAIL: $($spec.Name): $($_.Exception.Message)" 'WARN'
+            $cases.Add([ordered]@{id=$spec.Id;name=$spec.Name;status='FAIL';evidence=(Protect-ShadowAcceptanceText $_.Exception.Message);durationMs=$clock.ElapsedMilliseconds})
+            Write-ShadowMessage "FAIL: $($spec.Name): $($cases[-1].evidence)" 'WARN'
         }
+        $case=$cases[-1]
+        $report.cases=$cases.ToArray()
+        $report.progress+=@{sequence=$report.progress.Count+1;utc=[DateTime]::UtcNow.ToString('o');id=$spec.Id;component=$spec.Name;status=$case.status;evidence=$case.evidence;durationMs=$case.durationMs}
+        if($ResultPath){Write-ShadowAcceptanceJson -Path $ResultPath -Value $report}
     }
-    return [pscustomobject]@{schema=1;kind='installed-toolchain-dependencies';cases=$cases.ToArray();status=$(if(@($cases|Where-Object {$_.status -ne 'PASS'}).Count){'FAIL'}else{'PASS'})}
+    $report.status=if(@($cases|Where-Object {$_.status -ne 'PASS'}).Count){'FAIL'}else{'PASS'}
+    $report.finishedAtUtc=[DateTime]::UtcNow.ToString('o')
+    if($ResultPath){Write-ShadowAcceptanceJson -Path $ResultPath -Value $report}
+    return [pscustomobject]$report
 }
 
 function Write-ShadowAcceptanceJUnit {
@@ -112,6 +190,7 @@ function Invoke-ShadowToolchainAcceptance {
     $project=Join-Path $directory 'project'
     [void][IO.Directory]::CreateDirectory($project)
     $resultPath=Join-Path $directory 'acceptance.json'
+    $tracker=@{runId=$id;startedAtUtc=[DateTime]::UtcNow}
     $latestPath=Join-Path $InstallRoot 'diagnostics/toolchain/latest.json'
     $initial=[ordered]@{schema=1;kind='live-toolchain-acceptance';runId=$id;status='RUNNING';startedAtUtc=[DateTime]::UtcNow.ToString('o');cases=@();reportPath=$resultPath}
     Write-ShadowAcceptanceJson -Path $resultPath -Value $initial
@@ -175,11 +254,11 @@ function Invoke-ShadowToolchainAcceptance {
         Write-ShadowMessage 'Starting acceptance with the real desktop launcher, managed VS Code profile, extensions and workspace template. Review Workspace Trust in the test window.'
         $launchId=Start-ShadowEditor -InstallRoot $InstallRoot -CodePath $chain.codeExecutable -Arguments $arguments -WorkingDirectory $project -Environment $environment -WaitForHost
         $watch=[Diagnostics.Stopwatch]::StartNew()
-        $lastProgress=''
         while($watch.Elapsed.TotalSeconds -lt $TimeoutSeconds){
             $state=Read-ShadowAcceptanceState -Path $resultPath -RunId $id
-            $progress=[string](Get-LrProperty $state 'waitingFor')
-            if($progress -and $progress -cne $lastProgress){Write-ShadowMessage "Acceptance waiting for: $progress. Continue in the VS Code test window.";$lastProgress=$progress}
+            $dependencyPath=Join-Path $directory 'dependencies.json'
+            $dependency=if(Test-Path -LiteralPath $dependencyPath -PathType Leaf){Read-ShadowAcceptanceJson -Path $dependencyPath}else{$null}
+            Write-ShadowAcceptanceProgress -State $state -DependencyState $dependency -Tracker $tracker
             if($state.status -in @('PASS','FAIL','BLOCKED')){break}
             $statusPath=Join-Path $InstallRoot ('runtime/launch-requests/'+$launchId+'.status.json')
             if(Test-Path -LiteralPath $statusPath){
@@ -208,6 +287,9 @@ function Invoke-ShadowToolchainAcceptance {
         Write-ShadowAcceptanceJson -Path $resultPath -Value $partial
     }
     $result=Read-ShadowAcceptanceState -Path $resultPath -RunId $id
+    $dependencyPath=Join-Path $directory 'dependencies.json'
+    $dependency=if(Test-Path -LiteralPath $dependencyPath -PathType Leaf){Read-ShadowAcceptanceJson -Path $dependencyPath}else{$null}
+    Write-ShadowAcceptanceProgress -State $result -DependencyState $dependency -Tracker $tracker
     Write-ShadowAcceptanceJUnit -Path ([IO.Path]::ChangeExtension($resultPath,'junit.xml')) -Report $result
     Write-ShadowAcceptanceJson -Path $latestPath -Value $result
     Write-ShadowAcceptanceJUnit -Path (Join-Path $InstallRoot 'diagnostics/toolchain/latest.junit.xml') -Report $result

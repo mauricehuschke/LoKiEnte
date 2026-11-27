@@ -130,7 +130,15 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
         await writeFile(path.join(installed, 'package.json'), JSON.stringify({ publisher: 'kilocode', name: 'kilo-code', version: 'synthetic' }));
         await writeFile(path.join(root, 'toolchain.json'), '{}');
         let visible = false, activations = 0, hanging = false, configurationFailure = false;
-        const kilo = { extensionPath: installed, async activate() { activations++; if (hanging) await new Promise(() => {}); throw new Error('SYNTHETIC_STOP_BEFORE_NATIVE_OR_INFERENCE'); } };
+        const kilo = { extensionPath: installed, async activate() {
+            activations++;
+            const snapshot = JSON.parse(await readFile(path.join(root, 'diagnostics', 'toolchain', 'a'.repeat(32), 'acceptance.json'), 'utf8'));
+            assert.equal(snapshot.status, 'RUNNING');
+            assert.equal(snapshot.progress.at(-1).id, 'kilo-activation'); assert.equal(snapshot.progress.at(-1).status, 'RUNNING');
+            assert.ok(snapshot.progress.some(event => event.id === 'production-configuration' && event.status === 'PASS'));
+            if (hanging) await new Promise(() => {});
+            throw new Error('SYNTHETIC_STOP_BEFORE_NATIVE_OR_INFERENCE');
+        } };
         const sandbox = { module: { exports: {} }, __dirname: path.resolve('Quellpaket/vscode-startup'), setTimeout, clearTimeout, setInterval, clearInterval, AbortController,
             process: { versions: { electron: 'synthetic', node: process.versions.node } },
             require(id) {
@@ -156,6 +164,8 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
         assert.equal(activations, 1); assert.equal(report.cases.find(c => c.id === 'kilo-discovery').status, 'PASS');
         assert.equal(report.cases.find(c => c.id === 'kilo-activation').status, 'FAIL');
         assert.equal(report.status, 'FAIL'); assert.equal(report.nativeCommands.length, 0); assert.ok(!report.waitingFor);
+        assert.ok(report.progress.every((event, index) => event.sequence === index + 1 && Number.isFinite(Date.parse(event.utc))));
+        assert.ok(report.progress.some(event => event.id === 'kilo-activation' && event.status === 'FAIL' && event.durationMs >= 0));
         assert.match(JSON.stringify(report), /SYNTHETIC_STOP_BEFORE_NATIVE/); assert.doesNotMatch(JSON.stringify(report), /Kilo Code is not installed/);
         configurationFailure = true;
         const mismatch = await sandbox.module.exports.checkToolchain(options);
@@ -172,6 +182,8 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
             assert.equal(timed.status, 'BLOCKED'); assert.equal(timed.cases.find(c => c.id === 'kilo-activation').status, 'BLOCKED');
             assert.match(timed.cases.find(c => c.id === 'acceptance-cancelled').evidence, /overall acceptance deadline/);
             assert.equal(timed.nativeCommands.length, 0); assert.equal(JSON.parse(await readFile(timed.reportPath, 'utf8')).status, 'BLOCKED');
+            const interrupted = timed.progress.findLast(event => event.status === 'RUNNING');
+            assert.ok(interrupted); assert.ok(timed.progress.some(event => event.id === interrupted.id && event.status === 'BLOCKED'));
             const cancelFile = path.join(root, 'diagnostics', 'toolchain', 'a'.repeat(32), 'cancellation.json');
             const cancel = setTimeout(() => { void writeFile(cancelFile, JSON.stringify({ runId: 'a'.repeat(32), reason: 'synthetic native runner stopped' })); }, 50);
             const cancelled = await sandbox.module.exports.checkToolchain(options); clearTimeout(cancel);

@@ -2,6 +2,54 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Isolated dependency imports and terminal progress - package 2026.11.27.11
+
+The supplied target report (helper 0.3.8, VS Code 1.148.0, Kilo 7.8.32) passes
+the real host, trust, helper hashes, Git project, discovery, work-profile parity,
+Kilo activation and embedded executable. Nine of ten dependency checks pass.
+Ripgrep fails because Test-Toolchain.ps1 did not load ModelSelection.ps1, which
+defines Assert-ShadowDirectPath. Inference and visual checks were correctly
+BLOCKED after that prerequisite failure. This report does not establish full
+target acceptance. The dependency entry point now explicitly loads the guard.
+
+The regression extracts and executes the actual entry-point import statement in
+a fresh PowerShell process, with no parent setup imports. Real missing-file and
+bad-hash guards are exercised; an explicit fixture supplies the executable's
+version boundary. Both successful and failed dependency reports retain ten case
+results, starts, durations and sequence/timestamps. This closes the gap where
+setup's preloaded functions hid missing imports in the separate test process.
+
+Each host check publishes START before executing and retains ordered result
+events. Dependency snapshots are published before/after every action. The native
+coordinator merges both streams, prints each event once, includes brief steps
+that finish between polls and emits 15-second heartbeats for long steps. Trust
+and visual-confirmation waits identify required user action. Failed dependency
+details appear directly in the parent verdict, and partial dependency evidence
+is retained when the native command fails. Progress preserves verdicts; terminal
+snapshots, cancellation and persistence-failure results cannot produce PASS.
+
+The fresh-process/progress regression covers nested starts, retained short
+results, durations, timestamp order, deduplication, waiting/heartbeat intervals,
+redaction, wrong-run exclusion, final FAIL/BLOCKED and no post-completion updates.
+The actual coordinator launch regression also consumes nested events completed
+before its first poll and the existing persistence-failure fallback. JavaScript
+regressions verify that START is persisted before activation, and cancellation
+ends the interrupted step as BLOCKED. Desktop/UI and Kilo boundaries in these
+regressions remain explicit fixtures; they do not prove GPU/model inference.
+
+Validation: 104 JavaScript tests in 15 files PASS (0 skipped), and all 17
+selected PowerShell suites PASS, including the new 21-check import/progress suite
+and 60-check coordinator suite. The policy fixture now imports Runtime.ps1 as
+the production entry point does; its initial missing-import failure and passing
+26-check rerun are retained in local validation evidence. The previously
+committed import list separately reproduces the exact missing-path-guard error.
+Router recovery, model loading/reset/memory accounting, production profile,
+desktop runner, reporting and unattended provisioning regressions also pass.
+
+Complete target VS Code/Kilo/LM Studio acceptance remains UNVERIFIED until the
+next run on the target PC. No Docker or Hyper-V is used or required. No PR, main
+merge or release is authorized by synthetic regression success alone.
+
 ## Deleted installation files and orphaned router - package 2026.11.27.10
 
 The next provisioning excerpt attempts all four model-role checks, reloads the

@@ -1,3 +1,55 @@
+## Isolierte Testimporte und Terminal-Fortschritt - Paket 2026.11.27.11
+
+Der angehängte Zielbericht (Helper 0.3.8, VS Code 1.148.0, Kilo 7.8.32) besteht
+echten Host, Trust, Helper-Prüfsummen, Git-Projekt, Erkennung, Gleichheit zum
+Arbeitsprofil, Kilo-Aktivierung und eingebettetes Programm. Neun von zehn
+Abhängigkeitsprüfungen bestehen. Ripgrep scheitert, weil Test-Toolchain.ps1
+ModelSelection.ps1 mit Assert-ShadowDirectPath nicht geladen hat. Inferenz und
+Sichtprüfung wurden nach diesem Fehler korrekt BLOCKED. Das belegt keine volle
+Zielabnahme. Der Testeinstieg lädt den Pfadschutz nun ausdrücklich.
+
+Der Regressionstest extrahiert und führt die tatsächliche Importanweisung des
+Testeinstiegs in einem frischen PowerShell-Prozess ohne vorherige Setup-Importe
+aus. Echte Prüfungen fehlender Dateien und falscher Hashes werden ausgeführt;
+die Programmversions-Grenze wird ausdrücklich simuliert. Erfolgreiche wie auch
+fehlgeschlagene Abhängigkeitsberichte enthalten zehn Ergebnisse, Starts, Laufzeiten
+und Reihenfolge/Zeitstempel. Damit verdecken vorgeladene Setup-Funktionen keinen
+fehlenden Import im getrennten Testprozess mehr.
+
+Jeder Host-Schritt speichert START vor seiner Aktion und behält geordnete
+Ergebnisereignisse. Abhängigkeitssnapshots entstehen vor/nach jeder Aktion. Der
+native Koordinator führt beide Quellen zusammen, zeigt Ereignisse einmalig auch
+bei sehr kurzen Schritten und meldet bei langen Schritten alle 15 Sekunden den
+Status. Trust und Sichtbestätigung nennen die notwendige Benutzeraktion.
+Abhängigkeitsfehler stehen direkt im übergeordneten Ergebnis; Teilergebnisse
+bleiben auch nach einem fehlgeschlagenen nativen Aufruf erhalten. Fortschritt
+erhält das Urteil; Endberichte, Abbruch und Schreibfehler erzeugen kein PASS.
+
+Der neue Regressionstest deckt verschachtelte Starts, kurze Ergebnisse,
+Laufzeiten, Zeitreihenfolge, einmalige Ausgabe, Warte-/Statusintervalle,
+Schwärzung, Ausschluss fremder Läufe, finales FAIL/BLOCKED und Ende der Meldungen
+nach Abschluss ab. Der echte Koordinator-Test übernimmt auch Unterereignisse, die
+vor seiner ersten Abfrage fertig sind, sowie den bestehenden Ersatzbericht bei
+Schreibfehlern. JavaScript-Tests belegen START vor Aktivierung und BLOCKED nach
+Abbruch des unterbrochenen Schritts. Desktop-/UI- und Kilo-Grenzen bleiben in
+diesen Regressionen ausdrückliche Simulationen; GPU-/Modellinferenz ist damit
+nicht bewiesen.
+
+Validierung: 104 JavaScript-Tests in 15 Dateien PASS (0 übersprungen) und alle
+17 ausgewählten PowerShell-Suiten PASS, darunter die neue Import-/Fortschrittssuite
+mit 21 Prüfungen und die Koordinatorsuite mit 60 Prüfungen. Die Policy-Fixture
+importiert Runtime.ps1 nun wie der produktive Einstieg; ihr anfänglicher
+Importfehler und die bestandene Wiederholung mit 26 Prüfungen bleiben als lokale
+Nachweise erhalten. Die zuvor committete Importliste reproduziert separat den
+exakten Fehler des fehlenden Pfadschutzes. Regressionen für Router-Recovery,
+Modellladen/-reset/Speicherrechnung, Arbeitsprofil, Desktop-Runner, Reporting und
+unbeaufsichtigte Provisionierung bestehen ebenfalls.
+
+Die vollständige VS-Code-/Kilo-/LM-Studio-Abnahme auf dem Zielrechner bleibt bis
+zum nächsten dortigen Lauf UNVERIFIED. Docker und Hyper-V werden weder genutzt
+noch benötigt. Erfolgreiche Regressionen allein erlauben keinen PR, Main-Merge
+oder Release.
+
 ## Gelöschte Installation und verwaister Router - Paket 2026.11.27.10
 
 Der nächste Provisioning-Ausschnitt startet alle vier Modellrollen-Prüfungen,

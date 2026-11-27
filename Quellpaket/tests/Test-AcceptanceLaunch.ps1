@@ -7,6 +7,9 @@ foreach($file in @('Common.ps1','Runtime.ps1','AgentTemplates.ps1','Workspace.ps
 $root=Join-Path ([IO.Path]::GetTempPath()) ('lokiente-acceptance-launch-'+[guid]::NewGuid().ToString('N'))
 $checks=0
 function Assert-Launch($Condition,$Message){if(-not $Condition){throw $Message};$script:checks++}
+$script:progressMessages=[Collections.Generic.List[string]]::new()
+$script:originalMessage=(Get-Command Write-ShadowMessage).ScriptBlock
+function Write-ShadowMessage {param($Message,$Level='INFO') $script:progressMessages.Add($Message);& $script:originalMessage -Message $Message -Level $Level}
 try{
     $script:processes=@()
     function Get-CimInstance {param($ClassName) return $script:processes}
@@ -60,7 +63,11 @@ try{
         $report=Get-Content -LiteralPath $Environment.LOKIENTE_TOOLCHAIN_REPORT -Raw|ConvertFrom-Json -AsHashtable
         Assert-Launch ($report.projectGit.head -match '^[a-f0-9]{40,64}$' -and (($report.projectGit.initialized -and $report.projectGit.nativeCommands.Count -ge 6) -or (-not $report.projectGit.initialized -and $report.projectGit.nativeCommands.Count -eq 2))) 'Actual Git init/commit or verified reuse evidence must exist before the GUI launch.'
         if(-not $script:firstProject){$script:firstProject=$WorkingDirectory}else{Assert-Launch ($WorkingDirectory -ieq $script:firstProject -and $report.workspaceTrust.reused) 'WorkspaceTrust must reuse the prior owned project while keeping a fresh report.'}
+        $now=[DateTime]::UtcNow
+        $report.progress=@(@{sequence=1;utc=$now.ToString('o');id='workspace-trust';component='VS Code fixture';status='RUNNING';evidence=''},@{sequence=2;utc=$now.AddMilliseconds(3).ToString('o');id='workspace-trust';component='VS Code fixture';status='PASS';evidence='Fixture trust result';durationMs=3})
+        Write-ShadowAcceptanceJson -Path (Join-Path (Split-Path $Environment.LOKIENTE_TOOLCHAIN_REPORT) 'dependencies.json') -Value @{runId=$report.runId;status='PASS';cases=@(@{id='ripgrep';status='PASS';evidence='Fixture only'});progress=@(@{sequence=1;utc=$now.AddMilliseconds(1).ToString('o');id='ripgrep';component='dependency fixture';status='RUNNING';evidence=''},@{sequence=2;utc=$now.AddMilliseconds(2).ToString('o');id='ripgrep';component='dependency fixture';status='PASS';evidence='Fixture only';durationMs=1})}
         $report.status='BLOCKED';$report.cases+=@(@{id='workspace-trust';status='PASS';evidence='Synthetic trust history for the launch regression, not a target observation.'},@{id='synthetic-gui-boundary';status='BLOCKED';evidence='GUI/model execution intentionally not performed by this regression test.'})
+        $report.finishedAtUtc=$now.AddMilliseconds(4).ToString('o')
         Write-ShadowAcceptanceJson -Path $Environment.LOKIENTE_TOOLCHAIN_REPORT -Value $report
         return 'b'*32
     }
@@ -69,6 +76,8 @@ try{
     $script:firstProject=$null
     $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root
     Assert-Launch ($result.status -ceq 'BLOCKED' -and $result.cases[-1].id -ceq 'synthetic-gui-boundary') 'Native preparation must reach the intended GUI boundary; it must never claim real acceptance.'
+    Assert-Launch (@($script:progressMessages|Where-Object {$_ -match 'START: dependency fixture / ripgrep'}).Count -eq 1 -and @($script:progressMessages|Where-Object {$_ -match 'PASS: dependency fixture / ripgrep'}).Count -eq 1) 'The actual coordinator must display nested starts/results even when every action completes before its first poll.'
+    Assert-Launch (@($script:progressMessages|Where-Object {$_ -match 'BLOCKED:.*synthetic-gui-boundary'}).Count -eq 1) 'The coordinator must print terminal blocked results without duplicating them during final artifact writes.'
     Assert-Launch ((Get-FileHash -LiteralPath $settings).Hash -ceq $before) 'Acceptance preparation must preserve real profile settings byte for byte.'
     $priorRunId=$result.runId
     $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root -WorkspaceTrust

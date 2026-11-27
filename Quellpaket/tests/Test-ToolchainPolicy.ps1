@@ -2,6 +2,7 @@
 param([string]$SourceRoot=(Split-Path -Parent $PSScriptRoot))
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+. (Join-Path $SourceRoot 'Runtime.ps1')
 . (Join-Path $SourceRoot 'ToolchainAcceptance.ps1')
 . (Join-Path $SourceRoot 'DesktopRunner.ps1')
 $checks=0

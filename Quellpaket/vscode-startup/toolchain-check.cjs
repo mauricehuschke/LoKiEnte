@@ -134,7 +134,7 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
     const required = ['vscode-host', 'workspace-trust', 'managed-helper', 'acceptance-project-git', 'kilo-discovery', 'production-configuration', 'kilo-activation', 'installed-runtime', 'dependencies', 'model-catalog', 'kilo-webview-request', 'kilo-visible-response'];
     const report = { schema: 1, kind: 'live-toolchain-acceptance', runId, status: 'RUNNING', startedAtUtc: new Date().toISOString(),
         executionMode: 'native-windows-applications', requirements: { docker: false, hyperV: false },
-        versions: { vscode: vscode.version, node: process.versions.node, electron: process.versions.electron || null }, cases: [], nativeCommands: [], reportPath };
+        versions: { vscode: vscode.version, node: process.versions.node, electron: process.versions.electron || null }, cases: [], progress: [], nativeCommands: [], reportPath };
     if (prelaunch?.runId === runId) { if (prelaunch.launch) report.launch = prelaunch.launch; if (prelaunch.workspaceTrust) report.workspaceTrust = prelaunch.workspaceTrust; if (prelaunch.projectGit) report.projectPreparation = prelaunch.projectGit; }
     const secrets = Object.entries(env).filter(([name]) => /token|key|password/i.test(name)).map(([, value]) => value);
     const controller = new AbortController(), signal = controller.signal;
@@ -181,18 +181,24 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
             await save();
         }
     };
+    const progress = (id, component, status, evidence = '', metadata = {}) => {
+        report.progress.push({ sequence: report.progress.length + 1, utc: new Date().toISOString(), id, component, status, evidence: redact(evidence, secrets), ...metadata });
+    };
     const record = async (id, component, status, evidence, metadata = {}) => {
         const entry = { id, component, status, evidence: redact(evidence, secrets), ...metadata };
         report.cases.push(entry); logger[status === 'FAIL' ? 'error' : status === 'BLOCKED' ? 'warn' : 'info'](component, `${status}: ${id}: ${entry.evidence}`);
+        progress(id, component, status, entry.evidence, metadata);
         await save(); return entry;
     };
     const check = async (id, component, action) => {
+        const started = Date.now();
         logger.info(component, `START: ${id}`);
+        progress(id, component, 'RUNNING'); await save();
         let status = 'PASS', evidence;
         try { evidence = await withCancellation(action, signal); }
         catch (e) { if (e.acceptancePersistence) throw e; status = e.blocked ? 'BLOCKED' : 'FAIL'; evidence = e.message; }
         // A report-write failure is not an activation/trust/model failure.
-        return await record(id, component, status, evidence);
+        return await record(id, component, status, evidence, { durationMs: Date.now() - started });
     };
     const blocked = message => Object.assign(new Error(message), { blocked: true });
     try {
@@ -283,11 +289,19 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         if (runtime.status !== 'PASS') throw blocked('The installed Kilo runtime is unavailable; dependent checks were not executed.');
         const dependencies = await check('dependencies', 'LoKiEnte -> Kilo Code', async () => {
             const file = path.join(directory, 'dependencies.json');
-            const result = await native(chain.powerShellExecutable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-File', path.join(root, 'app', 'Test-Toolchain.ps1'),
-                '-InstallRoot', root, '-DependenciesOnly', '-WorkingDirectory', project, '-ResultPath', file], { cwd: project, env, timeoutMs: 300000 });
-            const dependency = JSON.parse(await fs.readFile(file, 'utf8'));
-            report.dependencies = dependency;
-            if (result.code !== 0 || dependency.status !== 'PASS' || dependency.cases.length < 10 || dependency.cases.some(c => c.status !== 'PASS')) throw new Error('Installed desktop/Git/CLI/config/tool/search checks failed. See dependencies.json.');
+            let result;
+            try { result = await native(chain.powerShellExecutable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-File', path.join(root, 'app', 'Test-Toolchain.ps1'),
+                '-InstallRoot', root, '-DependenciesOnly', '-WorkingDirectory', project, '-ResultPath', file], { cwd: project, env, timeoutMs: 300000 }); }
+            finally {
+                const text = await fs.readFile(file, 'utf8').catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+                if (text) report.dependencies = JSON.parse(text);
+            }
+            const dependency = report.dependencies;
+            if (!dependency) throw new Error('The installed dependency runner produced no report.');
+            if (result.code !== 0 || dependency.status !== 'PASS' || dependency.cases.length < 10 || dependency.cases.some(c => c.status !== 'PASS')) {
+                const failures = dependency.cases.filter(c => c.status !== 'PASS').map(c => `${c.id}: ${c.evidence}`).join('; ');
+                throw new Error(`Installed desktop/Git/CLI/config/tool/search checks failed: ${failures || `process exit ${result.code}`}. See dependencies.json.`);
+            }
             return 'Standalone and embedded Kilo passed effective configuration, tool-import and actual file-search checks.';
         });
         if (dependencies.status !== 'PASS') throw blocked('Installed toolchain dependencies failed; dependent inference checks were not executed.');
@@ -365,8 +379,12 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         if (webview.status !== 'PASS') await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'The webview request failed; no visible response can be accepted.');
         else if (!interactive) await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'Visible webview rendering has not been observed. Noninteractive checks cannot claim this evidence.');
         else {
-            const answer = await withCancellation(() => vscode.window.showInformationMessage(`LoKiEnte acceptance: is the completed Kilo explanation containing ${marker} visible in this test window?`,
-                { modal: true, detail: 'Confirm the actual Kilo chat response, not the Output log or this question. A missing/unconfirmed response prevents full acceptance.' }, 'Response is visible', 'Response is missing', 'Skip visual check'), signal);
+            report.waitingFor = 'kilo-visible-response confirmation';
+            progress('kilo-visible-response', 'Kilo Code UI', 'RUNNING'); await save();
+            let answer;
+            try { answer = await withCancellation(() => vscode.window.showInformationMessage(`LoKiEnte acceptance: is the completed Kilo explanation containing ${marker} visible in this test window?`,
+                { modal: true, detail: 'Confirm the actual Kilo chat response, not the Output log or this question. A missing/unconfirmed response prevents full acceptance.' }, 'Response is visible', 'Response is missing', 'Skip visual check'), signal); }
+            finally { delete report.waitingFor; }
             await record('kilo-visible-response', 'Kilo Code UI', answer === 'Response is visible' ? 'PASS' : answer === 'Response is missing' ? 'FAIL' : 'BLOCKED',
                 answer === 'Response is visible' ? 'User observed the nonce-bearing response in the real Kilo webview.' : 'The real Kilo response was not confirmed visible.', { evidenceKind: 'manual-visual-observation' });
         }

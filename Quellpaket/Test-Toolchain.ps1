@@ -10,12 +10,12 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
-foreach($file in @('Common.ps1','Runtime.ps1','ModelPool.ps1','Router.ps1','AgentTemplates.ps1','Ripgrep.ps1','Workspace.ps1','ProjectSelection.ps1','DesktopRunner.ps1','ToolchainAcceptance.ps1')){. (Join-Path $PSScriptRoot $file)}
+foreach($file in @('Common.ps1','Runtime.ps1','ModelPool.ps1','Router.ps1','AgentTemplates.ps1','ModelSelection.ps1','Ripgrep.ps1','Workspace.ps1','ProjectSelection.ps1','DesktopRunner.ps1','ToolchainAcceptance.ps1')){. (Join-Path $PSScriptRoot $file)}
 Initialize-ShadowToolchainLogging -InstallRoot $InstallRoot
 try{
     if($DependenciesOnly){
         if(-not $WorkingDirectory -or -not $ResultPath){throw 'Dependency acceptance requires WorkingDirectory and ResultPath.'}
-        $result=Test-ShadowToolchainDependencies -InstallRoot $InstallRoot -WorkingDirectory $WorkingDirectory
+        $result=Test-ShadowToolchainDependencies -InstallRoot $InstallRoot -WorkingDirectory $WorkingDirectory -ResultPath $ResultPath
         Write-ShadowAcceptanceJson -Path $ResultPath -Value $result
     }else{
         if($WaitForProfileClose){

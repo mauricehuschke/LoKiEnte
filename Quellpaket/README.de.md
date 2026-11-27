@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.10 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.11 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 ## Erstinstallation und erneute Provisionierung
 
@@ -54,7 +54,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.8; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.9; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
@@ -191,6 +191,18 @@ Schnappschuss zu löschen. Eine dauerhafte Sperre beendet die Abnahme mit FAIL i
 `acceptance.failure.json` samt JUnit-Datei; der vollständige ausstehende Schnappschuss
 bleibt zur Diagnose erhalten. Provisioning und Neustarterkennung werten diesen
 Fehlerbericht aus.
+
+Provisioning im Vordergrund und `Test-Toolchain.ps1` zeigen für jeden
+Abnahmeschritt START und PASS/FAIL/BLOCKED mit Komponente und Laufzeit im Terminal.
+Auch die einzelnen Prüfungen im separaten Abhängigkeitsprozess werden während
+des Laufs übernommen. Lange Schritte melden alle 15 Sekunden den aktuellen
+Schritt, die verstrichene Zeit und die Zahl erfasster Ergebnisse. Workspace Trust
+und die Bestätigung der sichtbaren Antwort weisen ausdrücklich auf die notwendige
+Aktion in VS Code hin. Kurze Schritte bleiben auch dann sichtbar, wenn mehrere
+zwischen zwei Abfragen abschließen. Fortschrittsereignisse mit Zeitstempeln
+bleiben im Laufbericht und in `dependencies.json`; Zugangsdaten werden geschwärzt.
+Fortschritt ändert kein Ergebnis in PASS. Desktop-/Sidebar-Runner öffnen weiterhin
+kein Terminal; ihre Meldungen stehen in Output und lokalen Logs.
 
 Die lokalen Nachweise liegen unter `diagnostics/toolchain/latest.json` und
 `latest.junit.xml`, außerdem in einem eigenen Ordner je Lauf. `PASS` erfordert alle
