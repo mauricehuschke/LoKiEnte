@@ -1,6 +1,6 @@
-#requires -Version 7.0
+#requires -Version 7.4
 <#
-  LM Studio runtime provisioning. Dot-source this file from PowerShell 7.
+  LM Studio runtime provisioning. Dot-source this file from PowerShell 7.4 or newer.
   Public entry: Configure-LocalRuntime. No work occurs merely by dot-sourcing.
 
   Contract verified against LM Studio CLI source and REST v1 documentation:
@@ -91,6 +91,17 @@ function Resolve-LocalLmsCommand {
     throw 'lms.exe not found. Start LM Studio once; if necessary run: npx --yes lmstudio install-cli. Then rerun provisioning.'
 }
 
+function New-LrNativeTimeoutError {
+    param([string[]]$Arguments,[int]$TimeoutSeconds,[string]$LogPath,[switch]$OutputDrain)
+    $phase=if($OutputDrain){'waiting for command output to close'}else{'running the command'}
+    [IO.File]::WriteAllText($LogPath,"LM Studio command '$($Arguments[0])' exceeded $TimeoutSeconds seconds while $phase.",[Text.UTF8Encoding]::new($false))
+    $error=[TimeoutException]::new("LM Studio command '$($Arguments[0])' timed out while $phase ($TimeoutSeconds seconds). Check LM Studio and the local command log. Details: $LogPath")
+    $error.Data['ShadowNativeTimeout']=$true
+    # Terminating a CLI does not prove that the model server stopped loading.
+    $error.Data['ShadowControllerUncertain']=($Arguments[0] -ceq 'load' -and $Arguments -notcontains '--estimate-only' -and $Arguments -notcontains '--help')
+    return $error
+}
+
 function Invoke-LrNative {
     [CmdletBinding()]
     param(
@@ -114,18 +125,31 @@ function Invoke-LrNative {
     foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
+    $readCancellation=[Threading.CancellationTokenSource]::new()
     $logPath = Join-Path $LogDirectory ((Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.log')
     try {
         $null = $process.Start()
-        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync($readCancellation.Token)
+        $stderrTask = $process.StandardError.ReadToEndAsync($readCancellation.Token)
         $watch = [Diagnostics.Stopwatch]::StartNew()
         while (-not $process.WaitForExit(1000)) {
             if ($watch.Elapsed.TotalSeconds -gt $TimeoutSeconds) {
-                $process.Kill() # Stop this CLI invocation only, never the running model server.
-                throw "Timeout for $([IO.Path]::GetFileName($FilePath)) $($Arguments[0]) ($TimeoutSeconds seconds)."
+                # Stop this CLI invocation only, never the running model server.
+                try{if(-not $process.HasExited){$process.Kill()}}catch{}
+                $readCancellation.Cancel()
+                throw (New-LrNativeTimeoutError -Arguments $Arguments -TimeoutSeconds $TimeoutSeconds -LogPath $logPath)
             }
             Write-Progress -Activity "LM Studio: $($Arguments[0])" -Status ('Running for {0:n0} seconds' -f $watch.Elapsed.TotalSeconds)
+        }
+        # A child started by the CLI may retain an inherited output handle after
+        # the CLI exits. Waiting synchronously on ReadToEndAsync then has no
+        # deadline, even though WaitForExit above was bounded.
+        while(-not $stdoutTask.IsCompleted -or -not $stderrTask.IsCompleted){
+            if($watch.Elapsed.TotalSeconds -gt $TimeoutSeconds){
+                $readCancellation.Cancel()
+                throw (New-LrNativeTimeoutError -Arguments $Arguments -TimeoutSeconds $TimeoutSeconds -LogPath $logPath -OutputDrain)
+            }
+            Start-Sleep -Milliseconds 50
         }
         $stdout = $stdoutTask.GetAwaiter().GetResult()
         $stderr = $stderrTask.GetAwaiter().GetResult()
@@ -136,13 +160,46 @@ function Invoke-LrNative {
         return [pscustomobject]@{ Stdout = $stdout; Stderr = $stderr; LogPath = $logPath; ExitCode = $process.ExitCode }
     } finally {
         Write-Progress -Activity "LM Studio: $($Arguments[0])" -Completed
+        $readCancellation.Cancel()
         $process.Dispose()
+        $readCancellation.Dispose()
     }
+}
+
+function Invoke-LrModelCommand {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$LmsPath,
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [Parameter(Mandatory)][string]$LogDirectory,
+        [int]$TimeoutSeconds=60
+    )
+    # A successful memory estimate says nothing about architecture support.
+    # Inspect both streams even for reserve overrides; an unsupported model
+    # must never be reported as a shortage of memory.
+    $result=Invoke-LrNative -FilePath $LmsPath -Arguments $Arguments -LogDirectory $LogDirectory -TimeoutSeconds $TimeoutSeconds -AllowFailure
+    $exitCode=Get-LrProperty $result 'ExitCode'
+    if($exitCode -isnot [int] -and $exitCode -isnot [long]){throw 'LM Studio returned no usable exit code for the model command.'}
+    if($exitCode -eq 0){return $result}
+    $text=([string](Get-LrProperty $result 'Stdout')+"`n"+[string](Get-LrProperty $result 'Stderr')) -replace '\x1B\[[0-?]*[ -/]*[@-~]', ''
+    $details="Details: $($result.LogPath)"
+    if($text -match '(?i)(unknown|unsupported) model architecture|model architecture[^\r\n]{0,100}(not supported|unsupported)'){
+        $error=[InvalidOperationException]::new("The selected LM Studio runtime does not support this model architecture. In LM Studio, select or update a compatible GPU runtime, then retry the same model. More memory or AllowUnfitAttempt cannot fix this. $details")
+        $error.Data['ShadowRuntimeCompatibilityFailure']=$true
+    }elseif($text -match '(?i)out of (?:device |GPU |host )?memory|not enough (?:free )?(?:memory|VRAM|RAM)|insufficient (?:memory|VRAM|RAM)|(?:memory|resource)[ -]?guardrails?[^\r\n]*(?:reject|exceed|insufficient)|guardrail rejected|(?:cudaMalloc|failed to allocate)[^\r\n]*(?:fail|memory|buffer)'){
+        $error=[InvalidOperationException]::new("LM Studio could not allocate memory for the selected model. Free memory and retry; the model file is preserved. $details")
+        $error.Data['ShadowResourceFitFailure']=$true
+    }else{
+        $error=[InvalidOperationException]::new("LM Studio rejected the selected model command (exit $exitCode). Check the local model file, runtime and command log, then retry. $details")
+        $error.Data['ShadowModelLoadFailure']=$true
+    }
+    # Keep native output in the local command log; do not forward it to clients.
+    throw $error
 }
 
 function Invoke-LrJson {
     param([string]$LmsPath, [string[]]$Arguments, [string]$LogDirectory)
-    $result = Invoke-LrNative -FilePath $LmsPath -Arguments $Arguments -LogDirectory $LogDirectory
+    $result = Invoke-LrNative -FilePath $LmsPath -Arguments $Arguments -LogDirectory $LogDirectory -TimeoutSeconds 60
     try {
         if($Arguments[0] -in @('ls','ps')){ConvertFrom-LrModelList -Json $result.Stdout;return}
         return ConvertFrom-Json -InputObject $result.Stdout -Depth 100 -ErrorAction Stop
@@ -389,7 +446,9 @@ function Assert-LrLoopbackListener {
     if ($listeners.Count -eq 0) { throw "No local listener found on port $Port." }
     $public = @($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') })
     if ($public.Count -gt 0) {
-        throw "Port $Port is not bound exclusively to loopback. Explicitly configure the existing LM Studio server for 127.0.0.1 and retry. This script does not change the running server."
+        $error=[InvalidOperationException]::new("Port $Port is not bound exclusively to loopback. Explicitly configure the existing LM Studio server for 127.0.0.1 and retry. This script does not change the running server.")
+        $error.Data['ShadowLoopbackFailure']=$true
+        throw $error
     }
 }
 
@@ -552,61 +611,57 @@ function Configure-LocalRuntime {
         }
     } else {
         if (-not $engine) { $engine = Ensure-LrInferenceEngine -LmsPath $lms -LogDirectory $logDirectory }
-        # Reserve capacity for the desktop/VS Code; never disable LM Studio guardrails.
-        $contexts = @($ContextLength)
-        if ($ContextLength -gt 16384) { $contexts += 16384 }
-        $guardrailCandidate=$null;$lastCandidate=$null
-        foreach ($context in ($contexts | Select-Object -Unique)) {
-            if(-not $ModelKey){Assert-LrSelectedModel -LmsPath $lms -LogDirectory $logDirectory -ExpectedPath $profile.ExpectedPath -ModelPath $selectedPath}
-            Write-Host "Checking memory requirements for $context context tokens and one inference slot ..."
-            $estimate = Invoke-LrNative -FilePath $lms -Arguments @('load', $selectedPath, '--exact', '--local', '--context-length', "$context", '--parallel', '1', '--gpu', 'max', '--estimate-only', '--yes') -LogDirectory $logDirectory
-            $estimateText = $estimate.Stdout + "`n" + $estimate.Stderr
-            $gpuBytes = Convert-LrEstimatedBytes -Text $estimateText -Label 'Estimated GPU Memory'
-            $totalBytes = Convert-LrEstimatedBytes -Text $estimateText -Label 'Estimated Total Memory'
-            $freshHardware = Get-LocalNvidiaGpu -LogDirectory $logDirectory
-            $allowed = $estimateText -match 'This model may be loaded based on your resource guardrails settings\.'
-            $candidate=[pscustomobject]@{GpuBytes=$gpuBytes;TotalBytes=$totalBytes;ContextLength=$context;LogPath=$estimate.LogPath;ReserveOverride=$false}
-            $lastCandidate=$candidate
-            if($allowed -and -not $guardrailCandidate){$guardrailCandidate=$candidate}
-            if ($allowed -and $estimateText -notmatch 'Confidence:\s*LOW' -and
-                $gpuBytes -le ($freshHardware.Gpu.FreeBytes - 1GB) -and
-                $totalBytes -le ($freshHardware.FreeRamBytes - 3GB)) {
-                $effectiveContext = $context
-                $memoryEstimate = $candidate
-                break
-            }
-        }
-        if ($null -eq $memoryEstimate) {
-            $fitMessage="No verified memory fit with at least 16K context (or the requested smaller context). Logs: $logDirectory"
-            if(-not $AllowUnfitAttempt){throw $fitMessage}
-            $memoryEstimate=if($guardrailCandidate){$guardrailCandidate}else{$lastCandidate}
-            if(-not $memoryEstimate){throw 'No usable LM Studio memory estimate available.'}
-            $memoryEstimate.ReserveOverride=$true
-            $effectiveContext=[int]$memoryEstimate.ContextLength
-            Write-Warning "$fitMessage Attempting load without LoKiEnte reserve; LM Studio safeguards remain active."
-        }
-        Write-Host "Loading model with $effectiveContext context tokens, GPU offload max and exactly one inference slot ..."
-        if(-not $ModelKey){Assert-LrSelectedModel -LmsPath $lms -LogDirectory $logDirectory -ExpectedPath $profile.ExpectedPath -ModelPath $selectedPath}
-        $loadArguments=@('load', $selectedPath, '--exact', '--local', '--context-length', "$effectiveContext", '--parallel', '1', '--gpu', 'max', '--identifier', $modelId, '--yes')
-        if($memoryEstimate.ReserveOverride){
-            $load=Invoke-LrNative -FilePath $lms -Arguments $loadArguments -LogDirectory $logDirectory -TimeoutSeconds 900 -AllowFailure
-            $loadExit=Get-LrProperty $load 'ExitCode'
-            if($loadExit -isnot [int] -and $loadExit -isnot [long]){throw 'LM Studio returned no usable exit code for the load attempt.'}
-            if($loadExit -ne 0){
-                $message="$fitMessage LM Studio rejected the load attempt (exit code $loadExit). Model remains downloaded. Details: $($load.LogPath)"
-                $state=[pscustomobject]@{
-                    SchemaVersion=1;Status='Deferred';CheckedAtUtc=[DateTime]::UtcNow.ToString('o')
-                    LmsPath=$lms;LmsVersion=$version.Stdout.Trim();Profile=$profile.Name;ModelId=$modelId;ModelKey=$selectedKey;ModelPath=$selectedPath
-                    ContextLength=$effectiveContext;Parallel=1;ApiBaseUrl="$serverRoot/v1";Port=$Port;ApiTokenEnvironmentVariable=$ApiTokenEnvironmentVariable
-                    ReusedServer=$reusedServer;ReusedLoadedModel=$false;Downloaded=$downloaded;Hardware=$hardware;InferenceEngine=$engine
-                    Estimate=$memoryEstimate;SmokeTests=[pscustomobject]@{Chat='NotRun';ToolCall='NotRun';ToolResultRoundTrip='NotRun'};LogsPath=$logDirectory;VerificationMessage=$message
+        try {
+            # Reserve capacity for the desktop/VS Code; never disable LM Studio guardrails.
+            $contexts = @($ContextLength)
+            if ($ContextLength -gt 16384) { $contexts += 16384 }
+            $guardrailCandidate=$null;$lastCandidate=$null
+            foreach ($context in ($contexts | Select-Object -Unique)) {
+                if(-not $ModelKey){Assert-LrSelectedModel -LmsPath $lms -LogDirectory $logDirectory -ExpectedPath $profile.ExpectedPath -ModelPath $selectedPath}
+                Write-Host "Checking memory requirements for $context context tokens and one inference slot ..."
+                $estimate = Invoke-LrModelCommand -LmsPath $lms -Arguments @('load', $selectedPath, '--exact', '--local', '--context-length', "$context", '--parallel', '1', '--gpu', 'max', '--estimate-only', '--yes') -LogDirectory $logDirectory
+                $estimateText = $estimate.Stdout + "`n" + $estimate.Stderr
+                $gpuBytes = Convert-LrEstimatedBytes -Text $estimateText -Label 'Estimated GPU Memory'
+                $totalBytes = Convert-LrEstimatedBytes -Text $estimateText -Label 'Estimated Total Memory'
+                $freshHardware = Get-LocalNvidiaGpu -LogDirectory $logDirectory
+                $allowed = $estimateText -match 'This model may be loaded based on your resource guardrails settings\.'
+                $candidate=[pscustomobject]@{GpuBytes=$gpuBytes;TotalBytes=$totalBytes;ContextLength=$context;LogPath=$estimate.LogPath;ReserveOverride=$false}
+                $lastCandidate=$candidate
+                if($allowed -and -not $guardrailCandidate){$guardrailCandidate=$candidate}
+                if ($allowed -and $estimateText -notmatch 'Confidence:\s*LOW' -and
+                    $gpuBytes -le ($freshHardware.Gpu.FreeBytes - 1GB) -and
+                    $totalBytes -le ($freshHardware.FreeRamBytes - 3GB)) {
+                    $effectiveContext = $context
+                    $memoryEstimate = $candidate
+                    break
                 }
-                Write-LrRuntimeState -StateRoot $StateRoot -State $state
-                Write-Warning $message
-                return $state
             }
-        }else{
-            $null=Invoke-LrNative -FilePath $lms -Arguments $loadArguments -LogDirectory $logDirectory -TimeoutSeconds 900
+            if ($null -eq $memoryEstimate) {
+                $fitMessage="No verified memory fit with at least 16K context (or the requested smaller context). Logs: $logDirectory"
+                if(-not $AllowUnfitAttempt){throw $fitMessage}
+                $memoryEstimate=if($guardrailCandidate){$guardrailCandidate}else{$lastCandidate}
+                if(-not $memoryEstimate){throw 'No usable LM Studio memory estimate available.'}
+                $memoryEstimate.ReserveOverride=$true
+                $effectiveContext=[int]$memoryEstimate.ContextLength
+                Write-Warning "$fitMessage Attempting load without LoKiEnte reserve; LM Studio safeguards remain active."
+            }
+            Write-Host "Loading model with $effectiveContext context tokens, GPU offload max and exactly one inference slot ..."
+            if(-not $ModelKey){Assert-LrSelectedModel -LmsPath $lms -LogDirectory $logDirectory -ExpectedPath $profile.ExpectedPath -ModelPath $selectedPath}
+            $loadArguments=@('load', $selectedPath, '--exact', '--local', '--context-length', "$effectiveContext", '--parallel', '1', '--gpu', 'max', '--identifier', $modelId, '--yes')
+            $null=Invoke-LrModelCommand -LmsPath $lms -Arguments $loadArguments -LogDirectory $logDirectory -TimeoutSeconds 900
+        } catch {
+            if(-not ($_.Exception.Data['ShadowResourceFitFailure'] -or $_.Exception.Data['ShadowRuntimeCompatibilityFailure'] -or $_.Exception.Data['ShadowModelLoadFailure'])){throw}
+            $message=$_.Exception.Message
+            $state=[pscustomobject]@{
+                SchemaVersion=1;Status='Deferred';CheckedAtUtc=[DateTime]::UtcNow.ToString('o')
+                LmsPath=$lms;LmsVersion=$version.Stdout.Trim();Profile=$profile.Name;ModelId=$modelId;ModelKey=$selectedKey;ModelPath=$selectedPath
+                ContextLength=$effectiveContext;Parallel=1;ApiBaseUrl="$serverRoot/v1";Port=$Port;ApiTokenEnvironmentVariable=$ApiTokenEnvironmentVariable
+                ReusedServer=$reusedServer;ReusedLoadedModel=$false;Downloaded=$downloaded;Hardware=$hardware;InferenceEngine=$engine
+                Estimate=$memoryEstimate;SmokeTests=[pscustomobject]@{Chat='NotRun';ToolCall='NotRun';ToolResultRoundTrip='NotRun'};LogsPath=$logDirectory;VerificationMessage=$message
+            }
+            Write-LrRuntimeState -StateRoot $StateRoot -State $state
+            Write-Warning $message
+            return $state
         }
     }
     Assert-LrLoopbackListener -Port $Port

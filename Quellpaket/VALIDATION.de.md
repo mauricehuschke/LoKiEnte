@@ -1,4 +1,37 @@
-## LoKiEnte-Logo und anbieterneutrale Benennung — Paket 2026.11.18.21
+## Begrenzte Modellwechsel und konkrete Fehler - Paket 2026.11.27.1
+
+Im unveränderten Code kehrte ein nativer Prozessaufruf erst nach 12,75 Sekunden
+zurück, obwohl sein Zeitlimit fünf Sekunden betrug: Ein Kindprozess hielt die
+geerbten Ausgabekanäle nach Ende der CLI offen. Das Lesen der Ausgabe verwendet
+jetzt dasselbe Zeitlimit und abbrechbare Leseoperationen. Status-/Katalogabfragen
+und Speicherschätzungen sind auf 60 Sekunden begrenzt; echte Modellladevorgänge
+behalten 900 Sekunden. Nach einem Timeout mit unklarem Ladezustand sperrt der
+Router weitere Modellwechsel bis zu einem bewussten Neustart.
+
+Regressionen prüfen echte Unterprozesse, geerbte Ausgabekanäle, den PowerShell-
+Controller, Loopback-HTTP, Fehlerberichte, Modellaliasse und Installationspfade
+mit Leerzeichen. Die LM-Studio-/GPU-Grenzen der Lebenszyklustests sind simuliert.
+Nicht unterstützte Architektur, Speicherablehnung und andere Ladefehler bleiben
+unterscheidbar. Gescheiterte Profile müssen vor erneuter Verifizierung alle
+Chat-/Tool-Smoke-Tests bestehen. Routerzustand und Ereignisse zeigen Lade- und
+Inferenzphase sowie Fehler ohne Promptinhalte; private Exceptiondetails bleiben
+im lokalen Controllerbericht.
+
+Geprüfte Bereiche: Modellladefehler, Modellpool, Single-Modus, LMS-CLI,
+partielles GPU-Offload, Modellvarianten, manuelle Modelle, Embeddings,
+Routerlebenszyklus, Modellpflege, gespeicherte Optionen, Sprachdateien und die
+HTTP-Routen für Chat und Embeddings. Der Test für manuelle Modelle prüft jetzt
+den tatsächlichen Modellkonfigurationszweig statt einer veralteten Annahme über
+eine Zuweisung auf oberster Ebene; sein bisheriger Fehler wurde auch am
+unveränderten Ausgangsstand bestätigt.
+
+Die betroffene Nutzerinstallation liegt auf einem anderen PC. Erfolgreiches
+manuelles Laden bestätigt dort noch keine verwalteten Kontext-/Offloadwerte
+oder API-Zugriffe. Diese Regressionen belegen die korrigierten Wartezeiten und
+Fehlerpfade, nicht die unbeobachtete Ursache oder echte erfolgreiche Inferenz
+auf diesem PC. Die Korrektur wechselt Modelle und Runtimes nicht automatisch.
+
+## LoKiEnte-Logo und anbieterneutrale Benennung - Paket 2026.11.18.21
 
 <!-- lokiente-language -->
 [English](VALIDATION.md) · Deutsch

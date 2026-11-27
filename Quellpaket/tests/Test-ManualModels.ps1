@@ -59,7 +59,14 @@ Assert-Models ((Get-ManualFailure -Mode Single -Key 'my/custom-model') -ceq '') 
 $script:available=@([pscustomobject]@{path='one';modelKey='my/custom-model'},[pscustomobject]@{path='two';modelKey='my/custom-model'})
 Assert-Models ((Get-ManualFailure -Mode Single -Key 'my/custom-model') -match 'Multiple exact') 'Ambiguous models remain explicit errors'
 $main=@($ast.EndBlock.Statements|Where-Object {$_ -is [Management.Automation.Language.TryStatementAst]})[0]
-$statements=@($main.Body.Statements)
+$entry=$main.Body.Find({param($node)
+    $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+    $node.Left.Extent.Text -ceq '$lms' -and $node.Right.Extent.Text -match '^Resolve-ShadowSetupLms'
+},$true)
+if(-not $entry){throw 'Setup LM Studio entry missing'}
+# ModelAction Keep moved model configuration inside a branch. Inspect the
+# actual configuration block instead of assuming it is a top-level statement.
+$statements=@($entry.Parent.Statements)
 $start=-1
 for($i=0;$i -lt $statements.Count;$i++){
     if($statements[$i].Extent.Text -match '^\$lms=Resolve-ShadowSetupLms'){$start=$i;break}
@@ -80,6 +87,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $report=[ordered]@{schema=1;status='IN_PROGRESS'}
 $ModelMode='Single';$PreferredModel='Auto';$ModelKey='my/custom-model';$IncludeFastModel=$false;$studio='C:\LM Studio.exe'
+$IndexingMode='Off'
 '@
     $harness+="`n. '$runtimeFile'`n. '$poolFile'`n"
     $harness+=@'
@@ -87,6 +95,7 @@ function Resolve-ShadowSetupLms {param($StudioPath) return 'C:\lms.exe'}
 function Get-LocalNvidiaGpu {param($LogDirectory) return [pscustomobject]@{Gpu=[pscustomobject]@{TotalBytes=20GB};TotalRamBytes=28GB}}
 function Get-LrDownloadedModels {param($LmsPath,$LogDirectory) if($Scenario -eq 'error'){throw 'Synthetic model-list failure'};return @()}
 function Stop-ShadowModelRouter {[IO.File]::WriteAllText((Join-Path $InstallRoot 'unexpected'),'router');throw 'Unexpected router stop'}
+function Stop-ShadowEmbeddingModel {param($InstallRoot,$Pool)}
 function Configure-LocalModelPool {[IO.File]::WriteAllText((Join-Path $InstallRoot 'unexpected'),'pool');throw 'Unexpected pool action'}
 function Write-ShadowManagedFile {param($Path,$Content,$BackupRoot) [IO.File]::WriteAllText($Path,$Content);return $true}
 '@

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
-import { mkdtemp, writeFile, copyFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,6 +96,8 @@ test('resource refusal is reported explicitly by the real controller process', a
     await writeFile(path.join(root, 'ModelPool.ps1'), `function Switch-ShadowLocalModel {\n` +
       `param($InstallRoot,$Alias)\n$error=[InvalidOperationException]::new('synthetic')\n` +
       `if($Alias -eq 'coder-fast'){$error.Data['ShadowModelVerificationFailure']=$true}` +
+      `elseif($Alias -eq 'review'){$error.Data['ShadowRuntimeCompatibilityFailure']=$true}` +
+      `elseif($Alias -eq 'fast'){$error.Data['ShadowModelLoadFailure']=$true}` +
       `else{$error.Data['ShadowResourceFitFailure']=$true}\nthrow $error\n}\n`);
     const switcher = makePowerShellSwitcher({ installRoot: root, pwsh: 'pwsh.exe', switchScript: script });
     await assert.rejects(() => switcher({ Alias: 'coder-high' }),
@@ -104,6 +106,12 @@ test('resource refusal is reported explicitly by the real controller process', a
     await assert.rejects(() => switcher({ Alias: 'coder-fast' }),
       error => error.code === 'model_unverified' && error.status === 503 &&
         error.message.includes('tool test'));
+    await assert.rejects(() => switcher({ Alias: 'review' }),
+      error => error.code === 'model_runtime_incompatible' && error.status === 503 &&
+        error.message.includes('compatible GPU runtime'));
+    await assert.rejects(() => switcher({ Alias: 'fast' }),
+      error => error.code === 'model_load_failed' && error.status === 503 &&
+        error.message.includes('runtime/pool-logs'));
     const profiles = ['coder-high', 'review'].map(alias => ({
       Alias: alias, RouteId: `shadow-${alias}`, InstanceId: `owned-${alias}`,
       ContextLength: 16384, OutputLimit: 4096,
@@ -124,11 +132,133 @@ test('resource refusal is reported explicitly by the real controller process', a
       assert.equal((await response.json()).error.code, 'model_memory_unavailable');
       const health = await (await fetch(`${base}/health`)).json();
       assert.equal(health.models[0].verification, 'Deferred');
+      const incompatible = await fetch(`${base}/v1/chat/completions`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'shadow-review', messages: [{ role: 'user', content: 'fixture' }] }),
+      });
+      assert.equal(incompatible.status, 503);
+      assert.equal((await incompatible.json()).error.code, 'model_runtime_incompatible');
+      const afterFailure = await (await fetch(`${base}/health`)).json();
+      assert.equal(afterFailure.ready, true);
+      assert.equal(afterFailure.models[1].verification, 'Deferred');
     } finally {
       router.close();
       await once(router, 'close');
     }
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('controller refusals name the actionable cause and retain private details locally', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'LoKiEnte install with spaces-'));
+  const script = path.join(root, 'Switch-LocalModel.ps1');
+  try {
+    await copyFile(fileURLToPath(new URL('../Switch-LocalModel.ps1', import.meta.url)), script);
+    for (const [flag, code, message, status = 503, uncertain = false] of [
+      ['ShadowModelConflict', 'model_conflict', 'manually loaded'],
+      ['ShadowModelBusy', 'model_busy', 'still busy'],
+      ['ShadowLoopbackFailure', 'backend_not_loopback', '127.0.0.1'],
+      ['ShadowAuthenticationFailure', 'backend_authentication', 'user environment variable'],
+      ['UnknownFixture', 'controller_rejected', 'model-switch-failure.json'],
+      ['ShadowNativeTimeout', 'controller_check_timeout', 'exceeded its deadline', 504],
+      ['ShadowNativeTimeout', 'controller_timeout', 'another load will not be started', 504, true],
+    ]) {
+      await writeFile(path.join(root, 'ModelPool.ps1'), `function Switch-ShadowLocalModel {\n` +
+        `param($InstallRoot,$Alias)\n$error=[InvalidOperationException]::new('private-fixture-detail')\n` +
+        `$error.Data['${flag}']=$true\n$error.Data['ShadowControllerUncertain']=${uncertain ? '$true' : '$false'}\nthrow $error\n}\n`);
+      const switcher = makePowerShellSwitcher({ installRoot: root, pwsh: 'pwsh.exe', switchScript: script });
+      await assert.rejects(() => switcher({ Alias: 'coder-high' }),
+        error => error.code === code && error.status === status && !!error.fatal === uncertain &&
+          error.message.includes(message) && !error.message.includes('private-fixture-detail'));
+      const diagnostic = JSON.parse(await readFile(path.join(root, 'runtime', 'model-switch-failure.json'), 'utf8'));
+      assert.equal(diagnostic.Code, code);
+      assert.equal(diagnostic.Detail, 'private-fixture-detail');
+      assert.equal(diagnostic.Script, 'ModelPool.ps1');
+      assert.ok(diagnostic.Line > 0);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a waiting model switch exposes its phase and answers the client at the request deadline', async () => {
+  let begin, finish;
+  const started = new Promise(resolve => { begin = resolve; });
+  const loading = new Promise(resolve => { finish = resolve; });
+  const logs = [];
+  const profiles = ['coder-high', 'review'].map(alias => ({
+    Alias: alias, RouteId: `shadow-${alias}`, InstanceId: `owned-${alias}`,
+    ContextLength: 16384, OutputLimit: 4096,
+    SmokeTests: { Chat: 'Passed', ToolCall: 'Passed', ToolResultRoundTrip: 'Passed' },
+  }));
+  const router = createModelRouter({
+    config: { SchemaVersion: 2, Status: 'Ready', Profiles: profiles, BackendApiBaseUrl: 'http://127.0.0.1:1234/v1' },
+    configDigest: 'fixture', requestTimeoutMs: 500, log: entry => logs.push(entry),
+    switchModel: async profile => {
+      begin(); await loading;
+      return { Status: 'Ready', Alias: profile.Alias, ModelId: profile.InstanceId, ContextLength: profile.ContextLength, Parallel: 1 };
+    },
+  });
+  router.listen(0, '127.0.0.1'); await once(router, 'listening');
+  const base = `http://127.0.0.1:${router.address().port}`;
+  try {
+    const waiting = fetch(`${base}/v1/chat/completions`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'shadow-coder-high', stream: true, messages: [{ role: 'user', content: 'private-fixture-prompt' }] }),
+    });
+    await started;
+    const health = await (await fetch(`${base}/health`)).json();
+    assert.equal(health.currentRequest.alias, 'coder-high');
+    assert.equal(health.currentRequest.phase, 'Loading');
+    const response = await waiting;
+    assert.equal(response.status, 504);
+    assert.equal((await response.json()).error.code, 'request_timeout');
+    const timedOut = await (await fetch(`${base}/health`)).json();
+    assert.equal(timedOut.lastError.code, 'request_timeout');
+    finish();
+    const settled = await (await fetch(`${base}/health`)).json();
+    assert.equal(settled.currentRequest, null);
+    assert.equal(settled.ready, true);
+    assert.ok(logs.some(entry => entry.event === 'model_switch_started'));
+    assert.ok(logs.some(entry => entry.event === 'request_timed_out'));
+    assert.ok(!JSON.stringify(logs).includes('private-fixture-prompt'));
+  } finally {
+    finish(); router.close(); await once(router, 'close');
+  }
+});
+
+test('an uncertain load timeout blocks further model switches', async () => {
+  let switches = 0;
+  const profiles = ['coder-high', 'review'].map(alias => ({
+    Alias: alias, RouteId: `shadow-${alias}`, InstanceId: `owned-${alias}`,
+    ContextLength: 16384, OutputLimit: 4096,
+    SmokeTests: { Chat: 'Passed', ToolCall: 'Passed', ToolResultRoundTrip: 'Passed' },
+  }));
+  const router = createModelRouter({
+    config: { SchemaVersion: 2, Status: 'Ready', Profiles: profiles, BackendApiBaseUrl: 'http://127.0.0.1:1234/v1' },
+    configDigest: 'fixture',
+    switchModel: async () => {
+      switches++;
+      throw Object.assign(new Error('Uncertain model load'), { code: 'controller_timeout', status: 504, fatal: true });
+    },
+  });
+  router.listen(0, '127.0.0.1'); await once(router, 'listening');
+  const base = `http://127.0.0.1:${router.address().port}`;
+  const request = () => fetch(`${base}/v1/chat/completions`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'shadow-coder-high', messages: [{ role: 'user', content: 'fixture' }] }),
+  });
+  try {
+    const first = await request();
+    assert.equal(first.status, 504); await first.json();
+    const health = await fetch(`${base}/health`);
+    assert.equal(health.status, 503);
+    assert.equal((await health.json()).ready, false);
+    const second = await request();
+    assert.equal(second.status, 503); await second.json();
+    assert.equal(switches, 1);
+  } finally {
+    router.close(); await once(router, 'close');
   }
 });
