@@ -6,7 +6,29 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.9 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.10 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+
+## Erstinstallation und erneute Provisionierung
+
+Der lokale Modellrouter läuft als unsichtbarer Node-Prozess. Gelöschte
+Installationsdateien beenden einen bereits laufenden Prozess nicht. Configure
+prüft den Router-Endpunkt vor Modellreset, Downloads und Modelltests, auch wenn
+die alte Pooldatei fehlt. Mit vorhandenen Steuerungsdaten erfolgt ein
+authentifizierter Stopp. Nach gelöschten Steuerungsdaten darf nur ein inaktiver
+Router wiederhergestellt werden, dessen Windows-Benutzer, Node-Programm,
+vollständige Kommandozeile dieser Installation, Loopback-Port/PID und Startzeit
+übereinstimmen. Ein gebundenes Prozesshandle beendet genau diesen Prozess;
+kein Prozessbaum wird beendet. Aktive, fremde, veränderte oder nicht eindeutig
+prüfbare Prozesse blockieren das Setup vor der Modellarbeit.
+
+`provisioning-report.json` erfasst `routerReset` und bei einer Wiederherstellung
+die lokalen Nachweise aus `runtime/router-recovery.json`. PID, Methode und
+Identitätsprüfungen bleiben ohne Steuerungsgeheimnisse erhalten; ältere
+Wiederherstellungsberichte werden gesichert. Auch der Start stellt einen sonst
+passenden Router ohne Steuerungsdaten wieder her, statt ihn ungeprüft weiter zu
+verwenden. Geprüfte Modelldateien bleiben erhalten und werden genutzt; fehlende
+Dateien durchlaufen den normalen geprüften Download. Configure führt die
+Modellprüfungen anschließend erneut aus. Docker und Hyper-V sind nicht nötig.
 
 ## Desktop-Projekte und Provisioning-Diagnose
 
@@ -32,7 +54,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.7; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.8; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.

@@ -15,6 +15,7 @@ try{
     $value=Invoke-ShadowProvisionStep -Id 'real-native-test' -Action {Invoke-ShadowNative -FilePath $node -ArgumentList @('-e','process.stdout.write("positive synthetic-report-secret");process.stderr.write("Bearer abc123");process.exitCode=3') -AllowFailure -Quiet -TimeoutSeconds 10}
     Assert-Report ($value.ExitCode -eq 3 -and $report.commands.Count -eq 1 -and $report.commands[0].exitCode -eq 3) 'Actual native arguments, outputs and exit status must be captured.'
     $null=Write-ShadowManagedFile -Path (Join-Path $root 'inventory.json') -Content '{"cpu":"synthetic","apiKey":"nested-private-key"}'
+    $null=Write-ShadowManagedFile -Path (Join-Path $root 'runtime/router-recovery.json') -Content '{"kind":"router-control-recovery","pid":4242,"accountMatched":true,"method":"VerifiedOwnedProcess"}'
     $null=Invoke-ShadowNative -FilePath $node -ArgumentList @('-e','process.stdout.write("x".repeat(300000))') -Quiet -TimeoutSeconds 10
     Assert-Report ($report.commands[1].streams.stdout.truncated -and (Test-Path -LiteralPath (Join-Path $root $report.commands[1].streams.stdout.fullLog))) 'Oversized stdout must have an explicit inline limit and a complete redacted local log.'
     $failure=$null;try{Invoke-ShadowProvisionStep -Id 'failing-check' -Kind Test -Action {throw 'synthetic-report-secret check failed'}}catch{$failure=$_}
@@ -24,6 +25,7 @@ try{
     $report.status='INCOMPLETE';Complete-ShadowProvisionReport -Failure $failure
     $text=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw;$saved=$text|ConvertFrom-Json
     Assert-Report ($saved.schema -eq 2 -and $saved.failure.stack -and $saved.snapshots.'inventory.json'.cpu -eq 'synthetic') 'Main report must embed environment, snapshots and exception stack.'
+    Assert-Report ($saved.snapshots.'runtime/router-recovery.json'.pid -eq 4242 -and $saved.snapshots.'runtime/router-recovery.json'.accountMatched) 'Router recovery process identity must be retained in the self-contained provisioning report.'
     Assert-Report ($text -notmatch 'synthetic-report-secret|nested-private-key|abc123') 'Known secrets, nested credentials and Authorization headers must be redacted.'
     Assert-Report ($saved.runtimeRequirements.dockerRequired -eq $false -and $saved.runtimeRequirements.hyperVRequired -eq $false) 'Acceptance must not depend on a VM/container runtime.'
     Assert-Report ($saved.commands[0].arguments.Count -eq 2 -and $saved.commands[0].durationMs -ge 0 -and $saved.environment.powerShell) 'Report must retain command arguments, timing and process environment metadata.'

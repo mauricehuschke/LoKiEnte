@@ -1,3 +1,57 @@
+## Gelöschte Installation und verwaister Router - Paket 2026.11.27.10
+
+Der nächste Provisioning-Ausschnitt startet alle vier Modellrollen-Prüfungen,
+lädt das Hauptmodell erneut und scheitert danach an fehlenden Router-Steuerdaten.
+Der Benutzer hat vor Provisioning alles außer models gelöscht. Die Meldung belegt
+eine Antwort des erwarteten Router-Dienstes, identifiziert allein aber keinen
+Windows-Prozess und beweist nicht alle Modellergebnisse. Ein Node-Router kann
+Konsole und gelöschte Dateien überleben. Eine fehlende Pooldatei übersprang bisher
+den frühen Stopp; der Fehler wurde erst nach Modellarbeit erkannt. Ein passender
+gesunder Router konnte zudem ohne Prüfung vorhandener Steuerdaten weiterlaufen.
+
+Configure prüft/stoppt den Endpunkt nun vor der Modellarbeit auch ohne alten Pool.
+Der normale Weg bleibt der authentifizierte Stopp. Bei fehlenden Steuerdaten
+erlaubt erst die Prüfung von Loopback-Port/PID, exaktem Node-Programm, vollständigem
+Start mit zwölf Argumenten dieser Installation, Routing-Digest, PowerShell- und
+Controllerpfaden, Windows-Benutzer-SID und Startzeit gegen ein gebundenes
+Prozesshandle die Wiederherstellung. Eine zweite Statusprüfung muss dieselbe
+PID/Digest und einen inaktiven Zustand bestätigen. Nur dieser Prozess wird mit
+begrenzten Wartezeiten beendet. Fremde/aktive/nicht prüfbare Prozesse sowie
+falsche vorhandene Steuerdaten führen zu keinem erzwungenen Stopp. CIM-Aufrufe
+sind auf fünf Sekunden begrenzt. Der freie Port wird geprüft. Wiederherstellungs-
+nachweise werden ohne Geheimnisse gespeichert/gesichert und in den Provisioning-
+Bericht übernommen; die Vorprüfung liefert routerReset. Auch der Desktop-Start
+verwendet Router ohne Steuerdaten nicht ungeprüft weiter. Das Protokoll bleibt gleich.
+
+Die Regression startet echte Node-/HTTP-Kindprozesse und löscht alle Testdateien
+außer models bei lebendem Router. Sie durchläuft die echte Setup-Vorprüfung,
+Wiederherstellung/neue Steuerdaten, authentifiziertes erneutes Provisioning,
+Dateinutzung mit SkipModelDownload und Download-/Kopier-/Hashlogik für fehlende
+Dateien. Gegenproben prüfen falschen Benutzer, Programme, PID, Port/Adresse,
+Installations-/Konfigurations-/Controllerpfade, Startzeit, Zusatzargumente, Digest,
+verweigerte Metadaten und einen inzwischen aktiven Router. Windows-Argumentparser
+und Prozesshandles sind echt; CIM-/Portmetadaten, Curl-Transport und LM Studio
+sind ausdrücklich simuliert. Kleine Testdateien belegen keine GGUF-Inferenz oder
+echte Modelldownloads.
+
+Die gemeinsame JavaScript-Gruppe mit 15 Dateien besteht 104 Tests ohne
+übersprungene oder fehlgeschlagene Fälle. Alle 16 ausgewählten PowerShell-Suiten
+bestehen: neuer Provisionierungszyklus (29 Checks, nach Umstellung der Test-
+Bereinigung auf eigene Prozesshandles erneut geprüft), Router (18), Modellpool
+(51), native Modellladefehler (29), Teil-GPU-Offload (14), Configure-Reset (23),
+Modellaktionsrichtlinien, Abnahmestart/-richtlinien/-integration/native Fristen,
+VS-Code-Profil/Einstellungen, Desktop-Sammler, Bericht (14) und automatische
+Optionen. Die Berichtsregression belegt eingebettete Wiederherstellungsnachweise.
+Das sind Entwicklungsregressionen mit den genannten simulierten Grenzen, keine
+GPU-Abnahme des Zielsystems.
+
+Eine direkte native CIM-Abfrage ist durch die Client-Richtlinie dieses
+Entwicklungshosts BLOCKED; kein anderer Zugangsweg umgeht dies. Echte Prozess-
+zuordnung/Wiederherstellung, Erstinstallation mit und ohne Download, erneutes
+Provisioning sowie volle GPU-/Kilo-/VS-Code-Abnahme bleiben bis zur Wiederholung
+auf dem Ziel-PC UNVERIFIED. Erst erfolgreiche Zielnachweise erlauben PR,
+Main-Merge und Release. Tests und Zielablauf benötigen kein Docker oder Hyper-V.
+
 ## VS-Code-/Kilo-Starteinstellungen vor Trust vorbereiten - Paket 2026.11.27.9
 
 Der nächste Textbericht vom Zielsystem verwendet Helfer 0.3.6 und VS Code 1.148.0.

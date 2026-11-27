@@ -2,6 +2,57 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Deleted installation files and orphaned router - package 2026.11.27.10
+
+The next provisioning excerpt attempts all four model-role checks, reloads the
+primary model and then stops on missing router-control credentials. The user
+deleted everything except models before provisioning. The message establishes
+that an endpoint answered as the expected router; it alone does not identify the
+Windows process or prove every model check passed. A Node router may outlive its
+console and removed files. Previously a missing pool file skipped the early
+shutdown, so this was detected only after model work; matching healthy routers
+could also be reused without checking whether control credentials still existed.
+
+Configure now checks/stops the router endpoint before model work even without
+previous pool state. Authenticated shutdown remains the usual path. Missing
+credentials permit recovery only after validating the loopback listening PID,
+exact Node executable and 12-argument launch contract for this installation,
+routing digest, PowerShell/controller paths, current Windows owner SID and
+creation time against a bound process handle. The same PID/digest must remain
+idle at a second health check. Only that process is stopped, with bounded waits;
+foreign/busy/unverifiable processes and incorrect existing credentials are not
+force-stopped. CIM operations have five-second timeouts. Port freedom is checked.
+Recovery metadata is saved/backed up without secrets and embedded in provisioning
+diagnostics; preflight returns routerReset evidence. The desktop lifecycle also
+refuses silent reuse when credentials are missing. Router wire protocol is unchanged.
+
+The lifecycle regression starts real Node/HTTP children and deletes all fixture
+files except models while a router remains alive. It exercises actual setup
+preflight, credential recovery/recreation, authenticated reprovisioning, file
+reuse with SkipModelDownload, and fresh-file download/copy/hash verification.
+Negative cases cover wrong user, executable, PID, port/address, install/config/
+controller paths, process creation time, extra arguments, digest, denied metadata
+and a newly busy state. Real Windows argv parsing and process handles are used;
+CIM/listener metadata, curl transport and LM Studio are explicit mocks. Small
+synthetic files do not establish successful GGUF inference or live downloads.
+
+The combined 15-file JavaScript group passes 104 tests without skips/failures.
+All 16 selected PowerShell suites pass, including the new reprovisioning lifecycle
+(29 checks, repeated after binding fixture cleanup to owned process handles),
+router lifecycle (18), model pool (51), native model-load failure handling (29),
+partial GPU offload (14), Configure reset (23), model-action policy, acceptance
+launch/policy/provisioning/native deadlines, VS Code profile/settings, desktop
+collector, report (14) and automatic options. The report regression confirms that
+recovery metadata is embedded. These are development regressions with the
+boundaries described above, not target GPU acceptance.
+
+A direct native CIM query is BLOCKED by this development host's client policy.
+No alternate access bypass was used. Real target process identity/recovery,
+first provisioning with and without downloads, reprovisioning and complete
+GPU/Kilo/VS Code acceptance remain UNVERIFIED until rerun on the target PC.
+PR, main merge and release still require successful target evidence. The tests
+and target workflow do not require Docker or Hyper-V.
+
 ## Prepare VS Code/Kilo startup settings before trust - package 2026.11.27.9
 
 The next target text report uses helper 0.3.6 and VS Code 1.148.0. Host, trust,

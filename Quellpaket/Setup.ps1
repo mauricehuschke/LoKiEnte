@@ -442,7 +442,10 @@ try {
             # Report that manual step before interrupting an existing model.
             Assert-ShadowSetupModels -LmsPath $lms -InstallRoot $InstallRoot -ModelMode $ModelMode -PreferredModel $PreferredModel -ModelKey $ModelKey -IncludeFastModel:$IncludeFastModel
         }
-        if($previousPool){Stop-ShadowModelRouter -InstallRoot $InstallRoot -Pool $previousPool}
+        $report.routerReset=Invoke-ShadowProvisionStep -Id 'router-reset-1' -Action {
+            if($previousPool){Stop-ShadowModelRouter -InstallRoot $InstallRoot -Pool $previousPool -NodePath $node -PowerShellPath $toolchain.powerShellExecutable -PassThru}
+            else{Stop-ShadowModelRouter -InstallRoot $InstallRoot -RouterPort $RouterPort -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable -NodePath $node -PowerShellPath $toolchain.powerShellExecutable -PassThru}
+        }
         $report.modelReset=Invoke-ShadowProvisionStep -Id 'lmstudio-model-reset-1' -Action { Reset-ShadowSetupLoadedModels -InstallRoot $InstallRoot -LmsPath $lms -Port $Port -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable }
         $Port=[int]$report.modelReset.port
         if($previousPool -and $IndexingMode -ne 'Automatic'){Stop-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $previousPool}

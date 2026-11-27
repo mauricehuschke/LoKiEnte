@@ -2,7 +2,27 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.27.9 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.10 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+
+## Fresh installation and reprovisioning
+
+The local model router runs as a hidden Node process. Deleting installation files
+does not stop an already running process. Configure checks the configured router
+endpoint before model reset, downloads and model tests, including when the old
+pool file no longer exists. Known control credentials use authenticated shutdown.
+If credentials were deleted, an idle router can be recovered only when Windows
+confirms the same user, Node executable, complete command line for this exact
+installation, loopback listener PID and process creation time. A bound process
+handle is used to stop that one verified process; no process tree is killed.
+Busy, foreign, changed or unverifiable processes block setup before model work.
+
+`provisioning-report.json` records `routerReset`, and includes the local
+`runtime/router-recovery.json` evidence when recovery occurred. It retains the
+PID, method and identity checks without control secrets; earlier recovery records
+are backed up. Startup also recovers an otherwise matching router with missing
+credentials instead of silently reusing it. Verified model files remain and are
+reused; missing files follow the normal verified-download path. Configure then
+performs model checks again. No Docker or Hyper-V is required.
 
 ## Desktop projects and provisioning diagnostics
 
@@ -25,7 +45,7 @@ Startup is confirmed only by a launch-specific handshake from the expected
 LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
 not establish a running extension. Kilo discovery waits for registration and
 Workspace Trust before activation. Installed-but-unavailable, missing and activation
-failures have separate diagnostics. The helper version is 0.3.7; fully close old
+failures have separate diagnostics. The helper version is 0.3.8; fully close old
 managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
 
 **Output → LoKiEnte** receives launcher/editor console logs as well as the managed

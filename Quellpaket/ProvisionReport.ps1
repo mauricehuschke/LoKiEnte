@@ -131,7 +131,7 @@ function Complete-ShadowProvisionReport {
     }
     if($Failure){$report.failure=@{type=$Failure.Exception.GetType().FullName;message=$Failure.Exception.Message;innerException=[string]$Failure.Exception.InnerException;errorId=$Failure.FullyQualifiedErrorId;category=[string]$Failure.CategoryInfo;script=$Failure.InvocationInfo.ScriptName;line=$Failure.InvocationInfo.ScriptLineNumber;position=$Failure.InvocationInfo.PositionMessage;stack=$Failure.ScriptStackTrace}}
     $report.snapshots=[ordered]@{}
-    foreach($file in @('inventory.json','toolchain.json','dependency-versions.json','provisioning-options.json','model-selection.json','workspaces.json','security/profile.json','runtime/model-pool.json','runtime/runtime-state.json','runtime/model-switch-failure.json','runtime/embedding-status.json','runtime/startup-health.json','vscode-data/User/settings.json','kilo-managed/kilo.json','diagnostics/toolchain/latest.json')){
+    foreach($file in @('inventory.json','toolchain.json','dependency-versions.json','provisioning-options.json','model-selection.json','workspaces.json','security/profile.json','runtime/model-pool.json','runtime/runtime-state.json','runtime/model-switch-failure.json','runtime/router-recovery.json','runtime/embedding-status.json','runtime/startup-health.json','vscode-data/User/settings.json','kilo-managed/kilo.json','diagnostics/toolchain/latest.json')){
         $full=Join-Path $session.root $file
         if(Test-Path -LiteralPath $full -PathType Leaf){try{$report.snapshots[$file]=Protect-ShadowDiagnosticValue (Get-Content -LiteralPath $full -Raw|ConvertFrom-Json -AsHashtable)}catch{$report.snapshots[$file]=@{error=$_.Exception.Message}}}
     }
