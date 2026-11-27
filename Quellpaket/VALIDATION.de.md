@@ -1,3 +1,44 @@
+## Austausch des Windows-Abnahmeberichts - Paket 2026.11.27.7
+
+Der nächste Ziellauf brach direkt nach Workspace Trust mit EPERM beim Umbenennen
+einer vollständigen temporären Datei auf acceptance.json ab. Eine echte Windows-
+Reproduktion hält die Zieldatei mit FileShare.ReadWrite ohne Delete-Freigabe offen
+und erzeugt denselben EPERM-/rename-Fehler. Der PowerShell-Koordinator las diese
+Datei bisher regelmäßig per Get-Content. Die einzelne Logzeile belegt nicht, welcher
+Prozess das Handle hielt; externe Leser können denselben Fehler auslösen.
+
+Der Koordinator liest vollständige Schnappschüsse nun mit ReadWrite- und Delete-
+Freigabe. Atomare Schreibvorgänge erhalten die Zieldatei und wiederholen EPERM,
+EACCES und EBUSY höchstens fünf Sekunden. Andere Fehler brechen sofort ab. Bleibt
+der Austausch gesperrt, bleibt die vollständige temporäre Datei zur Diagnose
+erhalten. Die Abnahme endet mit FAIL und schreibt acceptance.failure.json samt
+JUnit. Der Koordinator übernimmt dieses Endergebnis, aktualisiert latest.json/JUnit
+und meldet es an Provisioning. Neustartsperre und Wiederverwendung eigener
+Testprojekte berücksichtigen den Fehlerbericht ebenfalls; VS Code prüft weiterhin
+das aktuelle Workspace-Vertrauen. Schreibfehler werden getrennt von Vertrauens-,
+Modell- oder Aktivierungsfehlern erfasst. Endgültiges JSON folgt seiner JUnit-Datei.
+
+Test-AcceptancePersistence.mjs besteht sechs Prüfungen: vorübergehende Sperrcodes,
+dauerhafte Sperren mit erhaltenen Nachweisen, sofortiger Abbruch bei anderen
+Fehlern, echte Windows-Sperre mit anschließender Freigabe, endgültiger Fehlerbericht
+ohne native/Modellarbeit und 150 echte Node-Schreibvorgänge parallel zu 150 echten
+PowerShell-Lesevorgängen. Die Startsuite besteht 56 Checks einschließlich Übernahme
+des Fehlerberichts bei weiterhin RUNNING im alten Hauptbericht und FAIL in
+latest.json. Ihre GUI-Grenze ist synthetisch; Zielinferenz und Darstellung sind
+damit nicht belegt.
+
+Der gemeinsame JavaScript-Lauf mit 14 Dateien besteht 98 Tests ohne übersprungene
+oder fehlgeschlagene Fälle. Alle acht ausgewählten PowerShell-Suiten bestehen:
+Abnahmestart, Richtlinien, Provisioning-Integration, native Fristen, VS-Code-Profil/
+VSIX, Desktop-Runner, Provisioning-Bericht und automatische Optionen. Dazu gehört
+ein echter konsolenfreier WinExe-Sammler mit Kindprozess. Bestehende Modellwahl-,
+Klon- und Junction-Zweige des vorherigen Kandidaten wurden nicht erneut geprüft;
+ihre dokumentierten Hosteinschränkungen bleiben von der Zielabnahme getrennt.
+
+Die Zielabnahme dieses exakten Kandidaten bleibt UNVERIFIED. Provisioning und
+Abnahme auf dem Ziel-PC erneut ausführen. Docker und Hyper-V sind nicht nötig.
+Vor erfolgreicher Zielabnahme gibt es keinen PR, Main-Merge oder Release.
+
 ## Automatische Modelloptionen und Configure-Modellreset - Paket 2026.11.27.6
 
 Das nächste Ziel-Setup brach nach der Prüfung vorhandener Modelldateien ab: Ein

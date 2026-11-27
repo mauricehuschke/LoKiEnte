@@ -2,6 +2,45 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Windows acceptance report replacement - package 2026.11.27.7
+
+The next target run stopped immediately after Workspace Trust with EPERM while
+renaming a complete temporary file onto acceptance.json. A native Windows
+reproduction holds the destination open with FileShare.ReadWrite, without Delete
+sharing, and produces the same EPERM/rename failure. The PowerShell coordinator
+previously polled that file with Get-Content. The reported line alone cannot
+identify which process held the handle; external readers may cause the same error.
+
+The coordinator now reads complete snapshots through a stream sharing ReadWrite
+and Delete. Atomic writes retain the destination and retry EPERM/EACCES/EBUSY for
+up to five seconds. Other errors fail immediately. If replacement remains blocked,
+the complete temporary snapshot is retained, acceptance stops with FAIL and writes
+acceptance.failure.json plus JUnit. The coordinator consumes that terminal result,
+updates latest.json/JUnit and exposes it to provisioning. Reload protection and
+owned-workspace reuse recognize the failure report too; current Workspace Trust
+is still checked by VS Code. Report persistence errors are identified separately
+from trust/model/activation failures. Terminal JSON is published after its JUnit.
+
+Test-AcceptancePersistence.mjs passes six checks: transient replacement codes,
+permanent locks with retained evidence, immediate unrelated errors, the native
+Windows lock/release reproduction, a terminal fallback with no native/model work,
+and 150 actual Node writes concurrent with 150 actual PowerShell snapshot reads.
+The production-launch regression passes 56 checks, including coordinator fallback
+consumption with the old primary report still RUNNING and latest.json set to FAIL.
+Its GUI boundary is synthetic; this does not prove target inference or rendering.
+
+The combined 14-file JavaScript regression passes 98 tests without skips or
+failures. All eight selected PowerShell suites pass: acceptance launch, policy,
+provisioning integration, native deadlines, VS Code profile/VSIX, desktop runner,
+provisioning report and automatic options. These include a real console-free
+WinExe collector/child process. Existing model-selection/clone/junction branches
+from the preceding candidate were not rerun; their recorded host restrictions
+remain separate from target acceptance.
+
+Target acceptance with this exact candidate remains UNVERIFIED. Rerun provisioning
+and acceptance on the target PC. No Docker or Hyper-V is needed. No PR, main merge
+or release is made before successful target evidence.
+
 ## Automatic model options and Configure model reset - package 2026.11.27.6
 
 The next target setup stopped after verifying existing model files: a manually

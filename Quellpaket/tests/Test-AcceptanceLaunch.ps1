@@ -35,6 +35,14 @@ try{
     function Get-ShadowBundledKilo {param($CodePath,$InstallRoot) return $node}
     function Start-ShadowEditor {
         param($InstallRoot,$CodePath,$Arguments,$WorkingDirectory,$Environment,[switch]$WaitForHost)
+        if($script:simulatePersistenceFailure){
+            $report=Read-ShadowAcceptanceJson -Path $Environment.LOKIENTE_TOOLCHAIN_REPORT -AsHashtable
+            $report.status='FAIL';$report.persistenceFailure=@{code='EPERM';primaryReportPath=$Environment.LOKIENTE_TOOLCHAIN_REPORT}
+            $report.reportPath=[IO.Path]::ChangeExtension($Environment.LOKIENTE_TOOLCHAIN_REPORT,'failure.json')
+            $report.cases+=@(@{id='report-persistence';status='FAIL';evidence='Synthetic permanent report lock.'})
+            Write-ShadowAcceptanceJson -Path $report.reportPath -Value $report
+            return 'b'*32
+        }
         if($script:simulateExit){
             Write-ShadowAcceptanceJson -Path (Join-Path $InstallRoot ('runtime/launch-requests/'+('b'*32)+'.status.json')) -Value @{phase='exited';exitCode=0}
             return 'b'*32
@@ -56,6 +64,7 @@ try{
         return 'b'*32
     }
     $script:simulateExit=$false
+    $script:simulatePersistenceFailure=$false
     $script:firstProject=$null
     $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root
     Assert-Launch ($result.status -ceq 'BLOCKED' -and $result.cases[-1].id -ceq 'synthetic-gui-boundary') 'Native preparation must reach the intended GUI boundary; it must never claim real acceptance.'
@@ -66,6 +75,13 @@ try{
     $script:simulateExit=$true
     $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root
     Assert-Launch ($result.status -ceq 'BLOCKED' -and $result.cases[-1].evidence -match 'VS Code exited before acceptance completed') 'Closing the real editor before completion must block promptly instead of leaving a RUNNING report until the global deadline.'
+    $script:simulateExit=$false;$script:simulatePersistenceFailure=$true
+    $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root
+    Assert-Launch ($result.status -ceq 'FAIL' -and $result.persistenceFailure.code -ceq 'EPERM') 'The coordinator must consume a terminal persistence failure without waiting for its overall deadline.'
+    $primary=Read-ShadowAcceptanceJson -Path $result.persistenceFailure.primaryReportPath
+    Assert-Launch ($primary.status -ceq 'RUNNING') 'The coordinator must preserve the prior main report when the helper publishes a separate failure report.'
+    $latest=Read-ShadowAcceptanceJson -Path (Join-Path $root 'diagnostics/toolchain/latest.json')
+    Assert-Launch ($latest.status -ceq 'FAIL' -and $latest.runId -ceq $result.runId) 'The latest report must expose the actual persistence failure to provisioning.'
     @{suite='Acceptance production-profile launch';checks=$checks;passed=$true;limitations='Real native Git/Node and workspace preparation. Process inventory and GUI launch are synthetic boundaries.'}|ConvertTo-Json
 }finally{
     $resolved=[IO.Path]::GetFullPath($root);$allowed=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar

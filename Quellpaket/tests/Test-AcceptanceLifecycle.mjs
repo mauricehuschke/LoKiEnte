@@ -17,6 +17,10 @@ test('finished reports for the same run prevent replay; RUNNING and other run ID
             assert.equal(await completedAcceptance(file, 'b'), null);
         }
         await writeFile(file, '{bad'); await assert.rejects(completedAcceptance(file, 'a'));
+        await writeFile(file, '{"runId":"a","status":"RUNNING"}');
+        await writeFile(path.join(root, 'acceptance.failure.json'), '{"runId":"a","status":"FAIL"}');
+        assert.equal((await completedAcceptance(file, 'a')).status, 'FAIL');
+        assert.equal(await completedAcceptance(file, 'b'), null);
     } finally { assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir()) + path.sep)); await rm(root, { recursive: true, force: true }); }
 });
 test('results use their real verdict, and only an explicit test-window action closes VS Code', async () => {

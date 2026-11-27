@@ -98,14 +98,33 @@ function junit(report) {
             (c.status === 'FAIL' ? `<failure message="${xml(c.evidence)}"/>` : c.status !== 'PASS' ? `<skipped message="${xml(c.evidence)}"/>` : '') + '</testcase>').join('') + '</testsuite></testsuites>\n';
 }
 
-async function atomic(file, text) {
-    await fs.mkdir(path.dirname(file), { recursive: true });
+async function atomic(file, text, { io = fs, timeoutMs = 5000, retryDelayMs = 25 } = {}) {
+    await io.mkdir(path.dirname(file), { recursive: true });
     const temporary = `${file}.${crypto.randomUUID()}.tmp`;
-    try { await fs.writeFile(temporary, text, 'utf8'); await fs.rename(temporary, file); }
-    finally { await fs.unlink(temporary).catch(() => {}); }
+    let written = false, published = false, retries = 0;
+    try {
+        await io.writeFile(temporary, text, 'utf8'); written = true;
+        const started = Date.now();
+        for (;;) {
+            try { await io.rename(temporary, file); published = true; return { retries }; }
+            catch (error) {
+                const remaining = timeoutMs - (Date.now() - started);
+                if (!['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || remaining <= 0) {
+                    error.temporaryFile = temporary; error.reportDestination = file; error.retries = retries;
+                    error.message += ` Last complete destination was preserved. Pending snapshot: ${temporary}`;
+                    throw error;
+                }
+                await new Promise(resolve => setTimeout(resolve, Math.min(remaining, 250, retryDelayMs * 2 ** Math.min(retries++, 4))));
+            }
+        }
+    } finally {
+        // A complete snapshot is evidence when replacement remains blocked.
+        // Never delete/truncate the current destination as a rename fallback.
+        if (published || !written) await io.unlink(temporary).catch(() => {});
+    }
 }
 
-async function checkToolchain({ vscode, root, logger, env = process.env, reportPath, project, runId, interactive = true, diagnostics = () => ({}), signal: outerSignal }) {
+async function checkToolchain({ vscode, root, logger, env = process.env, reportPath, project, runId, interactive = true, diagnostics = () => ({}), signal: outerSignal, persistenceOptions }) {
     runId ||= crypto.randomUUID().replaceAll('-', '');
     const directory = path.join(root, 'diagnostics', 'toolchain', runId);
     reportPath ||= path.join(directory, 'acceptance.json');
@@ -116,7 +135,7 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
     const report = { schema: 1, kind: 'live-toolchain-acceptance', runId, status: 'RUNNING', startedAtUtc: new Date().toISOString(),
         executionMode: 'native-windows-applications', requirements: { docker: false, hyperV: false },
         versions: { vscode: vscode.version, node: process.versions.node, electron: process.versions.electron || null }, cases: [], nativeCommands: [], reportPath };
-    if (prelaunch?.runId === runId) { if (prelaunch.launch) report.launch = prelaunch.launch; if (prelaunch.workspaceTrust) report.workspaceTrust = prelaunch.workspaceTrust; }
+    if (prelaunch?.runId === runId) { if (prelaunch.launch) report.launch = prelaunch.launch; if (prelaunch.workspaceTrust) report.workspaceTrust = prelaunch.workspaceTrust; if (prelaunch.projectGit) report.projectPreparation = prelaunch.projectGit; }
     const secrets = Object.entries(env).filter(([name]) => /token|key|password/i.test(name)).map(([, value]) => value);
     const controller = new AbortController(), signal = controller.signal;
     const abort = () => controller.abort(outerSignal.reason);
@@ -129,11 +148,17 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
             if (value.runId === runId) controller.abort(new Error(value.reason || 'Acceptance cancelled by its native runner.'));
         }).catch(error => { if (error.code !== 'ENOENT') controller.abort(new Error('Acceptance cancellation state is unreadable.')); });
     }, 500); cancelPoll.unref?.();
+    const write = async (file, text) => {
+        try {
+            const result = await atomic(file, text, persistenceOptions);
+            if (result.retries) logger.info('LoKiEnte', `Report replacement recovered after ${result.retries} sharing/permission retries: ${file}`);
+        } catch (error) { error.acceptancePersistence = true; error.reportDestination ||= file; throw error; }
+    };
     let saving = Promise.resolve();
     const save = () => {
         const pending = saving.then(async () => {
-            await atomic(reportPath, JSON.stringify(report, null, 2));
-            await atomic(reportPath.replace(/\.json$/i, '') + '.junit.xml', junit(report));
+            await write(reportPath.replace(/\.json$/i, '') + '.junit.xml', junit(report));
+            await write(reportPath, JSON.stringify(report, null, 2));
         });
         saving = pending.catch(() => {}); return pending;
     };
@@ -148,7 +173,7 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
                 streams[name] = { characters: value.length, text: value.slice(0, 262144), truncated: value.length > 262144 };
                 if (streams[name].truncated) {
                     const fullLog = path.join(directory, `command-${report.nativeCommands.length}-${name}.log`);
-                    await atomic(fullLog, value); streams[name].fullLog = fullLog;
+                    await write(fullLog, value); streams[name].fullLog = fullLog;
                 }
             }
             report.nativeCommands.push({ utc: new Date().toISOString(), file, args: args.map(value => redact(value, secrets)), cwd: options?.cwd,
@@ -163,8 +188,11 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
     };
     const check = async (id, component, action) => {
         logger.info(component, `START: ${id}`);
-        try { return await record(id, component, 'PASS', await withCancellation(action, signal)); }
-        catch (e) { return await record(id, component, e.blocked ? 'BLOCKED' : 'FAIL', e.message); }
+        let status = 'PASS', evidence;
+        try { evidence = await withCancellation(action, signal); }
+        catch (e) { if (e.acceptancePersistence) throw e; status = e.blocked ? 'BLOCKED' : 'FAIL'; evidence = e.message; }
+        // A report-write failure is not an activation/trust/model failure.
+        return await record(id, component, status, evidence);
     };
     const blocked = message => Object.assign(new Error(message), { blocked: true });
     try {
@@ -340,16 +368,33 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
             await record('kilo-visible-response', 'Kilo Code UI', answer === 'Response is visible' ? 'PASS' : answer === 'Response is missing' ? 'FAIL' : 'BLOCKED',
                 answer === 'Response is visible' ? 'User observed the nonce-bearing response in the real Kilo webview.' : 'The real Kilo response was not confirmed visible.', { evidenceKind: 'manual-visual-observation' });
         }
-    } catch (e) { await record('acceptance-prerequisite', 'LoKiEnte', e.blocked ? 'BLOCKED' : 'FAIL', e.message); }
+    } catch (e) { if (e.acceptancePersistence) throw e; await record('acceptance-prerequisite', 'LoKiEnte', e.blocked ? 'BLOCKED' : 'FAIL', e.message); }
     for (const id of required) if (!report.cases.some(c => c.id === id)) await record(id, 'LoKiEnte', 'BLOCKED', 'Not executed because a prerequisite was unavailable.');
     if (signal.aborted) await record('acceptance-cancelled', 'LoKiEnte', 'BLOCKED', cancellationError(signal).message);
     report.status = summarize(report.cases, required); report.required = required; report.finishedAtUtc = new Date().toISOString();
     report.diagnostics = diagnostics();
+    await write(path.join(root, 'diagnostics', 'toolchain', 'latest.json'), JSON.stringify(report, null, 2));
+    await write(path.join(root, 'diagnostics', 'toolchain', 'latest.junit.xml'), junit(report));
+    // The coordinator observes terminal status only after final artifact writes.
     await save();
-    await atomic(path.join(root, 'diagnostics', 'toolchain', 'latest.json'), JSON.stringify(report, null, 2));
-    await atomic(path.join(root, 'diagnostics', 'toolchain', 'latest.junit.xml'), junit(report));
     logger[report.status === 'PASS' ? 'info' : 'error']('LoKiEnte', `Toolchain acceptance: ${report.status}. Report: ${reportPath}`);
     return report;
+    } catch (error) {
+        controller.abort(error);
+        await saving;
+        const original = reportPath, failurePath = reportPath.replace(/\.json$/i, '.failure.json');
+        report.status = 'FAIL'; report.finishedAtUtc = new Date().toISOString(); report.required = required;
+        report.failureStage = report.waitingFor || null; delete report.waitingFor;
+        if (error.acceptancePersistence) report.persistenceFailure = { code: error.code, syscall: error.syscall, destination: error.reportDestination,
+            pendingSnapshot: error.temporaryFile, retries: error.retries, primaryReportPath: original };
+        const reason = error.acceptancePersistence ? 'acceptance report persistence failed' : 'an unexpected acceptance error occurred';
+        report.cases.push({ id: error.acceptancePersistence ? 'report-persistence' : 'acceptance-internal', component: 'LoKiEnte', status: 'FAIL', evidence: redact(error.message, secrets) });
+        for (const id of required) if (!report.cases.some(c => c.id === id)) report.cases.push({ id, component: 'LoKiEnte', status: 'BLOCKED', evidence: `Not completed because ${reason}.` });
+        report.reportPath = failurePath;
+        await write(failurePath.replace(/\.json$/i, '.junit.xml'), junit(report));
+        await write(failurePath, JSON.stringify(report, null, 2));
+        logger.error('LoKiEnte', `Acceptance stopped because ${reason}. Failure report: ${failurePath}. ${redact(error.message, secrets)}`);
+        return report;
     } finally { clearInterval(cancelPoll); clearTimeout(deadlineTimer); outerSignal?.removeEventListener('abort', abort); }
 }
 

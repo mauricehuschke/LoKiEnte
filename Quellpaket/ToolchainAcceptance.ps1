@@ -26,6 +26,28 @@ function Write-ShadowAcceptanceJson {
     }finally{if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Force}}
 }
 
+function Read-ShadowAcceptanceJson {
+    param([Parameter(Mandatory)][string]$Path,[switch]$AsHashtable)
+    # Atomic replacement on Windows requires every reader to share Delete.
+    # ReadToEnd keeps one complete old/new snapshot even if its name is replaced.
+    $stream=[IO.FileStream]::new($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    try{
+        $reader=[IO.StreamReader]::new($stream,[Text.Encoding]::UTF8,$true)
+        try{$text=$reader.ReadToEnd()}finally{$reader.Dispose()}
+    }finally{$stream.Dispose()}
+    return ConvertFrom-Json -InputObject $text -AsHashtable:$AsHashtable -NoEnumerate
+}
+
+function Read-ShadowAcceptanceState {
+    param([string]$Path,[string]$RunId,[switch]$AsHashtable)
+    $failurePath=[IO.Path]::ChangeExtension($Path,'failure.json')
+    if(Test-Path -LiteralPath $failurePath -PathType Leaf){
+        $failure=Read-ShadowAcceptanceJson -Path $failurePath -AsHashtable:$AsHashtable
+        if($failure.runId -ceq $RunId -and $failure.status -in @('FAIL','BLOCKED')){return $failure}
+    }
+    return Read-ShadowAcceptanceJson -Path $Path -AsHashtable:$AsHashtable
+}
+
 function Test-ShadowToolchainDependencies {
     param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$WorkingDirectory)
     $cases=[Collections.Generic.List[object]]::new()
@@ -155,16 +177,16 @@ function Invoke-ShadowToolchainAcceptance {
         $watch=[Diagnostics.Stopwatch]::StartNew()
         $lastProgress=''
         while($watch.Elapsed.TotalSeconds -lt $TimeoutSeconds){
-            $state=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
+            $state=Read-ShadowAcceptanceState -Path $resultPath -RunId $id
             $progress=[string](Get-LrProperty $state 'waitingFor')
             if($progress -and $progress -cne $lastProgress){Write-ShadowMessage "Acceptance waiting for: $progress. Continue in the VS Code test window.";$lastProgress=$progress}
             if($state.status -in @('PASS','FAIL','BLOCKED')){break}
             $statusPath=Join-Path $InstallRoot ('runtime/launch-requests/'+$launchId+'.status.json')
             if(Test-Path -LiteralPath $statusPath){
-                $launchStatus=Get-Content -LiteralPath $statusPath -Raw|ConvertFrom-Json
+                $launchStatus=Read-ShadowAcceptanceJson -Path $statusPath
                 if($launchStatus.phase -ceq 'failed'){throw "Desktop launcher failed: $($launchStatus.error)"}
                 if($launchStatus.phase -ceq 'exited'){
-                    $state=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
+                    $state=Read-ShadowAcceptanceState -Path $resultPath -RunId $id
                     if($state.status -in @('PASS','FAIL','BLOCKED')){break}
                     throw "VS Code exited before acceptance completed (exit $($launchStatus.exitCode)). No PASS was recorded."
                 }
@@ -179,16 +201,16 @@ function Invoke-ShadowToolchainAcceptance {
     }catch{
         $failure=$_
         Write-ShadowAcceptanceJson -Path (Join-Path $directory 'cancellation.json') -Value @{runId=$id;reason=$failure.Exception.Message;utc=[DateTime]::UtcNow.ToString('o')}
-        try{$partial=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json -AsHashtable}catch{$partial=$initial}
+        try{$partial=Read-ShadowAcceptanceState -Path $resultPath -RunId $id -AsHashtable}catch{$partial=$initial}
         $partial.cases=@($partial.cases)+@(@{id='live-host';name='Real VS Code acceptance';status='BLOCKED';evidence=$failure.Exception.Message})
         $partial.status=if(@($partial.cases|Where-Object {$_.status -eq 'FAIL'}).Count){'FAIL'}else{'BLOCKED'}
         $partial.finishedAtUtc=[DateTime]::UtcNow.ToString('o')
         Write-ShadowAcceptanceJson -Path $resultPath -Value $partial
     }
-    $result=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
+    $result=Read-ShadowAcceptanceState -Path $resultPath -RunId $id
     Write-ShadowAcceptanceJUnit -Path ([IO.Path]::ChangeExtension($resultPath,'junit.xml')) -Report $result
     Write-ShadowAcceptanceJson -Path $latestPath -Value $result
     Write-ShadowAcceptanceJUnit -Path (Join-Path $InstallRoot 'diagnostics/toolchain/latest.junit.xml') -Report $result
-    Write-ShadowMessage "Live toolchain acceptance: $($result.status). Report: $resultPath" $(if($result.status -eq 'PASS'){'OK'}else{'WARN'})
+    Write-ShadowMessage "Live toolchain acceptance: $($result.status). Report: $($result.reportPath)" $(if($result.status -eq 'PASS'){'OK'}else{'WARN'})
     return $result
 }

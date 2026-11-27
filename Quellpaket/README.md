@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.27.6 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.7 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 ## Desktop projects and provisioning diagnostics
 
@@ -25,7 +25,7 @@ Startup is confirmed only by a launch-specific handshake from the expected
 LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
 not establish a running extension. Kilo discovery waits for registration and
 Workspace Trust before activation. Installed-but-unavailable, missing and activation
-failures have separate diagnostics. The helper version is 0.3.4; fully close old
+failures have separate diagnostics. The helper version is 0.3.5; fully close old
 managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
 
 **Output → LoKiEnte** receives launcher/editor console logs as well as the managed
@@ -131,6 +131,12 @@ status `EXPECTED_NONZERO_EXIT`; actual model/authentication failures remain erro
 GPU estimates are checked against VRAM and the remaining host allocation
 (`total - GPU`) against RAM, with the existing 1 GiB/3 GiB reserves.
 
+
+On Windows, report readers share file replacement. Atomic report writes retry
+sharing/permission failures for up to five seconds without deleting the previous
+snapshot. A persistent failure stops acceptance with FAIL in
+`acceptance.failure.json` and its JUnit file; the complete pending snapshot remains
+for diagnosis. Provisioning and restart detection consume this failure report.
 
 Results are local: `diagnostics/toolchain/latest.json` and `latest.junit.xml`, plus
 a separate directory for each run. `PASS` requires all mandatory checks, including

@@ -65,16 +65,21 @@ async function selectAcceptanceProjectOwner({ root, runId, reuseTrusted = false 
     const entries = await fs.readdir(directory, { withFileTypes: true }).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
     const candidates = [];
     for (const entry of entries.filter(e => e.isDirectory() && !e.isSymbolicLink() && /^[a-f0-9]{32}$/.test(e.name) && e.name !== runId)) {
-        const file = path.join(directory, entry.name, 'acceptance.json');
+        let file = path.join(directory, entry.name, 'acceptance.json');
         try {
-            const report = JSON.parse(await fs.readFile(file, 'utf8'));
+            const failureFile = path.join(directory, entry.name, 'acceptance.failure.json');
+            const failure = await fs.readFile(failureFile, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+            if (failure?.runId === entry.name && ['FAIL', 'BLOCKED'].includes(failure.status)) file = failureFile;
+            const report = file === failureFile ? failure : JSON.parse(await fs.readFile(file, 'utf8'));
+            if (report.runId !== entry.name) continue;
             const profile = report.launch?.dataDirectory || report.productionConfiguration?.dataDirectory;
             if (typeof profile !== 'string' || path.resolve(profile).toLowerCase() !== path.resolve(root, 'vscode-data').toLowerCase() ||
                 !Array.isArray(report.cases) || !report.cases.some(c => c?.id === 'workspace-trust' && c.status === 'PASS')) continue;
-            const ownerRunId = report.projectGit?.ownerRunId || report.projectGit?.runId || report.runId;
+            const preparation = report.projectGit || report.projectPreparation;
+            const ownerRunId = preparation?.ownerRunId || preparation?.runId || report.runId;
             if (!/^[a-f0-9]{32}$/.test(ownerRunId || '')) continue;
             const project = path.join(directory, ownerRunId, 'project');
-            if (typeof report.projectGit?.project !== 'string' || path.resolve(report.projectGit.project).toLowerCase() !== project.toLowerCase()) continue;
+            if (typeof preparation?.project !== 'string' || path.resolve(preparation.project).toLowerCase() !== project.toLowerCase()) continue;
             const marker = path.join(project, '.lokiente-acceptance.json');
             if ((await fs.lstat(project)).isSymbolicLink() || (await fs.lstat(marker)).isSymbolicLink()) continue;
             const ownership = JSON.parse(await fs.readFile(marker, 'utf8'));

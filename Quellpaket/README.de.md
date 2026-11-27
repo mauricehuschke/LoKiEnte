@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.6 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.7 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 ## Desktop-Projekte und Provisioning-Diagnose
 
@@ -32,7 +32,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.4; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.5; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
@@ -145,6 +145,13 @@ Reportstatus `EXPECTED_NONZERO_EXIT`; echte Modell-/Authentifizierungsfehler ble
 Fehler. GPU-Schätzungen werden gegen VRAM und der verbleibende Hostanteil
 (`gesamt - GPU`) gegen RAM geprüft; die Reserven von 1 GiB/3 GiB bleiben bestehen.
 
+
+Unter Windows geben Berichtsleser den Dateiaustausch frei. Atomare Schreibvorgänge
+wiederholen Freigabe-/Berechtigungsfehler höchstens fünf Sekunden, ohne den letzten
+Schnappschuss zu löschen. Eine dauerhafte Sperre beendet die Abnahme mit FAIL in
+`acceptance.failure.json` samt JUnit-Datei; der vollständige ausstehende Schnappschuss
+bleibt zur Diagnose erhalten. Provisioning und Neustarterkennung werten diesen
+Fehlerbericht aus.
 
 Die lokalen Nachweise liegen unter `diagnostics/toolchain/latest.json` und
 `latest.junit.xml`, außerdem in einem eigenen Ordner je Lauf. `PASS` erfordert alle

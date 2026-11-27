@@ -1,7 +1,7 @@
 // Filesystem/command-boundary regressions; the native Git case is separate.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -98,6 +98,15 @@ test('WorkspaceTrust reuses only an owned previously trusted project in the same
         await writeFile(file, JSON.stringify({ ...report, ...changed }));
         assert.equal((await selectAcceptanceProjectOwner({ root, runId, reuseTrusted: true })).workspaceTrust.reused, false);
     }
+    await writeFile(file, JSON.stringify(report));
+    const failureFile = path.join(path.dirname(file), 'acceptance.failure.json');
+    await writeFile(file, JSON.stringify({ runId: id, status: 'RUNNING' }));
+    await writeFile(failureFile, JSON.stringify({ ...report, status: 'FAIL', projectGit: undefined, projectPreparation: previous }));
+    const recovered = await selectAcceptanceProjectOwner({ root, runId, reuseTrusted: true });
+    assert.equal(recovered.ownerRunId, id); assert.equal(recovered.workspaceTrust.previouslyTrustedReport, failureFile);
+    await writeFile(failureFile, JSON.stringify({ ...report, runId, status: 'FAIL' }));
+    assert.equal((await selectAcceptanceProjectOwner({ root, runId, reuseTrusted: true })).workspaceTrust.reused, false);
+    await unlink(failureFile);
     await writeFile(file, JSON.stringify(report));
     await writeFile(path.join(previous.project, '.lokiente-acceptance.json'), '{"kind":"other-owner"}');
     assert.equal((await selectAcceptanceProjectOwner({ root, runId, reuseTrusted: true })).ownerRunId, runId);

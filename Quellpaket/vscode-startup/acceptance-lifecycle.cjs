@@ -5,10 +5,13 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
 async function completedAcceptance(file, runId) {
-    try {
-        const report = JSON.parse(await fs.readFile(file, 'utf8'));
-        return report.runId === runId && ['PASS', 'FAIL', 'BLOCKED'].includes(report.status) ? report : null;
-    } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+    for (const candidate of [file.replace(/\.json$/i, '.failure.json'), file]) {
+        try {
+            const report = JSON.parse(await fs.readFile(candidate, 'utf8'));
+            if (report.runId === runId && ['PASS', 'FAIL', 'BLOCKED'].includes(report.status)) return report;
+        } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+    return null;
 }
 
 function announceAcceptance({ vscode, report, isolated = false, logger }) {
