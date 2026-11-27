@@ -6,7 +6,90 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.1 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.3 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+
+## Desktop-Projekte und Provisioning-Diagnose
+
+Die Desktopverknüpfung startet einen Windows-Launcher ohne Konsolenfenster.
+PowerShell läuft unsichtbar; die Projektwahl erfolgt per Dialog. Registrierte Projekte
+bleiben erhalten. Hinzu kommen **Browse folder**, **Find Git projects**,
+**Clone repository** und **Repair path**. Die Git-Suche hat feste Tiefen-/Verzeichnis-
+Grenzen und überspringt Links sowie erzeugte Abhängigkeitsordner. Klonen akzeptiert
+HTTPS-/SSH-URLs ohne eingebettete Zugangsdaten oder ein lokales Repository und
+verlangt einen neuen Zielordner. Vorhandene Ziele werden erhalten. Authentifizierung
+erfolgt über Git Credential Manager beziehungsweise SSH-Agent. Ein fehlgeschlagener
+Teilklon bleibt zur Untersuchung bestehen.
+
+**Repair path** verbindet einen registrierten Eintrag mit dem neuen Projektordner.
+Vorhandene LoKiEnte-Aufgaben, Prüfdefinitionen, eigene Workspace-Einstellungen und
+die Registrierungsidentität bleiben erhalten; alte Pfade im verwalteten Workspace
+werden ersetzt. Index und Workspace werden vorher gesichert. Fehlende Einträge
+bleiben bis zur Reparatur sichtbar. Auch spätere Starts/Provisionierungen verwenden
+danach die erhaltenen Metadaten.
+
+Ein Start gilt erst dann als bestätigt, wenn der erwartete LoKiEnte-Helfer im richtigen
+VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-Liste
+installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
+wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
+fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
+0.3.1; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
+
+Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
+Der native Sammler hält kein Terminal offen. Bei fehlgeschlagenem Normalstart wird
+ein VS-Code-Diagnosefenster versucht. Kann VS Code selbst nicht starten, zeigt ein
+nativer Fehlerdialog auf `runtime/launcher-logs`.
+
+`provisioning-report.json` mit Schema 2 entsteht vor der ersten Setup-Operation und
+wird laufend aktualisiert. Enthalten sind Bootstrap-/Versions-/Paketnachweise,
+Umgebungs- und Hardwareinventar, Parameter, Aktionen und Tests mit Dauer, native
+Befehlsargumente, Exitcodes, stdout/stderr, Fehlerstellen/Stacks, installierte
+Extension-Manifeste, Konfigurations-/Zustandsschnappschüsse und lokale Logs dieses
+Laufs. Bereits abgeschlossene Abnahmenachweise bleiben bei späteren Startfehlern
+erhalten. Frühere Berichte werden gesichert. Sehr große Ausgaben/Logs sind ausdrücklich
+als gekürzt markiert und verweisen auf ihr vollständiges lokales Log; Zugangsdaten
+werden geschwärzt. Der Bericht enthält lokale Pfade und gegebenenfalls private
+Konfigurations-/Aufgabendiagnose: vor dem Teilen prüfen.
+
+Die Provisioning-Abnahme verwendet native Windows-Anwendungen und einen synthetischen
+lokalen Git-Klon. **Docker und Hyper-V werden weder benötigt noch gestartet.** Die
+optionale Offline-VM-Funktion bleibt davon getrennt. Übersprungene, blockierte und
+fehlgeschlagene Prüfungen werden niemals als bestanden ausgegeben.
+
+## Installierte Toolkette prüfen
+
+Das Provisioning fragt jetzt **Run the real VS Code/Kilo/LM Studio acceptance? [Y/n]**.
+Enter startet den Test; `n` überspringt ihn. Mit `-RunAcceptanceTest` startet er ohne
+diese Konsolenabfrage, mit `-SkipAcceptanceTest` wird er ausdrücklich übersprungen.
+Beide Schalter schließen sich aus und werden beim nächsten Update erneut gewählt.
+Überspringen bedeutet **ungeprüft**.
+
+Der Test öffnet ein eigenes VS-Code-Testfenster. Bestätige bei Bedarf das Vertrauen
+für dessen synthetischen Arbeitsbereich und am Ende die fertig angezeigte Antwort
+im echten Kilo-Chat. Geprüft werden installierte Abhängigkeiten, beide Kilo-Runtimes,
+Werkzeugimporte/Dateisuche sowie ein echter Datei-Leseaufruf mit Modellantwort für
+jedes konfigurierte Modell. Im Dual-Modus wird zusätzlich eine echte Anfrage aus
+dem Kilo-Webview über den Router bis LM Studio zugeordnet. Aktiviertes Indexing
+ergänzt echte Embedding-Inferenz und LanceDB-Schreib-/Suchprüfungen. Vollständige
+Repository-Indexierung bleibt ein eigener Arbeitslasttest.
+
+Unter **Ausgabe → LoKiEnte** stehen Erfolge, Fehler und Verbindungswechsel mit ihrer
+Quelle. Zusammengeführt werden verfügbare verwaltete VS-Code-/Kilo-Logs,
+Router-Ereignisse, Modellcontroller-Logs und LM-Studio-Serverlogs. Zugangsdaten
+werden geschwärzt; Prompt-/Antwort-JSON und Debug-/Trace-Inhalte werden ausgelassen.
+Meldungen, die ein Drittprogramm gar nicht protokolliert, lassen sich daraus nicht
+rekonstruieren. Ein erreichbarer API-Port allein belegt keine funktionierende Inferenz.
+
+Die lokalen Nachweise liegen unter `diagnostics/toolchain/latest.json` und
+`latest.junit.xml`, außerdem in einem eigenen Ordner je Lauf. `PASS` erfordert alle
+Pflichtprüfungen einschließlich der als manuell gekennzeichneten Sichtprüfung.
+`FAIL`, `BLOCKED` und `SKIPPED` gelten niemals als bestanden. Wiederholen kannst du
+den Test in der LoKiEnte-Seitenleiste (**Run toolchain acceptance**) oder in PowerShell 7:
+
+```powershell
+pwsh -NoProfile -File D:\LoKi\app\Test-Toolchain.ps1 -InstallRoot D:\LoKi
+```
+
 
 Über die LoKiEnte-Seitenleiste kannst du das gewählte lokale Modell mit **Run E.T. model rule test** in deiner normalen Windows-Sitzung prüfen. Kilos Regeln und Werkzeugrechte werden einbezogen. Die optionale Hyper-V-Prüfung ist separat.
 

@@ -40,6 +40,16 @@ function New-ShadowWorkspace {
     if (-not $safeName) { $safeName='project' }
     $workspaceFile=Join-Path $Root "workspaces/$safeName-$hash.code-workspace"
     $projectState=Join-Path $Root "projects/$safeName-$hash"
+    $registered=@(Get-ShadowWorkspaceIndex -Root $Root|Where-Object {$_.project -ieq $projectFull -and $_.Contains('workspace') -and $_.Contains('task')})
+    if($registered.Count -gt 1){throw 'Duplicate project registrations require repair.'}
+    if($registered.Count -eq 1){
+        $workspaceFile=[IO.Path]::GetFullPath($registered[0].workspace)
+        $projectState=[IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($registered[0].task))
+        foreach($pair in @(@{path=$workspaceFile;base=(Join-Path $Root 'workspaces')},@{path=$projectState;base=(Join-Path $Root 'projects')})){
+            $base=[IO.Path]::GetFullPath($pair.base).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar
+            if(-not $pair.path.StartsWith($base,[StringComparison]::OrdinalIgnoreCase)){throw 'Registered LoKiEnte metadata is outside the managed workspace directories.'}
+        }
+    }
     [IO.Directory]::CreateDirectory($projectState) | Out-Null
     $taskPath=Join-Path $projectState 'task.md'
     $checksPath=Join-Path $projectState 'checks.json'
@@ -178,11 +188,66 @@ function New-ShadowWorkspace {
 
 function Register-ShadowWorkspaces {
     param([Parameter(Mandatory)][string]$Root,[Parameter(Mandatory)][object[]]$Entries)
+    $lock=Enter-ShadowWorkspaceIndexLock -Root $Root
+    try{
     $index=Join-Path $Root 'workspaces.json'
     $byPath=[ordered]@{}
     foreach($entry in @(Get-ShadowWorkspaceIndex -Root $Root)){$byPath[$entry.project]=$entry}
     foreach($entry in $Entries){$byPath[[string]$entry.project]=$entry}
     $json=ConvertTo-Json -InputObject @($byPath.Values) -Depth 15
     $null=Write-ShadowManagedFile -Path $index -Content $json -BackupRoot (Join-Path $Root 'backups/workspaces')
+    }finally{$lock.Dispose()}
+}
+
+function Enter-ShadowWorkspaceIndexLock {
+    param([string]$Root)
+    $directory=Join-Path $Root 'runtime';[void][IO.Directory]::CreateDirectory($directory)
+    try{return [IO.File]::Open((Join-Path $directory 'workspace-index.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)}catch{throw 'Another LoKiEnte window is updating project registrations. Retry when it finishes.'}
+}
+
+function Repair-ShadowProjectRegistration {
+    param([Parameter(Mandatory)][string]$Root,[Parameter(Mandatory)][string]$OldPath,[Parameter(Mandatory)][string]$NewPath,[Parameter(Mandatory)][string]$PwshPath)
+    $target=Resolve-ShadowProjectDirectory $NewPath
+    $lock=Enter-ShadowWorkspaceIndexLock -Root $Root
+    $index=Join-Path $Root 'workspaces.json';$originalIndex=$null;$originalWorkspace=$null;$workspaceFile=$null
+    try{
+        $entries=@(Get-ShadowWorkspaceIndex $Root);$matches=@($entries|Where-Object {$_.project -ieq $OldPath})
+        if($matches.Count -ne 1){throw 'The project registration is missing or ambiguous.'}
+        if(@($entries|Where-Object {$_.project -ine $OldPath -and $_.project -ieq $target}).Count){throw 'The selected directory is already registered. Open that project instead.'}
+        $originalIndex=[IO.File]::ReadAllText($index)
+        $entry=$matches[0]
+        if($entry.Contains('workspace') -and (Test-Path -LiteralPath $entry.workspace -PathType Leaf)){
+            $workspaceFile=[IO.Path]::GetFullPath($entry.workspace)
+            $allowed=[IO.Path]::GetFullPath((Join-Path $Root 'workspaces')).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar
+            if(-not $workspaceFile.StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase)){throw 'The registered workspace file is outside the managed directory.'}
+            $originalWorkspace=[IO.File]::ReadAllText($workspaceFile)
+            $document=ConvertFrom-Json -InputObject $originalWorkspace -AsHashtable
+            $updated=Update-ShadowProjectReferences -Value $document -OldPath $OldPath -NewPath $target
+            $null=Write-ShadowManagedFile -Path $workspaceFile -Content ($updated|ConvertTo-Json -Depth 80) -BackupRoot (Join-Path $Root 'backups/workspaces')
+        }
+        $entry.project=$target
+        $null=Write-ShadowManagedFile -Path $index -Content (ConvertTo-Json -InputObject $entries -Depth 30) -BackupRoot (Join-Path $Root 'backups/workspaces')
+        $new=New-ShadowWorkspace -Root $Root -Project $target -PwshPath $PwshPath
+        for($i=0;$i -lt $entries.Count;$i++){if($entries[$i].project -ieq $target){$entries[$i]=$new}}
+        $null=Write-ShadowManagedFile -Path $index -Content (ConvertTo-Json -InputObject $entries -Depth 30) -BackupRoot (Join-Path $Root 'backups/workspaces')
+        Write-ShadowToolchainEvent -Component 'Projects' -Message "Repaired project registration: $OldPath -> $target. Task and checks metadata retained."
+        return $target
+    }catch{
+        if($null -ne $originalIndex){[IO.File]::WriteAllText($index,$originalIndex,[Text.UTF8Encoding]::new($false))}
+        if($null -ne $originalWorkspace){[IO.File]::WriteAllText($workspaceFile,$originalWorkspace,[Text.UTF8Encoding]::new($false))}
+        throw
+    }finally{$lock.Dispose()}
+}
+
+function Update-ShadowProjectReferences {
+    param($Value,[string]$OldPath,[string]$NewPath)
+    if($Value -is [string]){
+        if($Value -ieq $OldPath){return $NewPath}
+        foreach($separator in @('\','/')){if($Value.StartsWith($OldPath.TrimEnd('\','/')+$separator,[StringComparison]::OrdinalIgnoreCase)){return $NewPath.TrimEnd('\','/')+$Value.Substring($OldPath.TrimEnd('\','/').Length)}}
+        return $Value
+    }
+    if($Value -is [Collections.IDictionary]){foreach($key in @($Value.Keys)){$Value[$key]=Update-ShadowProjectReferences $Value[$key] $OldPath $NewPath};return ,$Value}
+    if($Value -is [array]){return ,@($Value|ForEach-Object {Update-ShadowProjectReferences $_ $OldPath $NewPath})}
+    return $Value
 }
 

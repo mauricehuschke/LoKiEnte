@@ -4,12 +4,12 @@
 import http from 'node:http';
 import { readFile, writeFile, mkdir, unlink } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { once } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const ROUTER_VERSION = '2026.11.27.1';
+export const ROUTER_VERSION = '2026.11.27.2';
 const BODY_LIMIT = 4 * 1024 * 1024;
 const RESPONSE_LIMIT = 16 * 1024 * 1024;
 const ALLOWED_FIELDS = new Set(['model','messages','stream','stream_options','max_tokens',
@@ -138,6 +138,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
         if(!Array.isArray(vector)||vector.length!==768||!vector.every(Number.isFinite)||!vector.some(value=>value!==0))
           throw new RouterError(502,'invalid_embedding_vector','LM Studio must return finite, nonzero vectors with exactly 768 dimensions.');
       }
+      log({event:'embedding_completed',modelId:embeddingId,status:200});
       json(res,200,result);
     }catch(error){
       log({event:'embedding_failed',code:error.code||'embedding_request_failed'});errorResponse(res,error);
@@ -181,6 +182,17 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
     if(body.max_tokens===undefined&&body.max_completion_tokens===undefined)body.max_tokens=profile.OutputLimit;
     if(queue.length>=maxQueued)throw new RouterError(429,'queue_full','The single-GPU request queue is full. Retry after current work completes.');
     const abort=new AbortController();
+    const requestId=randomUUID(),requestStarted=Date.now();
+    const lastUser=[...body.messages].reverse().find(m=>m?.role==='user');
+    const userText=typeof lastUser?.content==='string'?lastUser.content:Array.isArray(lastUser?.content)?lastUser.content.filter(p=>p?.type==='text').map(p=>p.text).join('\n'):'';
+    const probe=/LOKIENTE_ACCEPTANCE_[a-f0-9]{32}/.exec(userText)?.[0];
+    const probeHash=probe?createHash('sha256').update(probe).digest('hex'):undefined;
+    let probeTail='',probeReplyMatched=false;
+    const observeReply=text=>{
+      if(!probe||typeof text!=='string')return;
+      const combined=probeTail+text;if(combined.includes(probe))probeReplyMatched=true;
+      probeTail=combined.slice(-probe.length);
+    };
     // A deadline also has to answer a still-open client while it is queued or
     // waiting for the controller. Merely aborting fetch leaves those clients
     // hanging, because no fetch exists yet and the later job is skipped.
@@ -197,7 +209,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
         if(abort.signal.aborted)return;
         if(fatal)throw new RouterError(503,'controller_failed','The local model controller requires attention.');
         currentRequest={alias:profile.Alias,phase:'Loading',startedAtUtc:new Date().toISOString()};
-        log({event:'model_switch_started',alias:profile.Alias});
+        log({event:'model_switch_started',alias:profile.Alias,requestId,probeHash});
         // Do not abort an in-progress model load when the client disconnects.
         // Wait for its settled result; otherwise a second request could race it.
         const state=await switchModel(profile);
@@ -231,7 +243,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
               if(line.startsWith('data:')){
                 const data=line.slice(5).trim();
                 if(data==='[DONE]')done=true;
-                else if(data){try{if(JSON.parse(data).error)eventError=true;}catch{eventError=true;}}
+                else if(data){try{const event=JSON.parse(data);if(event.error)eventError=true;observeReply(event.choices?.[0]?.delta?.content);}catch{eventError=true;}}
               }
             }
             if(tail.length>1024*1024)throw new RouterError(502,'invalid_stream_frame','LM Studio returned an oversized event frame.');
@@ -241,12 +253,15 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
             if(!res.write(chunk))await once(res,'drain',{signal:abort.signal});
           }
           if(!bytes||!done||eventError)throw new RouterError(502,'incomplete_stream','LM Studio did not complete a valid prediction stream.');
+          log({event:'request_completed',alias:profile.Alias,modelId:state.ModelId,requestId,probeHash,probeReplyMatched,elapsedMs:Date.now()-requestStarted,status:200});
           res.end();
         }else{
           let size=0;const chunks=[];
           for await(const chunk of upstream.body){size+=chunk.length;if(size>RESPONSE_LIMIT){abort.abort();throw new RouterError(502,'response_too_large','Local response exceeded its transfer limit.');}chunks.push(chunk);}
           let result;try{result=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new RouterError(502,'invalid_upstream_json','LM Studio returned invalid JSON.');}
           if(result.error||!Array.isArray(result.choices)||!result.choices.length)throw new RouterError(502,'invalid_completion','LM Studio did not return a valid completion.');
+          observeReply(result.choices[0]?.message?.content);
+          log({event:'request_completed',alias:profile.Alias,modelId:state.ModelId,requestId,probeHash,probeReplyMatched,elapsedMs:Date.now()-requestStarted,status:200});
           json(res,200,result);
         }
       }catch(e){
@@ -258,7 +273,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
           profile.SmokeTests={Chat:status,ToolCall:status,ToolResultRoundTrip:status};
         }
         // Record metadata only, never prompts, completions, headers or tokens.
-        log({event:'request_failed',alias:profile.Alias,code:e.code||'request_aborted_or_failed'});
+        log({event:'request_failed',alias:profile.Alias,code:e.code||'request_aborted_or_failed',requestId,probeHash});
         errorResponse(res,e);
       }finally{currentRequest=null;clearTimeout(deadline);res.removeListener('close',disconnect);req.removeListener('aborted',disconnect);}
     });

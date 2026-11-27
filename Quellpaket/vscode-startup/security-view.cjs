@@ -6,13 +6,13 @@ const { promisify } = require('node:util');
 const execute = promisify(execFile);
 const {createReport,runInEditor} = require('./et-report.cjs');
 
-function registerSecurityView(vscode, context, dataDirectory) {
-    const root = path.dirname(dataDirectory);
+function registerSecurityView(vscode, context, dataDirectory, diagnostics = {}) {
+    const root = diagnostics.root || path.dirname(dataDirectory);
     const report = createReport(vscode,context);
     const guestChallenge = path.join(process.env.ProgramData, 'LoKiEnte-ET', 'challenge.json');
     const profile = path.join(root, 'security', 'profile.json');
     const event = new vscode.EventEmitter();
-    const output = vscode.window.createOutputChannel('LoKiEnte Security');
+    const output = diagnostics.output ? { appendLine: text => diagnostics.logger.info('LoKiEnte Security', text), show: preserve => diagnostics.output.show(preserve), dispose() {} } : vscode.window.createOutputChannel('LoKiEnte Security');
     const run = async (script,args,timeout=30000) => {
         const chain = JSON.parse(await fs.readFile(path.join(root,'toolchain.json'),'utf8'));
         return execute(chain.powerShellExecutable,['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(root,'app',script),...args],
@@ -44,6 +44,8 @@ function registerSecurityView(vscode, context, dataDirectory) {
             ...(guest?[item('Check VM isolation','vm','lokiente.security.guestTest')]:[]),
             item('Kilo rules and workflows','book','lokiente.security.rules','Agent Behaviour'),
             item('LoKiEnte startup settings','settings','lokiente.security.settings'),
+            item('Show LoKiEnte output','output','lokiente.showOutput'),
+            item('Run toolchain acceptance','beaker','lokiente.toolchain.check'),
             item('Configure extension sync','sync','lokiente.configureExtensionSync')
         ];
     }};
@@ -51,7 +53,8 @@ function registerSecurityView(vscode, context, dataDirectory) {
     const command = (id,fn) => context.subscriptions.push(vscode.commands.registerCommand(id,async()=>{
         try{await fn();}catch(e){
             const message=e.stderr || e.message || String(e);
-            output.appendLine(message);output.show(true);
+            if(diagnostics.logger)diagnostics.logger.error('LoKiEnte Security',message);else output.appendLine(message);
+            output.show(true);
             await vscode.window.showErrorMessage('LoKiEnte: '+message.slice(0,450));
         }finally{event.fire();}
     }));
@@ -124,6 +127,7 @@ function registerSecurityView(vscode, context, dataDirectory) {
                 const env={...process.env,LOKIENTE_ET_PROJECT:project || '',LOKIENTE_ET_CUSTOM:custom?JSON.stringify(custom):''};
                 await runInEditor(chain.nodeExecutable,path.join(root,'app','security-probe','local-model.cjs'),model.alias,{cwd:root,env},report,context);
             }catch{
+                diagnostics.logger?.error('LoKiEnte Security','Unable to start the provisioned Node runner.');
                 report.update({type:'fatal',detail:'Unable to start the provisioned Node runner. Check toolchain.json and reopen LoKiEnte from the desktop shortcut.'});
             }
         }finally{testing=false;}

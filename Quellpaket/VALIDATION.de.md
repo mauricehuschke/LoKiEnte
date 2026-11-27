@@ -1,3 +1,89 @@
+## Provisioning-Diagnose, nativer Launcher und Projektreparatur - Paket 2026.11.27.3
+
+Dieser Stand ergänzt laufende Berichte mit Schema 2, Bootstrap-Übergabenachweise,
+geschwärzte native stdout-/stderr-Ausgaben und den Erhalt teilweiser Abnahmenachweise.
+Die Desktopverknüpfung verweist auf ein kompiliertes Windows-GUI-Programm. Echte
+Prozess-/Argument-/Schwärzungstests prüfen den Sammler ohne Konsole. Erst eine zum
+Start, Helferstand und Profil passende Bestätigung bestätigt VS Code. Kilos Erkennung
+wartet auf spätere Registrierung; installierte Manifeste und laufende Extensions
+werden getrennt erfasst.
+
+Die Zielabnahme benötigt weder Docker noch Hyper-V. Die nativen Abhängigkeitsprüfungen
+enthalten zusätzlich zu Kilo/Konfiguration/Werkzeugen/Suche einen synthetischen lokalen
+Git-Klon. Die Projektwahl behält vorhandene Ordner und ergänzt begrenzte Git-Suche,
+Klonen und Pfadreparatur mit Backups sowie Erhalt von Aufgaben/Prüfungen/Einstellungen.
+
+Neue relevante Tests: Test-ProvisionReport.ps1 (echte Dateien/Prozessausgaben),
+Test-DesktopRunner.ps1 (echtes Windows-GUI-Programm samt Kindprozess; simulierter
+Host-Handshake), Test-KiloStartup.mjs (simulierte Extension-Registrierung),
+Test-ProjectGit.ps1 (echtes Git und Dateisystem-Reparatur), Test-ProjectSelection.ps1
+und Test-LauncherIcon.ps1. Die Dialogansicht und echte VS-Code-/Kilo-/LM-Studio-Inferenz
+müssen weiterhin auf dem Zielsystem abgenommen werden.
+
+Der native Git-Klon-Test ist in dieser Agent-Sitzung BLOCKED: Windows verweigert
+MSYS NtCreateDirectoryObject mit 0xC0000022. Unabhängige Such-/Reparaturprüfungen laufen
+mit einem gesondert initialisierten Repository weiter; sie zählen nicht als erfolgreicher
+Klon. Bestehende Junction-Prüfungen bleiben ebenfalls durch Zugriffsverweigerung blockiert.
+Es werden dafür weder VM noch Container verwendet. Fehlender Nachweis auf dem Ziel-PC
+bleibt ausdrücklich ungeprüft.
+
+## Echte Toolketten-Abnahme und gemeinsame Ausgabe - Paket 2026.11.27.2
+
+Nach der Einrichtung bietet das Provisioning die echte Abnahme an. RunAcceptanceTest
+und SkipAcceptanceTest werden durch Bootstrap und Anfrageübergabe weitergereicht.
+Enter startet den Test. Überspringen schreibt SKIPPED in JSON und JUnit und erzeugt
+eine Warnung über die ungeprüfte Umgebung. FAIL liefert Exitcode 1, BLOCKED 2;
+ausdrückliches Überspringen liefert 0 ohne einen Funktionsnachweis zu behaupten.
+
+Der Live-Test verwendet installiertes Desktop-VS-Code mit echtem Extension Host,
+installiertes Kilo samt eingebetteter Runtime, die vorbereitete lokale Konfiguration
+und LM Studio. Er prüft Extension-Abhängigkeiten, Konfiguration/Werkzeugimporte/Suche
+in beiden Kilo-Runtimes, echte Datei-Leseaufrufe mit abschließender Modellantwort für
+jedes konfigurierte Modell und eine echte Kilo-Webview-Anfrage. Im Dual-Modus werden
+Anfrage und erwarteter Antwortinhalt über einen zufälligen Nonce-Hash zugeordnet;
+Prompts und Antworten werden nicht in Router-Ereignisse geschrieben. Die sichtbare
+Chatantwort erfordert eine gesondert als manuell gekennzeichnete Sichtprüfung.
+Fehlende, unvollständige, übersprungene oder nicht interaktiv bestätigte Nachweise
+können niemals ein vollständiges PASS ergeben. Bei aktiviertem Indexing kommen echte
+Embedding-Inferenz und LanceDB-Schreib-/Suchprüfung hinzu. Vollständige Repository-
+Indexierung bleibt ein separater Arbeitslasttest.
+
+Die Ausgabe LoKiEnte vereinigt verfügbare verwaltete VS-Code-/Kilo-Logs, Router-
+Ereignisse, Controller-Logs, lokale Werkzeugereignisse und LM-Studio-Serverlogs mit
+Quelle und Schweregrad. Gesundheitsprüfungen belegen Erreichbarkeit, keine Inferenz.
+Regressionstests prüfen Schwärzung, begrenztes Nachlesen, UTF-8-Teilzeichen, Rotation,
+HTTP-Ausfall/Wiederherstellung, ungültige/übergroße Antworten, Router-Zuordnung,
+abgebrochene Streams und echte native Prozesse mit Zeitlimit/geerbten Ausgabekanälen.
+Die Startup-UI-Unit-Tests simulieren VS Code und gelten nicht als echter Host-Nachweis.
+
+Relevante Tests: Test-ToolchainAcceptance.mjs, Test-ToolchainDiagnostics.mjs,
+Test-RouterEvidence.mjs, Test-ToolchainNative.ps1, Test-ToolchainPolicy.ps1,
+Test-ToolchainProvisioning.ps1, Test-VsCodeStartup.mjs, Test-VsCodeProfile.ps1,
+Test-RouterLifecycle.ps1, Test-RipgrepIntegration.ps1 und Test-SelectionIntegration.ps1.
+Die installierte Abnahme startet über app/Test-Toolchain.ps1; vscode-tests/toolchain.cjs
+ist der echte Extension-Host-Einstieg. Berichte bleiben lokal unter diagnostics/toolchain.
+
+Lokale Validierung vom 27.11.2026: Der kombinierte JavaScript-Lauf mit neun Suiten
+bestand 61 Fälle. Der abschließende Startup-Einzellauf prüft zusätzlich das Zeitlimit
+beim Öffnen der Kilo-Seitenleiste (11 Fälle). Abnahmerichtlinie/Vorbereitung bestanden
+21 Prüfungen, Provisioning-Überspringen/Berichte 13, native Prozesse/Konfigurations-
+Zeitlimit/LM-Studio-Protokollierung 7, VSIX/Profil 36 und Router-Lebenszyklus 18.
+Der Audit unter Windows PowerShell 5.1 bestand 51 Prüfungen, native Modellbefehle mit
+Fehlerfällen 25. Einstellungenserhalt, Modellwahl-/Suchintegration, Indexing-Richtlinie
+und -Start, CLI-Auflösung, Werkzeugerkennung, Arbeitsbereichsanleitung und Lokalisierung
+bestanden ebenfalls. Die Kilo-Import-Junction-Prüfung bleibt wegen verweigertem Windows-
+Zugriff BLOCKED. Der Installer-Inhalt wird bytegenau mit allen Paketquellen verglichen;
+öffentliche Quellen und dekodierter Inhalt werden mit Gitleaks geprüft. Diese Prüfungen
+belegen keine Inferenz.
+
+Die Zielabnahme ist in dieser Entwicklungsumgebung weiterhin UNVERIFIED: Hier gibt
+es keine verwaltete D:\LoKi-Installation samt Kilo-Runtime. Ein isolierter Startversuch
+des echten Desktop-Hosts lieferte vor seinem Zeitlimit keinen Extension-Host-Bericht
+und wird nicht als bestanden gezählt. Die betroffene Installation auf dem anderen PC
+muss den neuen Installer/Test ausführen und ihren eigenen Bericht erzeugen. Der
+vorhandene Bootstrap-Junction-Test und die Kilo-Import-Junction-Prüfung bleiben wegen verweigerter Windows-
+Junction-Erzeugung blockiert; diese Prüfung wurde nicht abgeschwächt oder bestanden erklärt.
+
 ## Begrenzte Modellwechsel und konkrete Fehler - Paket 2026.11.27.1
 
 Im unveränderten Code kehrte ein nativer Prozessaufruf erst nach 12,75 Sekunden

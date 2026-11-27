@@ -61,7 +61,7 @@ Assert-Models ((Get-ManualFailure -Mode Single -Key 'my/custom-model') -match 'M
 $main=@($ast.EndBlock.Statements|Where-Object {$_ -is [Management.Automation.Language.TryStatementAst]})[0]
 $entry=$main.Body.Find({param($node)
     $node -is [Management.Automation.Language.AssignmentStatementAst] -and
-    $node.Left.Extent.Text -ceq '$lms' -and $node.Right.Extent.Text -match '^Resolve-ShadowSetupLms'
+    $node.Left.Extent.Text -ceq '$lms' -and $node.Right.Extent.Text -match 'Resolve-ShadowSetupLms'
 },$true)
 if(-not $entry){throw 'Setup LM Studio entry missing'}
 # ModelAction Keep moved model configuration inside a branch. Inspect the
@@ -69,7 +69,7 @@ if(-not $entry){throw 'Setup LM Studio entry missing'}
 $statements=@($entry.Parent.Statements)
 $start=-1
 for($i=0;$i -lt $statements.Count;$i++){
-    if($statements[$i].Extent.Text -match '^\$lms=Resolve-ShadowSetupLms'){$start=$i;break}
+    if($statements[$i].Extent.Text -match '^\$lms=' -and $statements[$i].Extent.Text.Contains('Resolve-ShadowSetupLms')){$start=$i;break}
 }
 if($start -lt 0){throw 'Setup LM Studio entry missing'}
 $body=@($statements[$start..($statements.Count-1)]|ForEach-Object {$_.Extent.Text}) -join "`n"
@@ -99,7 +99,8 @@ function Stop-ShadowEmbeddingModel {param($InstallRoot,$Pool)}
 function Configure-LocalModelPool {[IO.File]::WriteAllText((Join-Path $InstallRoot 'unexpected'),'pool');throw 'Unexpected pool action'}
 function Write-ShadowManagedFile {param($Path,$Content,$BackupRoot) [IO.File]::WriteAllText($Path,$Content);return $true}
 '@
-    $harness+="`n"+$helper.Extent.Text+"`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
+    $reportModule=(Join-Path $SourceRoot 'ProvisionReport.ps1').Replace("'","''")
+    $harness+="`n. '$reportModule'`nStart-ShadowProvisionReport -InstallRoot `$InstallRoot -Report `$report`n"+$helper.Extent.Text+"`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
     $harnessPath=Join-Path $root 'harness.ps1'
     [IO.File]::WriteAllText($harnessPath,$harness)
     $result=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root) -AllowFailure -Quiet -TimeoutSeconds 30

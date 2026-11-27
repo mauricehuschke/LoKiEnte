@@ -8,13 +8,14 @@ function Get-ShadowIndexingMode {
 }
 
 function Select-ShadowIndexingForLaunch {
-    param([ValidateSet('Off','OnDemand','Automatic')][string]$Mode='Off',[switch]$StartIndexing)
+    param([ValidateSet('Off','OnDemand','Automatic')][string]$Mode='Off',[switch]$StartIndexing,[switch]$Desktop)
     $Mode=Get-ShadowIndexingMode -Toolchain @{indexingMode=$Mode}
     if($Mode -ceq 'Off'){
         if($StartIndexing){throw 'Indexing is disabled. Provision OnDemand or Automatic before requesting indexing.'}
         return $false
     }
     if($Mode -ceq 'Automatic' -or $StartIndexing){return $true}
+    if($Desktop){Add-Type -AssemblyName System.Windows.Forms;return ([Windows.Forms.MessageBox]::Show('Start optional CPU embedding/indexing for this launch? Kilo project consent is still required.','LoKiEnte indexing','YesNo','Question','Button2') -eq 'Yes')}
     Write-Host 'Optional local indexing: starts the CPU embedding model for this launch. Kilo project consent is still required.'
     try {return ((Read-Host 'Start indexing for the selected project now? [y/N]') -ieq 'y')}
     catch {Write-Host 'No interactive indexing choice available. Indexing stays off for this launch.';return $false}

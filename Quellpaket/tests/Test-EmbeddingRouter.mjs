@@ -52,7 +52,8 @@ test('authentication and browser-origin policy also cover embeddings',async t=>{
   assert.equal(f.received.length,0);
   assert.equal((await f.send(undefined,{authorization:'Bearer synthetic-api-token'})).status,200);
   assert.equal(f.received[0].authorization,'Bearer synthetic-api-token');
-  assert.deepEqual(f.logs,[]);
+  assert.deepEqual(f.logs,[{event:'embedding_completed',modelId:model,status:200}]);
+  assert.ok(!JSON.stringify(f.logs).includes('synthetic-api-token'));
 });
 
 test('only owned model, exact dimension and supported bounded text requests are accepted',async t=>{

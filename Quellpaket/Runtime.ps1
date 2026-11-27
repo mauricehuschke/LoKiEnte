@@ -127,6 +127,9 @@ function Invoke-LrNative {
     $process.StartInfo = $startInfo
     $readCancellation=[Threading.CancellationTokenSource]::new()
     $logPath = Join-Path $LogDirectory ((Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.log')
+    $eventWriter=Get-Command Write-ShadowToolchainEvent -CommandType Function -ErrorAction SilentlyContinue
+    $evidenceClock=[Diagnostics.Stopwatch]::StartNew();$stdout='';$stderr='';$nativeExit=$null;$nativeFailure=$null
+    if($eventWriter){Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Message ("Starting native command: "+$Arguments[0])}
     try {
         $null = $process.Start()
         $stdoutTask = $process.StandardOutput.ReadToEndAsync($readCancellation.Token)
@@ -153,16 +156,26 @@ function Invoke-LrNative {
         }
         $stdout = $stdoutTask.GetAwaiter().GetResult()
         $stderr = $stderrTask.GetAwaiter().GetResult()
+        $nativeExit=$process.ExitCode
         [IO.File]::WriteAllText($logPath, ($stdout + [Environment]::NewLine + $stderr), [Text.UTF8Encoding]::new($false))
+        if($eventWriter){
+            Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Level $(if($process.ExitCode -eq 0){'INFO'}else{'ERROR'}) -Message ("Command $($Arguments[0]) exited with code $($process.ExitCode). Details: $logPath")
+            if($stderr.Trim()){Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Level $(if($process.ExitCode -eq 0){'WARN'}else{'ERROR'}) -Message $stderr.TrimEnd()}
+        }
         if ($process.ExitCode -ne 0 -and -not $AllowFailure) {
             throw "LM Studio command '$($Arguments[0])' failed (exit $($process.ExitCode)). Details: $logPath"
         }
         return [pscustomobject]@{ Stdout = $stdout; Stderr = $stderr; LogPath = $logPath; ExitCode = $process.ExitCode }
+    } catch {
+        $nativeFailure=$_.Exception.Message
+        if($eventWriter){Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Level ERROR -Message $_.Exception.Message}
+        throw
     } finally {
         Write-Progress -Activity "LM Studio: $($Arguments[0])" -Completed
         $readCancellation.Cancel()
         $process.Dispose()
         $readCancellation.Dispose()
+        if(Get-Command Add-ShadowProvisionCommand -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionCommand -File $FilePath -Arguments $Arguments -WorkingDirectory ([string]$PWD) -TimeoutSeconds $TimeoutSeconds -ExitCode $nativeExit -Stdout $stdout -Stderr $stderr -DurationMs $evidenceClock.Elapsed.TotalMilliseconds -Failure $nativeFailure}
     }
 }
 

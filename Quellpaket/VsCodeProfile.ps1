@@ -82,6 +82,9 @@ function New-ShadowVsCodeStartupVsix {
                     'extension/lokiente.png'=(Join-Path $source 'lokiente.png')
                     'extension/extension.cjs'=(Join-Path $source 'extension.cjs')
                     'extension/sync-guide.cjs'=(Join-Path $source 'sync-guide.cjs')
+                    'extension/diagnostics.cjs'=(Join-Path $source 'diagnostics.cjs')
+                    'extension/toolchain-check.cjs'=(Join-Path $source 'toolchain-check.cjs')
+                    'extension/kilo-startup.cjs'=(Join-Path $source 'kilo-startup.cjs')
                     'extension/LICENSE.txt'=(Join-Path $PSScriptRoot 'LICENSE.txt')
                 }
                 foreach($name in $entries.Keys){

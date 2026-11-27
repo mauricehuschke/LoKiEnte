@@ -3,6 +3,7 @@ param([string]$SourceRoot=(Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference='Stop'
 . (Join-Path $SourceRoot 'Common.ps1')
 . (Join-Path $SourceRoot 'VsCodeProfile.ps1')
+. (Join-Path $SourceRoot 'ProvisionReport.ps1')
 $t=$null;$e=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'Setup.ps1'),[ref]$t,[ref]$e)
 $main=@($ast.EndBlock.Statements|Where-Object {$_ -is [Management.Automation.Language.TryStatementAst]})[0]

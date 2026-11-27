@@ -8,6 +8,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 try {
+    . (Join-Path $PSScriptRoot 'Common.ps1')
+    Initialize-ShadowToolchainLogging -InstallRoot $InstallRoot
     . (Join-Path $PSScriptRoot 'ModelPool.ps1')
     $result=Switch-ShadowLocalModel -InstallRoot $InstallRoot -Alias $Alias
     [IO.File]::WriteAllText($ResultPath,($result|ConvertTo-Json -Depth 10 -Compress),[Text.UTF8Encoding]::new($false))

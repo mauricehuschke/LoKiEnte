@@ -18,6 +18,8 @@
 /logs/
 /models/
 /provisioning-report.json
+/inventory.json
+/bootstrap-failure.json
 /provisioning-options.json
 /dependency-versions.json
 /toolchain.json

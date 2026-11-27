@@ -21,10 +21,14 @@ param(
     [string[]]$ProjectPath=@(),
     [switch]$SkipModelDownload,
     [switch]$UpdateManaged,
-    [switch]$NoShortcut
+    [switch]$NoShortcut,
+    [switch]$RunAcceptanceTest,
+    [switch]$SkipAcceptanceTest,
+    [hashtable]$BootstrapEvidence
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+if($RunAcceptanceTest -and $SkipAcceptanceTest){throw 'RunAcceptanceTest and SkipAcceptanceTest are mutually exclusive.'}
 $IndexingMode=switch($IndexingMode){'Off'{'Off'} 'OnDemand'{'OnDemand'} 'Automatic'{'Automatic'}}
 $PSNativeCommandUseErrorActionPreference=$false
 . (Join-Path $PSScriptRoot 'Common.ps1')
@@ -39,6 +43,10 @@ $PSNativeCommandUseErrorActionPreference=$false
 . (Join-Path $PSScriptRoot 'Router.ps1')
 . (Join-Path $PSScriptRoot 'AgentTemplates.ps1')
 . (Join-Path $PSScriptRoot 'Workspace.ps1')
+. (Join-Path $PSScriptRoot 'ToolchainAcceptance.ps1')
+. (Join-Path $PSScriptRoot 'ProvisionReport.ps1')
+. (Join-Path $PSScriptRoot 'DesktopRunner.ps1')
+Initialize-ShadowToolchainLogging -InstallRoot $InstallRoot
 
 function New-ShadowWelcomeTestProject {
     param([string]$InstallRoot)
@@ -305,6 +313,10 @@ function Install-ShadowKilo {
 
 $report=$null
 try {
+    $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
+    $report=[ordered]@{schema=2;bundleVersion=$BundleVersion;payloadSha256=$PayloadSha256;startedUtc=[DateTime]::UtcNow.ToString('o');status='IN_PROGRESS';installRoot=$InstallRoot;steps=@();warnings=@();allowUnfitAttempt=[bool]$AllowUnfitAttempt}
+    Start-ShadowProvisionReport -InstallRoot $InstallRoot -Report $report -Parameters $PSBoundParameters
+    if($BootstrapEvidence){$report.bootstrap=$BootstrapEvidence;Save-ShadowProvisionReport}
     if (-not $IsWindows -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -ne 'X64') { throw 'This provisioning script is designed for Windows x64.' }
     if($ModelMode -ne 'Dual' -and $IndexingMode -ne 'Off'){throw 'Semantic indexing requires ModelMode Dual.'}
     if($ModelMode -eq 'Single' -and $IncludeFastModel){throw 'IncludeFastModel requires ModelMode Dual.'}
@@ -315,7 +327,6 @@ try {
     foreach($project in $ProjectPath){if(-not(Test-Path -LiteralPath $project -PathType Container)){throw "Project directory not found: $project"}}
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
     [IO.Directory]::CreateDirectory($InstallRoot) | Out-Null
-    $report=[ordered]@{schema=1;bundleVersion=$BundleVersion;payloadSha256=$PayloadSha256;startedUtc=[DateTime]::UtcNow.ToString('o');status='IN_PROGRESS';installRoot=$InstallRoot;steps=@();warnings=@();allowUnfitAttempt=[bool]$AllowUnfitAttempt}
     $versions=if($DependencyPlan){$DependencyPlan}else{Resolve-LoKiEnteDependencyPlan -Policy $UpdatePolicy}
     foreach($key in @('powerShell','git','node','npm','curl','vsCode','lmStudio','kiloCli','kiloVsCode')){
         if([string]$versions[$key] -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$'){throw "Missing or invalid policy target for $key."}
@@ -327,25 +338,26 @@ try {
     $report.minimumReleaseAgeHours=48
     $report.acceptedDependencyVersions=$versions
     $inventory=Get-ShadowInventory
+    $report.inventory=$inventory
     $report.inventoryFile='inventory.json'
     $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'inventory.json') -Content ($inventory|ConvertTo-Json -Depth 15) -BackupRoot (Join-Path $InstallRoot 'backups/inventory')
     if ($ModelAction -eq 'Configure' -and -not $inventory.GPU) { throw 'NVIDIA GPU not reachable through nvidia-smi. Graphics drivers will not be replaced automatically.' }
     $winget=Resolve-ShadowTool -Name winget
     if (-not $winget) { throw 'WinGet missing. Install/update Windows App Installer and rerun this script.' }
-    $git=Install-ShadowPackage -Tool git -PackageId 'Git.Git' -WingetPath $winget -AcceptedVersion $versions.git
-    $node=Install-ShadowPackage -Tool node -PackageId $versions.nodePackage -WingetPath $winget -AcceptedVersion $versions.node
-    $curl=Install-ShadowPackage -Tool curl -PackageId 'cURL.cURL' -WingetPath $winget -AcceptedVersion $versions.curl
+    $git=Invoke-ShadowProvisionStep -Id 'dependency-1' -Action { Install-ShadowPackage -Tool git -PackageId 'Git.Git' -WingetPath $winget -AcceptedVersion $versions.git }
+    $node=Invoke-ShadowProvisionStep -Id 'dependency-2' -Action { Install-ShadowPackage -Tool node -PackageId $versions.nodePackage -WingetPath $winget -AcceptedVersion $versions.node }
+    $curl=Invoke-ShadowProvisionStep -Id 'dependency-3' -Action { Install-ShadowPackage -Tool curl -PackageId 'cURL.cURL' -WingetPath $winget -AcceptedVersion $versions.curl }
     $curlVersion=(Invoke-ShadowNative -FilePath $curl -ArgumentList @('--version') -Quiet -TimeoutSeconds 30).StdOut
     if($curlVersion -notmatch '(?m)^curl \d+\.\d+\.\d+'){throw 'curl exists but cannot be verified as a working curl CLI.'}
-    $code=Install-ShadowPackage -Tool code -PackageId 'Microsoft.VisualStudioCode' -WingetPath $winget -AcceptedVersion $versions.vsCode
-    $studio=Install-ShadowPackage -Tool lmstudio -PackageId 'ElementLabs.LMStudio' -WingetPath $winget -AcceptedVersion $versions.lmStudio
+    $code=Invoke-ShadowProvisionStep -Id 'dependency-4' -Action { Install-ShadowPackage -Tool code -PackageId 'Microsoft.VisualStudioCode' -WingetPath $winget -AcceptedVersion $versions.vsCode }
+    $studio=Invoke-ShadowProvisionStep -Id 'dependency-5' -Action { Install-ShadowPackage -Tool lmstudio -PackageId 'ElementLabs.LMStudio' -WingetPath $winget -AcceptedVersion $versions.lmStudio }
     $nodeVersion=(Invoke-ShadowNative -FilePath $node -ArgumentList @('--version') -Quiet).StdOut.Trim()
     if ($nodeVersion -notmatch '^v(\d+)\.' -or [int]$Matches[1] -lt 20) {
         throw "Existing Node $nodeVersion is too old for this baseline. It was not replaced. Provide a suitable Node LTS version and retry."
     }
-    $npmTool=Install-ShadowNpm -NodePath $node -Root $InstallRoot -Target $versions.npm
+    $npmTool=Invoke-ShadowProvisionStep -Id 'npm-1' -Action { Install-ShadowNpm -NodePath $node -Root $InstallRoot -Target $versions.npm }
     $npm=$npmTool.Entry
-    $kilo=Install-ShadowKilo -NodePath $node -NpmEntry $npm -Root $InstallRoot -AcceptedVersion $versions.kiloCli
+    $kilo=Invoke-ShadowProvisionStep -Id 'kilo-cli-1' -Action { Install-ShadowKilo -NodePath $node -NpmEntry $npm -Root $InstallRoot -AcceptedVersion $versions.kiloCli }
     $report.toolVersions=[ordered]@{
         powerShell=$PSVersionTable.PSVersion.ToString()
         npm=$npmTool.Version
@@ -353,7 +365,7 @@ try {
         kiloCli=$kilo.kiloVersion
         curl=($curlVersion -split '\r?\n')[0]
     }
-    $ripgrep=Install-ShadowRipgrep -InstallRoot $InstallRoot
+    $ripgrep=Invoke-ShadowProvisionStep -Id 'ripgrep-1' -Action { Install-ShadowRipgrep -InstallRoot $InstallRoot }
     if($IndexingMode -ne 'Off'){$null=Install-ShadowLanceDb -InstallRoot $InstallRoot -NodePath $node -NpmEntry $npm}
     $toolchain=[ordered]@{
         schema=2;modelMode=$ModelMode;indexingMode=$IndexingMode;allowUnfitAttempt=[bool]$AllowUnfitAttempt;kiloExecutable=$kilo.kiloExecutable;kiloArgumentPrefix=@($kilo.kiloArgumentPrefix)
@@ -364,7 +376,7 @@ try {
     $profileRoot=Join-Path $InstallRoot 'vscode-data'
     $extensionsRoot=Join-Path $InstallRoot 'vscode-extensions'
     [IO.Directory]::CreateDirectory($extensionsRoot)|Out-Null
-    Update-ShadowVsCodeProfile -InstallRoot $InstallRoot -PowerShellPath $toolchain.powerShellExecutable
+    $null=Invoke-ShadowProvisionStep -Id 'vscode-profile-1' -Action { Update-ShadowVsCodeProfile -InstallRoot $InstallRoot -PowerShellPath $toolchain.powerShellExecutable }
     $codeArgs=@('--user-data-dir',$profileRoot,'--extensions-dir',$extensionsRoot,'--telemetry-level','off')
     $extensionList=Invoke-ShadowCodeCli -CodePath $code -Arguments ($codeArgs+@('--list-extensions','--show-versions'))
     $extensionVersion=Get-ShadowKiloExtensionVersion -Output $extensionList.StdOut
@@ -378,9 +390,11 @@ try {
     if(-not $extensionVersion){throw 'Kilo extension not found in the managed VS Code profile.'}
     if($extensionSpec -and $extensionVersion -cne $versions.kiloVsCode){throw 'VS Code does not report the approved Kilo version after installation.'}
     $report.kiloVsCodeExtensionVersion=$extensionVersion
-    $bundledKilo=Get-ShadowBundledKilo -CodePath $code -InstallRoot $InstallRoot
+    $report.extensions=@($extensionList.StdOut -split '\r?\n'|Where-Object {$_ -match '^.+@\d+\.\d+\.\d+'}|ForEach-Object {$parts=$_ -split '@',2;@{id=$parts[0];version=$parts[1]}})
+    $bundledKilo=Invoke-ShadowProvisionStep -Id 'installed-kilo-runtime-1' -Kind Test -Action { Get-ShadowBundledKilo -CodePath $code -InstallRoot $InstallRoot }
     $toolchain.bundledKiloExecutable=$bundledKilo
-    Install-ShadowVsCodeStartup -CodePath $code -InstallRoot $InstallRoot
+    $null=Invoke-ShadowProvisionStep -Id 'vscode-startup-1' -Action { Install-ShadowVsCodeStartup -CodePath $code -InstallRoot $InstallRoot }
+    $report.startupExtension=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'vscode-startup/package.json') -Raw|ConvertFrom-Json
     $report.steps+=@('Managed VS Code startup and Settings Sync exclusions configured')
     $report.steps+=@('Git/Node/curl/VSCode/LMStudio available','Kilo CLI available','Kilo VS Code extension available','Ripgrep verified')
 
@@ -396,17 +410,17 @@ try {
                 $savedEmbedding=Get-Content -LiteralPath $embeddingFile -Raw | ConvertFrom-Json
                 $embeddingArguments=Get-ShadowEmbeddingConfigurationArguments -Embedding $savedEmbedding.result -ApiBaseUrl $pool.RouterApiBaseUrl
             }
-            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $pool.RouterApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments
+            $configuration=Invoke-ShadowProvisionStep -Id 'agent-configuration-1' -Action { New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $pool.RouterApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments }
         } else {
             $runtime=Get-Content -LiteralPath (Join-Path $InstallRoot 'runtime/runtime-state.json') -Raw | ConvertFrom-Json
             if ($runtime.Status -notin @('Ready','Deferred') -or !$runtime.ModelId) {throw 'Invalid saved single-model state. Rerun with -ModelAction Configure.'}
             $name=if ($runtime.Status -eq 'Deferred') {'LoKiEnte local [NOT YET VERIFIED]'} else {'LoKiEnte local - verified workflow'}
-            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $name -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
+            $configuration=Invoke-ShadowProvisionStep -Id 'agent-configuration-2' -Action { New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $name -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable }
         }
         $report.smokeTests='NotRun'
         $report.steps+=@('Saved model configuration reused; model downloads, runtime changes and inference tests skipped')
     } else {
-        $lms=Resolve-ShadowSetupLms -StudioPath $studio
+        $lms=Invoke-ShadowProvisionStep -Id 'lmstudio-initialization-1' -Action { Resolve-ShadowSetupLms -StudioPath $studio }
         $poolPath=Join-Path $InstallRoot 'runtime/model-pool.json'
         $previousPool=$null
         if(Test-Path -LiteralPath $poolPath){
@@ -434,7 +448,7 @@ try {
             $null=Write-ShadowManagedFile -Path $selectionFile -Content ($selectedState|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/model-selection')
             $downloadDefinitions=@($selectedDefinitions)
             if($IndexingMode -ne 'Off'){$downloadDefinitions+=@(@{Alias='embedding';Definition=(Get-ShadowEmbeddingDefinition)})}
-            Install-ShadowSelectedModels -Definitions $downloadDefinitions -LmsPath $lms -InstallRoot $InstallRoot -SkipModelDownload:$SkipModelDownload
+            $null=Invoke-ShadowProvisionStep -Id 'model-downloads-1' -Action { Install-ShadowSelectedModels -Definitions $downloadDefinitions -LmsPath $lms -InstallRoot $InstallRoot -SkipModelDownload:$SkipModelDownload }
         }else{
             Assert-ShadowSetupModels -LmsPath $lms -InstallRoot $InstallRoot -ModelMode $ModelMode -PreferredModel $PreferredModel -ModelKey $ModelKey -IncludeFastModel:$IncludeFastModel
         }
@@ -442,11 +456,11 @@ try {
             Stop-ShadowModelRouter -InstallRoot $InstallRoot -Pool $previousPool
         }
         if($ModelMode -eq 'Dual'){
-            $pool=Configure-LocalModelPool -InstallRoot $InstallRoot -ContextLength $ContextLength -Port $Port -RouterPort $RouterPort -IncludeFastModel:$IncludeFastModel -AllowPartialGpuOffload:$AllowPartialGpuOffload -AllowUnfitAttempt:$AllowUnfitAttempt -SelectedDefinitions $selectedDefinitions -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable
-            $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $node -PowerShellPath $toolchain.powerShellExecutable
+            $pool=Invoke-ShadowProvisionStep -Id 'model-pool-1' -Action { Configure-LocalModelPool -InstallRoot $InstallRoot -ContextLength $ContextLength -Port $Port -RouterPort $RouterPort -IncludeFastModel:$IncludeFastModel -AllowPartialGpuOffload:$AllowPartialGpuOffload -AllowUnfitAttempt:$AllowUnfitAttempt -SelectedDefinitions $selectedDefinitions -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable }
+            $router=Invoke-ShadowProvisionStep -Id 'router-1' -Action { Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $node -PowerShellPath $toolchain.powerShellExecutable }
             $embedding=if($IndexingMode -ceq 'Automatic'){Initialize-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $pool -Definition (Get-ShadowEmbeddingDefinition)}else{Set-ShadowIndexingInactive -InstallRoot $InstallRoot -Mode $IndexingMode}
             $embeddingArguments=Get-ShadowEmbeddingConfigurationArguments -Embedding $embedding -ApiBaseUrl $router.ApiBaseUrl
-            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments
+            $configuration=Invoke-ShadowProvisionStep -Id 'agent-configuration-3' -Action { New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelCatalog (Get-ShadowPoolCatalog $pool) -MainModel $pool.PrimaryAlias -ApiBaseUrl $router.ApiBaseUrl -ApiTokenEnvironmentVariable $pool.ApiTokenEnvironmentVariable @embeddingArguments }
             $report.runtime=$pool;$report.router=$router
             $report.embedding=$embedding
             $report.indexingMode=$IndexingMode
@@ -465,22 +479,22 @@ try {
                 $null=Switch-ShadowLocalModel -InstallRoot $InstallRoot -Alias $alias
             }
             $singleProfile=if($selectedDefinitions.Count){$selectedDefinitions[0].Definition}else{$null}
-            $runtime=Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -PreferredModel $PreferredModel -ModelKey $ModelKey -SelectedProfile $singleProfile -ContextLength $ContextLength -Port $Port -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable -AllowUnfitAttempt:$AllowUnfitAttempt
+            $runtime=Invoke-ShadowProvisionStep -Id 'single-model-1' -Action { Configure-LocalRuntime -StateRoot (Join-Path $InstallRoot 'runtime') -PreferredModel $PreferredModel -ModelKey $ModelKey -SelectedProfile $singleProfile -ContextLength $ContextLength -Port $Port -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable -AllowUnfitAttempt:$AllowUnfitAttempt }
             if($runtime.Status -cnotin @('Ready','Deferred')){throw "Unknown model status: $($runtime.Status)"}
             $singleName=if($runtime.Status -ceq 'Deferred'){'LoKiEnte local [NOT YET VERIFIED]'}else{'LoKiEnte local - verified workflow'}
             if($runtime.Status -ceq 'Deferred'){$report.warnings+=@("Single model is downloaded but unverified: $($runtime.VerificationMessage)")}
             elseif(Get-LrProperty $runtime.Estimate 'ReserveOverride' $false){$report.warnings+=@('Single model was tested without LoKiEnte memory reserve.')}
-            $configuration=New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable
+            $configuration=Invoke-ShadowProvisionStep -Id 'agent-configuration-4' -Action { New-ShadowAgentConfiguration -InstallRoot $InstallRoot -ModelId $runtime.ModelId -ModelDisplayName $singleName -ApiBaseUrl $runtime.ApiBaseUrl -ContextLength $runtime.ContextLength -ApiTokenEnvironmentVariable $runtime.ApiTokenEnvironmentVariable }
             $report.runtime=$runtime;$report.smokeTests=$runtime.SmokeTests
         }
     }
-    $report.effectiveConfiguration=Assert-ShadowKiloEffectiveConfig -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot
-    $report.effectiveGuiBackendConfiguration=Assert-ShadowKiloEffectiveConfig -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot
-    $report.workflowCliTools=Assert-ShadowKiloWorkflowTools -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot
-    $report.workflowGuiTools=Assert-ShadowKiloWorkflowTools -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot
+    $report.effectiveConfiguration=Invoke-ShadowProvisionStep -Id 'effective-kilo-config-1' -Kind Test -Action { Assert-ShadowKiloEffectiveConfig -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot }
+    $report.effectiveGuiBackendConfiguration=Invoke-ShadowProvisionStep -Id 'effective-kilo-config-2' -Kind Test -Action { Assert-ShadowKiloEffectiveConfig -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot }
+    $report.workflowCliTools=Invoke-ShadowProvisionStep -Id 'kilo-tool-imports-1' -Kind Test -Action { Assert-ShadowKiloWorkflowTools -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot }
+    $report.workflowGuiTools=Invoke-ShadowProvisionStep -Id 'kilo-tool-imports-2' -Kind Test -Action { Assert-ShadowKiloWorkflowTools -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $InstallRoot }
     $searchConfig=$configuration.Config|ConvertTo-Json -Depth 40 -Compress
-    Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -ConfigJson $searchConfig
-    Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $bundledKilo -ConfigJson $searchConfig
+    $null=Invoke-ShadowProvisionStep -Id 'kilo-file-search-1' -Kind Test -Action { Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $kilo.kiloExecutable -KiloArgumentPrefix @($kilo.kiloArgumentPrefix) -ConfigJson $searchConfig }
+    $null=Invoke-ShadowProvisionStep -Id 'kilo-file-search-2' -Kind Test -Action { Test-ShadowKiloSearch -InstallRoot $InstallRoot -KiloExecutable $bundledKilo -ConfigJson $searchConfig }
     $report.steps+=@('File search verified in Kilo CLI and VS Code extension')
     if ($ModelAction -eq 'Configure') {
         if(($ModelMode -eq 'Dual' -and $pool.VerificationStatus -cne 'Verified') -or
@@ -497,10 +511,12 @@ try {
     $null=Write-ShadowManagedFile -Path (Join-Path $welcome 'START_HERE.de.md') -Content ([IO.File]::ReadAllText((Join-Path $PSScriptRoot 'templates/START_HERE.de.md')).Replace('(../welcome-example/README.de.md)','(workflow-test/README.de.md)')) -BackupRoot (Join-Path $InstallRoot 'backups/welcome')
     $welcomeProject=New-ShadowWelcomeTestProject -InstallRoot $InstallRoot
     $ProjectPath=@($ProjectPath)+@($welcomeProject.project)
-    $workspaceUpdate=Update-ShadowWorkspaces -Root $InstallRoot -ProjectPath $ProjectPath -PwshPath $toolchain.powerShellExecutable
+    $workspaceUpdate=Invoke-ShadowProvisionStep -Id 'workspaces-1' -Action { Update-ShadowWorkspaces -Root $InstallRoot -ProjectPath $ProjectPath -PwshPath $toolchain.powerShellExecutable }
     $report.workspaces=@($workspaceUpdate.Entries)
     $report.warnings+=@($workspaceUpdate.Warnings)
     $report.steps+=@('Registered and new workspaces updated to the package version')
+    $desktopRunner=Invoke-ShadowProvisionStep -Id 'desktop-runner' -Component 'Desktop runner' -Action {Install-ShadowDesktopRunner -InstallRoot $InstallRoot -PowerShellPath $toolchain.powerShellExecutable}
+    $toolchain.desktopRunner=$desktopRunner
     if (-not $NoShortcut) {
         $desktop=[Environment]::GetFolderPath('Desktop')
         if ($desktop) {
@@ -511,10 +527,11 @@ try {
             }
             $shell=New-Object -ComObject WScript.Shell
             $shortcut=$shell.CreateShortcut($shortcutPath)
-            $shortcut.TargetPath=$toolchain.powerShellExecutable
+            $shortcut.TargetPath=$desktopRunner
             $launcher=Join-Path $InstallRoot 'app/Start-LocalAI.ps1'
             if ($launcher.Contains('"')) { throw 'Invalid quotation mark in installation path.' }
-            $shortcut.Arguments='-NoLogo -NoProfile -ExecutionPolicy Bypass -File "'+$launcher+'" -InstallRoot "'+$InstallRoot+'" -PauseOnError'
+            $previousLauncherArguments='-NoLogo -NoProfile -ExecutionPolicy Bypass -File "'+$launcher+'" -InstallRoot "'+$InstallRoot+'" -PauseOnError'
+            $shortcut.Arguments=''
             $shortcut.WorkingDirectory=$InstallRoot
             $shortcut.Description='Local model, dedicated VS Code environment and reviewed agent workflows'
             $iconPath=Join-Path $InstallRoot 'app/assets/lokiente.ico'
@@ -526,7 +543,7 @@ try {
                 $legacyPath=Join-Path $desktop $legacyName
                 if(Test-Path -LiteralPath $legacyPath -PathType Leaf){
                     $legacy=$shell.CreateShortcut($legacyPath)
-                    if($legacy.TargetPath -ieq $shortcut.TargetPath -and $legacy.Arguments -ceq $shortcut.Arguments){
+                    if(($legacy.TargetPath -ieq $shortcut.TargetPath -and $legacy.Arguments -ceq $shortcut.Arguments) -or ($legacy.TargetPath -ieq $toolchain.powerShellExecutable -and $legacy.Arguments -ceq $previousLauncherArguments)){
                         $backupDirectory=Join-Path $InstallRoot 'backups/shortcuts'
                         [void][IO.Directory]::CreateDirectory($backupDirectory)
                         Copy-Item -LiteralPath $legacyPath -Destination (Join-Path $backupDirectory ([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')+'-'+$legacyName))
@@ -545,22 +562,37 @@ try {
         }
         $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-options.json') -Content ($desired|ConvertTo-Json) -BackupRoot (Join-Path $InstallRoot 'backups/provisioning-options')
     }
+    $acceptanceMode=Select-ShadowAcceptanceMode -RunAcceptanceTest:$RunAcceptanceTest -SkipAcceptanceTest:$SkipAcceptanceTest
+    if($acceptanceMode -eq 'Run'){
+        $report.acceptance=Invoke-ShadowProvisionStep -Id 'live-acceptance-1' -Action { Invoke-ShadowToolchainAcceptance -InstallRoot $InstallRoot }
+    }else{
+        $report.acceptance=@{schema=1;kind='live-toolchain-acceptance';status=$(if($acceptanceMode -eq 'Skip'){'SKIPPED'}else{'BLOCKED'});cases=@();reason=$(if($acceptanceMode -eq 'Skip'){'Explicitly skipped. The installed toolchain has not passed live acceptance.'}else{'No interactive answer available. Use RunAcceptanceTest or SkipAcceptanceTest explicitly.'})}
+        $report.acceptance.finishedAtUtc=[DateTime]::UtcNow.ToString('o')
+        $report.acceptance.cases=@(@{id='live-acceptance';status=$report.acceptance.status;evidence=$report.acceptance.reason})
+        Write-ShadowAcceptanceJson -Path (Join-Path $InstallRoot 'diagnostics/toolchain/latest.json') -Value $report.acceptance
+        Write-ShadowAcceptanceJUnit -Path (Join-Path $InstallRoot 'diagnostics/toolchain/latest.junit.xml') -Report $report.acceptance
+        Write-ShadowMessage ("Live toolchain acceptance: "+$report.acceptance.status+'. '+$report.acceptance.reason) 'WARN'
+    }
+    if($report.acceptance.status -ne 'PASS'){$report.warnings+=@("Live toolchain acceptance: $($report.acceptance.status). The environment is not verified end to end.")}
     $report.status=if($report.warnings.Count -or ($ModelAction -eq 'Configure' -and (($ModelMode -eq 'Dual' -and ($pool.VerificationStatus -cne 'Verified' -or $embedding.Status -ceq 'Deferred' -or (Get-LrProperty $embedding 'ReserveOverride' $false) -or
         @($pool.Profiles|Where-Object {(Get-LrProperty $_.Estimate 'ReserveOverride' $false)}).Count)) -or
         ($ModelMode -eq 'Single' -and ($runtime.Status -ceq 'Deferred' -or (Get-LrProperty $runtime.Estimate 'ReserveOverride' $false)))))){
         'PROVISIONED_WITH_WARNINGS'
     }else{'PROVISIONED'}
     $report.finishedUtc=[DateTime]::UtcNow.ToString('o')
-    $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-report.json') -Content ($report|ConvertTo-Json -Depth 25) -BackupRoot (Join-Path $InstallRoot 'backups/reports')
+    Complete-ShadowProvisionReport
     $statusLevel=if($report.status -ceq 'PROVISIONED_WITH_WARNINGS'){'WARN'}else{'OK'}
     Write-ShadowMessage "Setup: $($report.status). Report: $(Join-Path $InstallRoot 'provisioning-report.json')" $statusLevel
     $projectPaths=@($report.workspaces|ForEach-Object {$_.project})
     foreach($command in (Get-ShadowStartCommands -PowerShellPath $toolchain.powerShellExecutable -InstallRoot $InstallRoot -ProjectPaths $projectPaths)){
         Write-ShadowMessage "Start: $command"
     }
+    if($report.acceptance.status -eq 'FAIL'){exit 1}
+    if($report.acceptance.status -eq 'BLOCKED'){exit 2}
     exit 0
 }
 catch {
+    Write-ShadowToolchainEvent -Component 'Provisioning' -Level ERROR -Message $_.Exception.Message
     $manualAction=$_.Exception.Data['ShadowManualAction']
     $isManualAction=$manualAction -in @('LM_STUDIO_INITIALIZATION','MODEL_DOWNLOAD')
     if ($null -ne $report) {
@@ -571,7 +603,7 @@ catch {
             line=$_.InvocationInfo.ScriptLineNumber
             errorId=$_.FullyQualifiedErrorId
         }
-        try { $null=Write-ShadowManagedFile -Path (Join-Path $InstallRoot 'provisioning-report.json') -Content ($report|ConvertTo-Json -Depth 25) -BackupRoot (Join-Path $InstallRoot 'backups/reports') } catch { Write-Warning 'Could not save report.' }
+        try { Complete-ShadowProvisionReport -Failure $_ } catch { Write-Warning 'Could not save report.' }
     }
     if($isManualAction){Write-Host $_.Exception.Message}
     else{Write-Error -Message ("Setup incomplete: "+$_.Exception.Message) -ErrorAction Continue}

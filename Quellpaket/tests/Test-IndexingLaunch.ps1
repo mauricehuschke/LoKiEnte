@@ -6,6 +6,7 @@ foreach($name in @('ModelPool.ps1','Indexing.ps1','AgentTemplates.ps1')){. (Join
 $fixture=Join-Path ([IO.Path]::GetTempPath()) ('lokiente-index-launch-'+[guid]::NewGuid().ToString('N'))
 $null=[IO.Directory]::CreateDirectory((Join-Path $fixture 'runtime'))
 $count=0
+$Desktop=$false
 function Assert-Launch([bool]$Value,[string]$Message){if(-not $Value){throw $Message};$script:count++}
 function Read-Host {param($Prompt) $script:answer}
 function Start-ShadowModelRouter {$script:routerCalls++;return @{ApiBaseUrl='http://127.0.0.1:1235/v1'}}

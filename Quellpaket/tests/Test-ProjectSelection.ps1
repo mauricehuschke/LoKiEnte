@@ -64,11 +64,13 @@ try{
     $app=Join-Path $root 'launcher-fixture'
     New-Item -ItemType Directory -Path $app | Out-Null
     Copy-Item -LiteralPath (Join-Path $SourceRoot 'Start-LocalAI.ps1'),(Join-Path $SourceRoot 'ProjectSelection.ps1') -Destination $app
-    foreach($module in @('Runtime','ModelSelection','Ripgrep','ModelPool','Router','AgentTemplates','Workspace')){
+    foreach($module in @('Runtime','ModelSelection','Indexing','Ripgrep','ModelPool','Router','AgentTemplates','Workspace','DesktopRunner')){
         [IO.File]::WriteAllText((Join-Path $app ($module+'.ps1')),'')
     }
     [IO.File]::WriteAllText((Join-Path $app 'Common.ps1'),@'
 function Read-Host {param($Prompt) return '0'}
+function Initialize-ShadowToolchainLogging {param($InstallRoot)}
+function Write-ShadowToolchainEvent {param($Component,$Level,$Message)}
 function Assert-ShadowRipgrepReady {param($InstallRoot) throw 'Runtime was reached after cancel'}
 '@)
     $result=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile','-File',(Join-Path $app 'Start-LocalAI.ps1'),'-InstallRoot',$app) -AllowFailure -Quiet -TimeoutSeconds 30
