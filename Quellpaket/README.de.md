@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.8 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.9 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 ## Desktop-Projekte und Provisioning-Diagnose
 
@@ -32,7 +32,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.6; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.7; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
@@ -109,6 +109,14 @@ Der Bericht erfasst SHA-256-Prüfsummen der gemeinsamen Konfiguration/Quellen,
 vergleicht wirksame Benutzer-/Workspace-Einstellungen und inventarisiert die
 im laufenden Host sichtbaren Erweiterungen. Abweichungen blockieren die Abnahme.
 Nur das erzeugte Projekt und die Abnahmesteuerung unterscheiden sich.
+Provisioning ermittelt vor dem Profilaufbau die installierte VS-Code-Version.
+Ab VS Code 1.125 wird `extensions.autoUpdate: "off"` gesetzt; ältere Versionen
+behalten den booleschen Wert `false`. Die vier Terminal-Tastaturbefehle des Kilo
+Agent Managers werden vor dem Start ergänzt; eigene Einträge bleiben erhalten.
+Arbeits- und Testsitzung verwenden dieselben Einstellungen. VS Code/Kilo müssen
+sie nach der Vertrauensfreigabe nicht erneut schreiben. Die Versionsabfrage ist
+ein protokollierter Testschritt; die erkannte Version steht in Toolchain- und
+Provisioning-Bericht. Unbekannte Versionen stoppen vor einer Profiländerung.
 Settings-JSONC wird anhand aller Schlüssel und Werte verglichen. Kommentare,
 Einrückung, BOM, abschließende Kommas und Schlüsselreihenfolge dürfen sich ändern,
 wenn die Werte gleich bleiben. Ursprüngliche und aktuelle Byte-Prüfsummen sowie

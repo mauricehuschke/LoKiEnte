@@ -380,7 +380,14 @@ try {
     $profileRoot=Join-Path $InstallRoot 'vscode-data'
     $extensionsRoot=Join-Path $InstallRoot 'vscode-extensions'
     [IO.Directory]::CreateDirectory($extensionsRoot)|Out-Null
-    $null=Invoke-ShadowProvisionStep -Id 'vscode-profile-1' -Action { Update-ShadowVsCodeProfile -InstallRoot $InstallRoot -PowerShellPath $toolchain.powerShellExecutable }
+    $codeVersion=Invoke-ShadowProvisionStep -Id 'vscode-version-1' -Kind Test -Action {
+        $observed=Get-ShadowInstalledVersion -Tool code -Path $code
+        if(-not $observed){throw 'Cannot determine the installed VS Code version before configuring its managed profile.'}
+        return $observed.ToString()
+    }
+    $toolchain.codeVersion=$codeVersion
+    $report.toolVersions.vsCode=$codeVersion
+    $null=Invoke-ShadowProvisionStep -Id 'vscode-profile-1' -Action { Update-ShadowVsCodeProfile -InstallRoot $InstallRoot -PowerShellPath $toolchain.powerShellExecutable -VsCodeVersion ([version]$codeVersion) }
     $codeArgs=@('--user-data-dir',$profileRoot,'--extensions-dir',$extensionsRoot,'--telemetry-level','off')
     $extensionList=Invoke-ShadowCodeCli -CodePath $code -Arguments ($codeArgs+@('--list-extensions','--show-versions'))
     $extensionVersion=Get-ShadowKiloExtensionVersion -Output $extensionList.StdOut

@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.27.8 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.9 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 ## Desktop projects and provisioning diagnostics
 
@@ -25,7 +25,7 @@ Startup is confirmed only by a launch-specific handshake from the expected
 LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
 not establish a running extension. Kilo discovery waits for registration and
 Workspace Trust before activation. Installed-but-unavailable, missing and activation
-failures have separate diagnostics. The helper version is 0.3.6; fully close old
+failures have separate diagnostics. The helper version is 0.3.7; fully close old
 managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
 
 **Output → LoKiEnte** receives launcher/editor console logs as well as the managed
@@ -97,6 +97,13 @@ settings, extensions and their enablement state are preserved. The report record
 shared configuration/source SHA-256 hashes, compares effective user/workspace
 settings and inventories the extensions visible in the running host. Any mismatch
 blocks acceptance. Only the generated project and acceptance controls differ.
+Provisioning queries the installed VS Code version before preparing the profile.
+VS Code 1.125+ receives `extensions.autoUpdate: "off"`; older versions retain
+boolean `false`. The four Kilo Agent Manager terminal shortcut IDs are merged
+before launch, preserving custom entries. These are the same settings used by
+ordinary work and acceptance; VS Code/Kilo need not rewrite them after trust.
+The version query is a recorded test step, and the observed version is saved in
+the toolchain/provisioning report. Unknown versions stop before profile changes.
 Settings JSONC is compared by its complete set of keys and values. Comments,
 indentation, BOM, trailing commas and key order may change without altering
 settings. Original and current byte hashes plus semantic hashes remain in the

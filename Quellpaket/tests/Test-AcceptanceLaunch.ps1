@@ -30,7 +30,7 @@ try{
     Copy-Item -LiteralPath (Join-Path $SourceRoot 'vscode-startup/package.json') -Destination (Join-Path $root 'vscode-extensions/lokiente.managed-startup-synthetic/package.json')
     Write-ShadowAcceptanceJson -Path (Join-Path $root 'toolchain.json') -Value $expected
     Write-ShadowAcceptanceJson -Path (Join-Path $root 'kilo-managed/kilo.json') -Value @{}
-    Update-ShadowVsCodeProfile -InstallRoot $root -PowerShellPath $pwsh
+    Update-ShadowVsCodeProfile -InstallRoot $root -PowerShellPath $pwsh -VsCodeVersion '1.148.0'
     $settings=Join-Path $root 'vscode-data/User/settings.json';$before=(Get-FileHash -LiteralPath $settings).Hash
     function Get-ShadowBundledKilo {param($CodePath,$InstallRoot) return $node}
     function Start-ShadowEditor {
@@ -54,6 +54,7 @@ try{
         Assert-Launch $WaitForHost 'The installed helper handshake is required, not just a successful process start.'
         $baseline=Get-Content (Join-Path (Split-Path $Environment.LOKIENTE_TOOLCHAIN_REPORT) 'configuration-baseline.json') -Raw|ConvertFrom-Json
         Assert-Launch ($baseline.dataDirectory -ieq (Join-Path $InstallRoot 'vscode-data') -and $baseline.files.Count -eq 6) 'Configuration baseline must identify the real work profile and all shared configuration/source hashes.'
+        Assert-Launch ($baseline.userSettings.'extensions.autoUpdate' -ceq 'off' -and $baseline.userSettings.'terminal.integrated.commandsToSkipShell'.Count -eq 4) 'Acceptance must capture the same migration-ready profile used for actual work, before the GUI starts.'
         $workspace=Get-Content -LiteralPath $baseline.workspace -Raw|ConvertFrom-Json
         Assert-Launch ($workspace.folders[0].path -ieq $WorkingDirectory -and $workspace.tasks.tasks.Count -gt 0 -and $workspace.settings.'chat.disableAIFeatures') 'The real workspace generator must produce the test project settings and tasks.'
         $report=Get-Content -LiteralPath $Environment.LOKIENTE_TOOLCHAIN_REPORT -Raw|ConvertFrom-Json -AsHashtable

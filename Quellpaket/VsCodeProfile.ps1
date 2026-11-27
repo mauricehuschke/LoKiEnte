@@ -24,7 +24,7 @@ function Merge-ShadowSyncExclusions {
 }
 
 function Update-ShadowVsCodeProfile {
-    param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$PowerShellPath)
+    param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$PowerShellPath,[version]$VsCodeVersion=[version]'1.105.1')
     $file=Join-Path $InstallRoot 'vscode-data/User/settings.json'
     $settings=[ordered]@{}
     if(Test-Path -LiteralPath $file){
@@ -33,7 +33,8 @@ function Update-ShadowVsCodeProfile {
     }
     $managed=[ordered]@{
         'telemetry.telemetryLevel'='off'
-        'extensions.autoUpdate'=$false
+        # VS Code 1.125+ migrates legacy false to the string enum "off".
+        'extensions.autoUpdate'=$(if($VsCodeVersion -ge [version]'1.125.0'){'off'}else{$false})
         'chat.disableAIFeatures'=$true
         'terminal.integrated.defaultProfile.windows'='LoKiEnte PowerShell'
         'kilo-code.new.autocomplete.enableAutoTrigger'=$false
@@ -41,6 +42,20 @@ function Update-ShadowVsCodeProfile {
         'kilo-code.new.autocomplete.enableChatAutocomplete'=$false
     }
     foreach($key in $managed.Keys){$settings[$key]=$managed[$key]}
+    # Kilo's Windows startup appends these four Agent Manager shortcuts. Seed
+    # them before the shared desktop/acceptance baseline, retaining custom IDs.
+    $terminalKey='terminal.integrated.commandsToSkipShell'
+    $terminalCommands=@()
+    if($settings.Contains($terminalKey)){
+        if($settings[$terminalKey] -isnot [array] -or @($settings[$terminalKey]|Where-Object {$_ -isnot [string]}).Count){
+            throw 'VS Code terminal.integrated.commandsToSkipShell must be an array of strings. Existing settings are preserved.'
+        }
+        $terminalCommands=@($settings[$terminalKey])
+    }
+    foreach($command in @('kilo-code.new.agentManagerOpen','kilo-code.new.agentManager.showTerminal','kilo-code.new.agentManager.previousTerminal','kilo-code.new.agentManager.nextTerminal')){
+        if($terminalCommands -cnotcontains $command){$terminalCommands+=,$command}
+    }
+    $settings[$terminalKey]=@($terminalCommands)
     $profiles='terminal.integrated.profiles.windows'
     if(-not $settings.Contains($profiles) -or $settings[$profiles] -isnot [Collections.IDictionary]){
         $settings[$profiles]=[ordered]@{}
@@ -54,9 +69,10 @@ function Update-ShadowVsCodeProfile {
         }
     }
     $settings[$profiles]['LoKiEnte PowerShell']=[ordered]@{path=$PowerShellPath;args=@('-NoLogo')}
-    Merge-ShadowSyncExclusions -Settings $settings -Key 'settingsSync.ignoredSettings' -Required (@($managed.Keys)+@($profiles,'lokiente.startup.openKilo','github.copilot.enable'))
+    Merge-ShadowSyncExclusions -Settings $settings -Key 'settingsSync.ignoredSettings' -Required (@($managed.Keys)+@($profiles,$terminalKey,'lokiente.startup.openKilo','github.copilot.enable'))
     Merge-ShadowSyncExclusions -Settings $settings -Key 'settingsSync.ignoredExtensions' -Required @('github.copilot','github.copilot-chat','kilocode.kilo-code','lokiente.managed-startup')
     $null=Write-ShadowManagedFile -Path $file -Content ($settings|ConvertTo-Json -Depth 100) -BackupRoot (Join-Path $InstallRoot 'backups/vscode-settings')
+    Write-ShadowMessage "Managed VS Code $VsCodeVersion profile prepared: extension auto-update disabled; Kilo terminal shortcuts ready." 'OK'
 }
 
 function New-ShadowVsCodeStartupVsix {

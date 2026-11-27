@@ -1,3 +1,49 @@
+## VS-Code-/Kilo-Starteinstellungen vor Trust vorbereiten - Paket 2026.11.27.9
+
+Der nächste Textbericht vom Zielsystem verwendet Helfer 0.3.6 und VS Code 1.148.0.
+Host, Trust, Helfer-Prüfsummen, erzeugtes Git-Projekt und Kilo-Erkennung bestehen.
+Die Gleichheitsprüfung scheitert an genau zwei Einstellungen: extensions.autoUpdate
+ist geändert, terminal.integrated.commandsToSkipShell neu ergänzt. Die fünf anderen
+Ausgangsdateien sind bytegleich. Aktivierung, Laufzeit-/Abhängigkeitstests und alle
+Modellfälle bleiben BLOCKED. Der Bericht erfasst Schlüsselnamen, keine alten/neuen
+Werte; erfolgreiche Inferenz wurde nicht beobachtet.
+
+Die Schlüssel passen zum nachgeprüften Startverhalten der Programme. VS Code 1.125
+dokumentiert die automatische Migration von false zum neuen off-Wert; der
+1.124-Quellcode akzeptiert noch das alte boolesche Schema. Kilo 7.8.32 ergänzt bei der
+Aktivierung vier Windows-Agent-Manager-Befehle in der Terminalliste. Quellen:
+
+- [Versionshinweise VS Code 1.125](https://code.visualstudio.com/updates/v1_125#extension-auto-update-setting)
+- [Konfigurationsquelle VS Code 1.124](https://github.com/microsoft/vscode/blob/1.124.0/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts)
+- [Kilo-Startquelle 7.8.32](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/src/extension.ts)
+
+Setup ermittelt jetzt die tatsächlich installierte Code-Version, protokolliert
+einen Versionstest und speichert das Ergebnis in toolchain.json/provisioning-report.json.
+Das gemeinsame Arbeitsprofil setzt ab 1.125 den gültigen off-Wert, davor false.
+Kilos vier Windows-Terminalbefehle werden vorbereitet; eigene Einträge bleiben
+erhalten. Änderungen werden gesichert, Wiederholungen bleiben unverändert.
+Ungültige Terminallisten und unbekannte Code-Versionen stoppen vor dem
+Überschreiben der Einstellungen. Der Profilaufbau meldet Erfolg. Die Abnahme
+behält vollständige Werte-/Bereichs- und Quellprüfungen; keine Abweichung wird
+pauschal erlaubt und keine Baseline nach dem Start erneuert.
+
+Der gemeinsame Node-Lauf mit 15 Dateien besteht 104 Tests ohne übersprungene oder
+fehlgeschlagene Fälle. Neue native PowerShell-/Node-Integration prüft Profilaufbau
+für 1.105.1 und 1.148.0, unveränderte Dateien nach bekannter Programm-Initialisierung,
+vollständige Konfigurationsgleichheit und weiterhin erkannte echte Änderungen an
+beiden gemeldeten Schlüsseln. Alle neun ausgewählten PowerShell-Suiten bestehen:
+Produktionsstart (58 Checks), Profil/VSIX (48), echter Setup-/Profilerhalt samt
+Abbruch bei unbekannter Version (8), Abnahmerichtlinien, Provisioning-Integration,
+native Fristen, Desktop-Sammler, Provisioning-Bericht und automatische Optionen.
+Bestehende Hosteinschränkungen bei Klon/Junction bleiben unverändert.
+
+Profilaufbau und Start-Transformationsregression verwenden echtes PowerShell und
+Dateien. VS-Code-APIs und Programm-Transformationen sind synthetische Grenzen.
+Echte GUI-/Modellerfolge sind damit nicht belegt. Diesen exakten Kandidaten auf
+dem Ziel-PC erneut ausführen. Zielabnahme bleibt UNVERIFIED; PR, Main-Merge und
+Release warten weiterhin auf erfolgreiche Zielnachweise. Docker/Hyper-V sind
+nicht erforderlich.
+
 ## Einstellungsgleichheit und erhaltene Fehlernachweise - Paket 2026.11.27.8
 
 Der gelieferte Textanhang enthält einen abgeschlossenen FAIL-Bericht von Helfer

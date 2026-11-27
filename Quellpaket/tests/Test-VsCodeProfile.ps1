@@ -13,9 +13,11 @@ try{
     [void][IO.Directory]::CreateDirectory((Split-Path -Parent $personal))
     [IO.File]::WriteAllText($personal,'{"chat.disableAIFeatures":false,"editor.fontSize":19}')
     $personalHash=(Get-FileHash -LiteralPath $personal).Hash
-    Update-ShadowVsCodeProfile -InstallRoot $managed -PowerShellPath 'test-pwsh.exe'
+    Update-ShadowVsCodeProfile -InstallRoot $managed -PowerShellPath 'test-pwsh.exe' -VsCodeVersion '1.148.0'
     $settings=Get-Content -LiteralPath $file -Raw|ConvertFrom-Json -AsHashtable
     Assert-Profile ($settings['chat.disableAIFeatures'] -eq $true) 'Fresh profile must hide built-in AI'
+    Assert-Profile ($settings['extensions.autoUpdate'] -ceq 'off') 'Current VS Code must receive its native off enum before first startup.'
+    Assert-Profile ($settings['terminal.integrated.commandsToSkipShell'].Count -eq 4) 'The four Kilo Windows terminal commands must exist before startup.'
     Assert-Profile ($settings['settingsSync.ignoredExtensions'].Count -eq 4) 'Fresh profile must isolate Kilo, startup helper and both Copilot extensions'
     Assert-Profile ($settings['settingsSync.ignoredSettings'] -contains 'terminal.integrated.profiles.windows') 'Terminal paths must stay local'
     Assert-Profile ($settings['settingsSync.ignoredSettings'] -contains 'chat.disableAIFeatures') 'AI policy must not affect other synced devices'
@@ -24,14 +26,17 @@ try{
     $settings['[typescript]']=@{'editor.defaultFormatter'='example.formatter'}
     $settings['lokiente.startup.openKilo']=$false
     $settings['chat.disableAIFeatures']=$false
+    $settings['terminal.integrated.commandsToSkipShell']=@('custom.run','kilo-code.new.agentManagerOpen')
     $settings['settingsSync.ignoredSettings']=@('CHAT.DISABLEAIFEATURES','editor.fontSize','-chat.disableAIFeatures','-terminal.integrated.profiles.windows','-custom.machine.setting')
     $settings['settingsSync.ignoredExtensions']=@('custom.extension','GitHub.Copilot','-github.copilot-chat','-kilocode.kilo-code')
     $before=$settings|ConvertTo-Json -Depth 100
     [IO.File]::WriteAllText($file,$before)
-    Update-ShadowVsCodeProfile -InstallRoot $managed -PowerShellPath 'updated-pwsh.exe'
+    Update-ShadowVsCodeProfile -InstallRoot $managed -PowerShellPath 'updated-pwsh.exe' -VsCodeVersion '1.148.0'
     $settings=Get-Content -LiteralPath $file -Raw|ConvertFrom-Json -AsHashtable
     Assert-Profile ($settings['workbench.colorTheme'] -ceq 'Quiet Light' -and $settings['[typescript]']['editor.defaultFormatter'] -ceq 'example.formatter') 'Personal settings must survive upgrades'
     Assert-Profile ($settings['lokiente.startup.openKilo'] -eq $false) 'Explicit startup opt-out must survive upgrades'
+    Assert-Profile ($settings['terminal.integrated.commandsToSkipShell'].Count -eq 5 -and $settings['terminal.integrated.commandsToSkipShell'][0] -ceq 'custom.run') 'Custom terminal commands must survive, and managed commands must be appended without duplicates.'
+    Assert-Profile ($settings['settingsSync.ignoredSettings'] -contains 'terminal.integrated.commandsToSkipShell') 'Managed terminal command policy must remain local.'
     Assert-Profile ($settings['terminal.integrated.profiles.windows']['LoKiEnte PowerShell'].path -ceq 'updated-pwsh.exe') 'Managed terminal must follow the approved PowerShell path'
     Assert-Profile ($settings['settingsSync.ignoredSettings'] -contains 'editor.fontSize' -and $settings['settingsSync.ignoredSettings'] -contains '-custom.machine.setting') 'Custom sync exclusions and unrelated opt-ins must survive'
     Assert-Profile ($settings['settingsSync.ignoredSettings'] -ccontains 'chat.disableAIFeatures') 'Incorrectly cased personal entries must not shadow required settings exclusions'
@@ -41,9 +46,19 @@ try{
     $hash=(Get-FileHash -LiteralPath $file).Hash
     $backups=@(Get-ChildItem -LiteralPath (Join-Path $managed 'backups/vscode-settings') -File)
     Assert-Profile (@($backups|Where-Object {[IO.File]::ReadAllText($_.FullName) -ceq $before}).Count -eq 1) 'Prior profile must be backed up'
-    Update-ShadowVsCodeProfile -InstallRoot $managed -PowerShellPath 'updated-pwsh.exe'
+    Update-ShadowVsCodeProfile -InstallRoot $managed -PowerShellPath 'updated-pwsh.exe' -VsCodeVersion '1.148.0'
     Assert-Profile ((Get-FileHash -LiteralPath $file).Hash -ceq $hash -and @(Get-ChildItem -LiteralPath (Join-Path $managed 'backups/vscode-settings') -File).Count -eq $backups.Count) 'Repeated provisioning must not rewrite or back up an unchanged profile'
-    foreach($invalid in @('{"settingsSync.ignoredSettings":"wrong"}','{"settingsSync.ignoredExtensions":[1]}','[1,2]','{"broken":')){
+    $legacy=Join-Path $root 'legacy-profile'
+    Update-ShadowVsCodeProfile -InstallRoot $legacy -PowerShellPath 'legacy-pwsh.exe' -VsCodeVersion '1.105.1'
+    $legacySettings=Get-Content (Join-Path $legacy 'vscode-data/User/settings.json') -Raw|ConvertFrom-Json -AsHashtable
+    Assert-Profile ($legacySettings['extensions.autoUpdate'] -is [bool] -and $legacySettings['extensions.autoUpdate'] -eq $false) 'Legacy VS Code must retain its supported boolean false.'
+    Update-ShadowVsCodeProfile -InstallRoot $legacy -PowerShellPath 'legacy-pwsh.exe' -VsCodeVersion '1.124.0'
+    $legacySettings=Get-Content (Join-Path $legacy 'vscode-data/User/settings.json') -Raw|ConvertFrom-Json -AsHashtable
+    Assert-Profile ($legacySettings['extensions.autoUpdate'] -is [bool] -and $legacySettings['extensions.autoUpdate'] -eq $false) 'VS Code 1.124 must retain the legacy setting schema.'
+    Update-ShadowVsCodeProfile -InstallRoot $legacy -PowerShellPath 'legacy-pwsh.exe' -VsCodeVersion '1.125.0'
+    $migrated=Get-Content (Join-Path $legacy 'vscode-data/User/settings.json') -Raw|ConvertFrom-Json -AsHashtable
+    Assert-Profile ($migrated['extensions.autoUpdate'] -ceq 'off') 'VS Code 1.125 must use the migrated enum at the release boundary.'
+    foreach($invalid in @('{"settingsSync.ignoredSettings":"wrong"}','{"settingsSync.ignoredExtensions":[1]}','{"terminal.integrated.commandsToSkipShell":"wrong"}','{"terminal.integrated.commandsToSkipShell":[1]}','[1,2]','{"broken":')){
         [IO.File]::WriteAllText($file,$invalid)
         $failed=$false
         try{Update-ShadowVsCodeProfile -InstallRoot $managed -PowerShellPath 'test.exe'}catch{$failed=$true}

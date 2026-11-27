@@ -17,10 +17,15 @@ if($e -or $first -lt 0 -or $last -lt $first){throw 'Settings implementation not 
 $update=[scriptblock]::Create(($statements[$first..$last].Extent.Text -join [Environment]::NewLine))
 $InstallRoot=Join-Path ([IO.Path]::GetTempPath()) ('loki-settings-'+[guid]::NewGuid().ToString('N'))
 $toolchain=@{powerShellExecutable='verified-pwsh.exe'}
+$report=@{toolVersions=@{}}
+$code='synthetic-code.cmd'
+$script:installedCodeVersion=[version]'1.148.0'
+function Get-ShadowInstalledVersion {param($Tool,$Path) if($Tool -cne 'code' -or $Path -cne $code){throw 'Wrong version query'};return $script:installedCodeVersion}
 try{
     & $update
     $file=Join-Path $InstallRoot 'vscode-data/User/settings.json'
     $settings=Get-Content -LiteralPath $file -Raw|ConvertFrom-Json -AsHashtable
+    if($settings['extensions.autoUpdate'] -cne 'off' -or $toolchain.codeVersion -cne '1.148.0' -or $report.toolVersions.vsCode -cne '1.148.0'){throw 'Actual setup must select the installed VS Code format and record its version.'}
     $settings['editor.fontSize']=17
     $settings['custom.extension.setting']=@{nested=@('preserve',123)}
     $settings['terminal.integrated.profiles.windows']['My Shell']=@{path='custom-shell.exe';args=@('-custom')}
@@ -43,7 +48,11 @@ try{
     & $update
     $custom=Get-Content -LiteralPath $file -Raw|ConvertFrom-Json -AsHashtable
     if($custom['terminal.integrated.profiles.windows']['Shadow PowerShell'].path -cne 'custom-legacy-shell.exe'){throw 'Customized legacy terminal profile lost'}
-    @{suite='Existing VS Code settings preservation';checks=6;passed=$true}|ConvertTo-Json
+    $unchanged=(Get-FileHash -LiteralPath $file).Hash
+    $script:installedCodeVersion=$null;$failed=$false
+    try{& $update}catch{$failed=$_.Exception.Message -match 'Cannot determine the installed VS Code version'}
+    if(-not $failed -or (Get-FileHash -LiteralPath $file).Hash -cne $unchanged){throw 'Unknown installed versions must stop before changing the profile.'}
+    @{suite='Existing VS Code settings preservation';checks=8;passed=$true}|ConvertTo-Json
 }finally{
     $resolved=[IO.Path]::GetFullPath($InstallRoot)
     if(-not $resolved.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($resolved) -notlike 'loki-settings-*'){throw 'Unsafe cleanup'}

@@ -2,6 +2,48 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Prepare VS Code/Kilo startup settings before trust - package 2026.11.27.9
+
+The next target text report uses helper 0.3.6 and VS Code 1.148.0. Host, trust,
+helper source hashes, generated Git project and Kilo discovery pass. Parity fails
+on exactly two settings: extensions.autoUpdate is modified and
+terminal.integrated.commandsToSkipShell is added. The other five baseline files
+are byte-identical. Activation, runtime/dependency and all model cases are BLOCKED.
+The report records key names rather than old/new values; no inference succeeded.
+
+These keys match verified upstream startup behavior. VS Code 1.125 documents
+automatic migration of legacy false to the new off enum; the 1.124 source still
+accepts the old boolean schema. Kilo 7.8.32 adds four Windows Agent Manager command IDs
+to the terminal skip list during activation. Sources:
+
+- [VS Code 1.125 release notes](https://code.visualstudio.com/updates/v1_125#extension-auto-update-setting)
+- [VS Code 1.124 configuration source](https://github.com/microsoft/vscode/blob/1.124.0/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts)
+- [Kilo 7.8.32 startup source](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/src/extension.ts)
+
+Setup now queries the actual installed Code version, records a version test and
+saves the observation in toolchain.json/provisioning-report.json. The shared work
+profile uses the supported off enum for 1.125+ and false for older versions. It
+prepares Kilo's four Windows terminal commands while preserving custom entries,
+backs up changes and remains idempotent. Invalid terminal lists and unknown Code
+versions fail before overwriting settings. Profile preparation reports success.
+Acceptance keeps its complete settings-value/effective-scope and source checks;
+no differences are whitelisted and no baseline is refreshed after startup.
+
+The combined 15-file Node run passes 104 tests without skips/failures. New native
+PowerShell-to-Node integration covers 1.105.1 and 1.148.0 profile preparation,
+unchanged files after known upstream initialization, full configuration parity
+and continued rejection of real changes to both reported keys. All nine selected
+PowerShell suites pass: production launch (58 checks), profile/VSIX (48), actual
+setup/profile preservation and unknown-version rejection (8), acceptance policy,
+provisioning integration, native deadlines, desktop collector, provisioning
+report and automatic options. Existing clone/junction host limitations are unchanged.
+
+The native profile generation and startup-transform regression uses real
+PowerShell/files; VS Code APIs and upstream transforms are synthetic boundaries.
+It does not establish real target GUI/model success. Rerun this exact candidate on
+the target PC. Target acceptance remains UNVERIFIED; PR, main merge and release
+continue to wait for successful target evidence. Docker/Hyper-V are not required.
+
 ## Settings parity and retained failure evidence - package 2026.11.27.8
 
 The supplied text attachment contains a completed FAIL report from helper 0.3.5.
