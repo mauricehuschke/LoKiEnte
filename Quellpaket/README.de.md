@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.24.5 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.1 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 Über die LoKiEnte-Seitenleiste kannst du das gewählte lokale Modell mit **Run E.T. model rule test** in deiner normalen Windows-Sitzung prüfen. Kilos Regeln und Werkzeugrechte werden einbezogen. Die optionale Hyper-V-Prüfung ist separat.
 
@@ -828,6 +828,44 @@ Ein bekannter, nicht bereiter Router mit HTTP 503 kann kontrolliert neu gestarte
 Bei Fehlern enthält der Provisionierungsbericht zusätzlich Skriptname, Zeilennummer und Fehlerkennung. Nach einem Prozesszeitlimit können nachgelagerte Installer oder Dienste noch arbeiten: Status prüfen, bevor du den Lauf wiederholst.
 
 Manuelle Änderungen an installierten Programmdateien werden beim nächsten Bootstrap-Lauf nach Sicherung durch den eingebetteten Paketstand ersetzt. Verwende deshalb diese aktualisierte PS1-Datei, nicht nur eine lokal korrigierte entpackte Datei.
+
+### Ein Modell lädt in LM Studio, aber nicht in Kilo
+
+Status-/Katalogabfragen und Speicherschätzungen erhalten ein Limit von 60 Sekunden.
+Ein echter Modellladevorgang behält sein Limit von 15 Minuten. Beide Limits gelten
+auch für Ausgabekanäle, die Kindprozesse nach Ende der CLI offen halten. Nach einem
+Timeout mit unklarem Ladezustand bleiben weitere Modellwechsel gesperrt, bis
+LM Studio geprüft und LoKiEnte neu gestartet wurde. Die Routerzustandsabfrage zeigt
+den aktuellen Alias, die Phase Loading/Generating und den letzten Fehlercode;
+das Ereignisprotokoll erfasst Beginn und Bereitschaft eines Modellwechsels.
+
+LoKiEnte verwendet eine verwaltete Instanz mit eigenem Kontext, GPU-Offload und
+genau einem Inferenzplatz. Erfolgreiches manuelles Laden bestätigt diese
+Konfiguration noch nicht. Der Installationsordner ist frei wählbar; es gibt keine
+Abhängigkeit von einem bestimmten Laufwerk oder Ordnernamen. Starte das verwaltete
+VS-Code-Fenster über die LoKiEnte-Verknüpfung und wähle dort ein Modell mit
+`[CODER HIGH]`, `[CODER FAST]` oder `[REVIEW]`.
+
+Modellwechselfehler unterscheiden jetzt Speicherablehnung, nicht unterstützte
+Architektur, sonstige Ladefehler, manuell geladene fremde Modelle, eine belegte
+Instanz, öffentliche Serverbindung und abgewiesenen API-Zugriff. Ein gescheitertes
+Modell bleibt heruntergeladen und ausdrücklich ungeprüft. Eine spätere Anfrage
+versucht dasselbe Profil erneut und muss vor erneuter Verifizierung die Chat-
+und Tool-Prüfungen bestehen. Die Runtime-Auswahl bleibt erhalten; fehlgeschlagene
+Anfragen laden keine Runtime herunter und wechseln sie nicht automatisch.
+
+Nach dem Update die verwalteten VS-Code-Fenster schließen, LoKiEnte neu starten
+und den Fehler einmal reproduzieren. Der letzte Controllerfehler steht lokal in
+`runtime/model-switch-failure.json`, mit Zeitpunkt, Alias, Ursache und
+Skriptposition. Native Befehlsausgaben bleiben in `runtime/pool-logs`. Die
+HTTP-Antwort enthält feste Abhilfehinweise statt privater Exceptiondetails.
+Der Fehlerbericht kann lokale Pfade enthalten; vor dem Weitergeben prüfen.
+
+Bei einer bestehenden Installation den eigenständigen Installer aktualisieren
+und mit dem bisherigen Installationspfad ausführen. `-ModelAction Keep` installiert
+die aktualisierten Skripte und behält die gespeicherten Modelle und Optionen.
+Vor Änderungen an Modell- oder Speichereinstellungen die neue Kilo-Meldung und
+den lokalen Bericht prüfen.
 
 | Meldung | Nächster Schritt |
 |---|---|

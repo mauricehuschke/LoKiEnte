@@ -187,7 +187,11 @@ function Get-SmpOwnedLoaded {
             $owned=@($Owner.Entries|Where-Object {
                 $_.Verified -eq $true -and $_.InstanceId -ceq (Get-LrProperty $item 'identifier') -and $_.ModelPath -ceq (Get-LrProperty $item 'path')
             })
-            if($owned.Count -ne 1){throw 'An external or unverified managed model is loaded. It will not be unloaded. Finish existing model work and unload it explicitly yourself.'}
+            if($owned.Count -ne 1){
+                $error=[InvalidOperationException]::new('An external or unverified managed model is loaded. It will not be unloaded. Finish existing model work and unload it explicitly yourself.')
+                $error.Data['ShadowModelConflict']=$true
+                throw $error
+            }
             if((Get-LrProperty $owned[0] 'Origin') -ceq 'verified-cpu-embedding'){
                 if((Get-LrProperty $item 'type') -cne 'embedding' -or
                    (Get-LrProperty $item 'identifier') -cne ('shadow-'+$Owner.OwnerId+'-embedding')){
@@ -209,7 +213,11 @@ function Get-SmpOwnedLoaded {
                 -not @($Owner.Entries|Where-Object { $_.InstanceId -ceq $id -and (Get-LrProperty $_ 'Origin') -ceq 'verified-cpu-embedding' }).Count
             })
         }
-        if($watch.Elapsed.TotalSeconds -ge $IdleTimeoutSeconds){throw 'Managed model is still working or cannot be verified as idle. No model was unloaded.'}
+        if($watch.Elapsed.TotalSeconds -ge $IdleTimeoutSeconds){
+            $error=[InvalidOperationException]::new('Managed model is still working or cannot be verified as idle. No model was unloaded.')
+            $error.Data['ShadowModelBusy']=$true
+            throw $error
+        }
         Start-Sleep -Milliseconds 500
     }
 }
@@ -294,7 +302,7 @@ function Set-SmpActiveProfile {
     foreach($gpu in $gpuOptions){
       foreach($context in ($contexts|Select-Object -Unique)){
         if($expectedPath){Assert-LrSelectedModel -LmsPath $Pool.LmsPath -LogDirectory $LogDirectory -ExpectedPath $expectedPath -ModelPath $profile.ModelPath}
-        $estimate=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments @('load',$profile.ModelPath,'--exact','--local','--context-length',"$context",'--parallel','1','--gpu',$gpu,'--estimate-only','--yes') -LogDirectory $LogDirectory
+        $estimate=Invoke-LrModelCommand -LmsPath $Pool.LmsPath -Arguments @('load',$profile.ModelPath,'--exact','--local','--context-length',"$context",'--parallel','1','--gpu',$gpu,'--estimate-only','--yes') -LogDirectory $LogDirectory
         $text=$estimate.Stdout+"`n"+$estimate.Stderr
         $gpuBytes=Convert-LrEstimatedBytes -Text $text -Label 'Estimated GPU Memory'
         $totalBytes=Convert-LrEstimatedBytes -Text $text -Label 'Estimated Total Memory'
@@ -336,18 +344,7 @@ function Set-SmpActiveProfile {
     Save-SmpOwnership -InstallRoot $InstallRoot -Owner $Owner -InstanceId $profile.InstanceId -ModelPath $profile.ModelPath -ExpectedPath $expectedPath -SelectedVariant $variant -GpuOffload $fit.GpuOffload -Pending
     Write-Host "Loading managed model $Alias with $($profile.ContextLength) tokens and GPU offload $($fit.GpuOffload) ..."
     $loadArguments=@('load',$profile.ModelPath,'--exact','--local','--context-length',"$($profile.ContextLength)",'--parallel','1','--gpu',$fit.GpuOffload,'--identifier',$profile.InstanceId,'--yes')
-    if($fit.ReserveOverride){
-        $load=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments $loadArguments -LogDirectory $LogDirectory -TimeoutSeconds 900 -AllowFailure
-        $loadExit=Get-LrProperty $load 'ExitCode'
-        if($loadExit -isnot [int] -and $loadExit -isnot [long]){throw 'LM Studio returned no usable exit code for the load attempt.'}
-        if($loadExit -ne 0){
-            $error=[InvalidOperationException]::new("$fitMessage LM Studio rejected the load attempt (exit code $($load.ExitCode)); model remains downloaded. Details: $($load.LogPath)")
-            $error.Data['ShadowResourceFitFailure']=$true
-            throw $error
-        }
-    }else{
-        $null=Invoke-LrNative -FilePath $Pool.LmsPath -Arguments $loadArguments -LogDirectory $LogDirectory -TimeoutSeconds 900
-    }
+    $null=Invoke-LrModelCommand -LmsPath $Pool.LmsPath -Arguments $loadArguments -LogDirectory $LogDirectory -TimeoutSeconds 900
     $result=Test-SmpLoadedProfile -Pool $Pool -Profile $profile -Owner $Owner -LogDirectory $LogDirectory
     Save-SmpOwnership -InstallRoot $InstallRoot -Owner $Owner -InstanceId $profile.InstanceId -ModelPath $profile.ModelPath -ExpectedPath $expectedPath -SelectedVariant $variant -GpuOffload $fit.GpuOffload
     return $result
@@ -373,7 +370,7 @@ function Invoke-SmpProfileCheck {
     try {
         $null=Set-SmpActiveProfile -InstallRoot $InstallRoot -Pool $Pool -Owner $Owner -Alias $Profile.Alias -LogDirectory $LogDirectory -AllowContextFallback:$AllowContextFallback -AllowUnfitAttempt:(Get-LrProperty $Pool 'AllowUnfitAttempt' $false)
     } catch {
-        if(-not $_.Exception.Data['ShadowResourceFitFailure']){throw}
+        if(-not ($_.Exception.Data['ShadowResourceFitFailure'] -or $_.Exception.Data['ShadowRuntimeCompatibilityFailure'] -or $_.Exception.Data['ShadowModelLoadFailure'])){throw}
         $Profile.SmokeTests=[pscustomobject]@{Chat='NotRun';ToolCall='NotRun';ToolResultRoundTrip='NotRun'}
         $Profile.VerificationState='Deferred'
         $Profile.VerificationMessage=$_.Exception.Message
@@ -478,7 +475,7 @@ function Configure-LocalModelPool {
             try{
                 $null=Set-SmpActiveProfile -InstallRoot $InstallRoot -Pool $pool -Owner $owner -Alias $pool.PrimaryAlias -LogDirectory $logs -AllowUnfitAttempt:$AllowUnfitAttempt
             }catch{
-                if(-not $_.Exception.Data['ShadowResourceFitFailure']){throw}
+                if(-not ($_.Exception.Data['ShadowResourceFitFailure'] -or $_.Exception.Data['ShadowRuntimeCompatibilityFailure'] -or $_.Exception.Data['ShadowModelLoadFailure'])){throw}
                 $primaryProfile.SmokeTests=[pscustomobject]@{Chat='NotRun';ToolCall='NotRun';ToolResultRoundTrip='NotRun'}
                 $primaryProfile.VerificationState='Deferred'
                 $primaryProfile.VerificationMessage=$_.Exception.Message
@@ -510,7 +507,7 @@ function Switch-ShadowLocalModel {
         try {
             $result=Set-SmpActiveProfile -InstallRoot $InstallRoot -Pool $pool -Owner $owner -Alias $Alias -LogDirectory $logs -AllowUnfitAttempt:(Get-LrProperty $pool 'AllowUnfitAttempt' $false)
         } catch {
-            if($_.Exception.Data['ShadowResourceFitFailure']){
+            if($_.Exception.Data['ShadowResourceFitFailure'] -or $_.Exception.Data['ShadowRuntimeCompatibilityFailure'] -or $_.Exception.Data['ShadowModelLoadFailure']){
                 $profile|Add-Member -NotePropertyName VerificationState -NotePropertyValue 'Deferred' -Force
                 $profile|Add-Member -NotePropertyName VerificationMessage -NotePropertyValue $_.Exception.Message -Force
                 $profile.SmokeTests=[pscustomobject]@{Chat='NotRun';ToolCall='NotRun';ToolResultRoundTrip='NotRun'}

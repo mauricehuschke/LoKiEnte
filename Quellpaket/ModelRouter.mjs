@@ -9,7 +9,7 @@ import { once } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const ROUTER_VERSION = '2026.11.18.25';
+export const ROUTER_VERSION = '2026.11.27.1';
 const BODY_LIMIT = 4 * 1024 * 1024;
 const RESPONSE_LIMIT = 16 * 1024 * 1024;
 const ALLOWED_FIELDS = new Set(['model','messages','stream','stream_options','max_tokens',
@@ -74,6 +74,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
   if(typeof switchModel!=='function')throw new Error('A model switch controller is required.');
   const embeddingId=/^[a-f0-9]{24}$/.test(config.OwnerId||'')?`shadow-${config.OwnerId}-embedding`:null;
   let busy=false,activeAlias=null,shuttingDown=false,fatal=null;
+  let currentRequest=null,lastError=null;
   let embeddingRequests=0;
   const queue=[];
   const identity=randomUUID();
@@ -151,6 +152,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
     if(req.method==='GET'&&req.url==='/health'){
       json(res,fatal?503:200,{service:'shadow-local-model-router',version:ROUTER_VERSION,identity,pid:process.pid,
         configDigest,ready:!fatal&&!shuttingDown,activeAlias,busy:busy||embeddingRequests>0,queued:queue.length,embeddingRequests,
+        currentRequest,lastError,
         models:[...profiles.values()].map(p=>({id:p.RouteId,context:p.ContextLength,output:p.OutputLimit,verification:p.VerificationState||'Verified'}))});return;
     }
     if(req.method==='POST'&&req.url==='/admin/shutdown'){
@@ -184,6 +186,8 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
     // hanging, because no fetch exists yet and the later job is skipped.
     const deadline=setTimeout(()=>{
       const error=new RouterError(504,'request_timeout','The local request deadline was exceeded.');
+      lastError={alias:profile.Alias,code:error.code,utc:new Date().toISOString()};
+      log({event:'request_timed_out',alias:profile.Alias,code:error.code});
       abort.abort(error);errorResponse(res,error);
     },requestTimeoutMs);
     const disconnect=()=>{if(!res.writableFinished)abort.abort(new Error('Client disconnected.'));};
@@ -192,6 +196,8 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
       try{
         if(abort.signal.aborted)return;
         if(fatal)throw new RouterError(503,'controller_failed','The local model controller requires attention.');
+        currentRequest={alias:profile.Alias,phase:'Loading',startedAtUtc:new Date().toISOString()};
+        log({event:'model_switch_started',alias:profile.Alias});
         // Do not abort an in-progress model load when the client disconnects.
         // Wait for its settled result; otherwise a second request could race it.
         const state=await switchModel(profile);
@@ -204,6 +210,8 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
           profile.SmokeTests={Chat:'Passed',ToolCall:'Passed',ToolResultRoundTrip:'Passed'};
         }
         activeAlias=profile.Alias;
+        currentRequest={...currentRequest,phase:'Generating'};
+        log({event:'model_switch_ready',alias:profile.Alias});
         if(abort.signal.aborted)return;
         const headers={'content-type':'application/json'};
         if(token)headers.authorization=`Bearer ${token}`;
@@ -242,8 +250,9 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
           json(res,200,result);
         }
       }catch(e){
+        lastError={alias:profile.Alias,code:e.code||'request_aborted_or_failed',utc:new Date().toISOString()};
         if(e.fatal){fatal=e.code||'controller_failed';log({event:'controller_failed',code:fatal});}
-        if(e.code==='model_memory_unavailable'||e.code==='model_unverified'){
+        if(['model_memory_unavailable','model_unverified','model_runtime_incompatible','model_load_failed'].includes(e.code)){
           profile.VerificationState='Deferred';
           const status=e.code==='model_unverified'?'NotVerified':'NotRun';
           profile.SmokeTests={Chat:status,ToolCall:status,ToolResultRoundTrip:status};
@@ -251,7 +260,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
         // Record metadata only, never prompts, completions, headers or tokens.
         log({event:'request_failed',alias:profile.Alias,code:e.code||'request_aborted_or_failed'});
         errorResponse(res,e);
-      }finally{clearTimeout(deadline);res.removeListener('close',disconnect);req.removeListener('aborted',disconnect);}
+      }finally{currentRequest=null;clearTimeout(deadline);res.removeListener('close',disconnect);req.removeListener('aborted',disconnect);}
     });
   }
   return server;
@@ -276,11 +285,27 @@ export function makePowerShellSwitcher({installRoot,pwsh,switchScript,timeoutMs=
         throw new RouterError(503,'controller_result_missing','The controller did not provide a valid verification result.');
       }
       if(exitCode!==0){
+        if(state?.Status==='Error'&&state.Code==='controller_timeout')
+          throw new RouterError(504,'controller_timeout','LM Studio model loading or command output exceeded its deadline. Inspect LM Studio before restarting LoKiEnte; another load will not be started automatically.',true);
+        if(state?.Status==='Error'&&state.Code==='controller_check_timeout')
+          throw new RouterError(504,'controller_check_timeout','An LM Studio status, catalog or memory check exceeded its deadline. Check LM Studio responsiveness and runtime/model-switch-failure.json, then retry.');
+        if(state?.Status==='Error'&&state.Code==='runtime_incompatible')
+          throw new RouterError(503,'model_runtime_incompatible','The selected LM Studio runtime does not support this model architecture. Select or update a compatible GPU runtime in LM Studio, then retry. More memory cannot fix this. See runtime/pool-logs.');
+        if(state?.Status==='Error'&&state.Code==='model_load_failed')
+          throw new RouterError(503,'model_load_failed','LM Studio rejected the selected model load. Check the local model file, runtime and runtime/pool-logs, then retry.');
+        if(state?.Status==='Error'&&state.Code==='model_conflict')
+          throw new RouterError(503,'model_conflict','An external or manually loaded model blocks the managed model pool. Finish its work, unload it explicitly in LM Studio, then retry.');
+        if(state?.Status==='Error'&&state.Code==='model_busy')
+          throw new RouterError(503,'model_busy','The managed model is still busy or its idle state is unknown. Wait for active requests to finish, then retry.');
+        if(state?.Status==='Error'&&state.Code==='backend_not_loopback')
+          throw new RouterError(503,'backend_not_loopback','The LM Studio server is not bound exclusively to loopback. Disable serving on the local network and bind it to 127.0.0.1, then retry.');
+        if(state?.Status==='Error'&&state.Code==='backend_authentication')
+          throw new RouterError(503,'backend_authentication','LM Studio denied API access. Set its token in the configured user environment variable and restart LoKiEnte; authentication stays enabled.');
         if(state?.Status==='Error'&&state.Code==='resource_fit')
           throw new RouterError(503,'model_memory_unavailable','The local model cannot currently load. Free memory and retry; the model file is preserved.');
         if(state?.Status==='Error'&&state.Code==='model_unverified')
           throw new RouterError(503,'model_unverified','The local model failed the chat or tool test. Check local logs.');
-        throw new RouterError(503,'controller_rejected','The model switch was refused. Inspect local model ownership, memory and busy state.');
+        throw new RouterError(503,'controller_rejected','The model switch was refused. Read runtime/model-switch-failure.json for the local cause and script location.');
       }
       return state;
     }finally{await unlink(resultPath).catch(()=>{});}

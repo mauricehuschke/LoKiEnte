@@ -2,6 +2,38 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Bounded model switching and actionable errors - package 2026.11.27.1
+
+The original native-command implementation was reproduced returning after
+12.75 seconds despite a five-second deadline: a child inherited its output
+handles after the CLI process exited. Output draining now shares the command
+deadline and uses cancellable reads. Status/catalog queries and memory estimates
+are limited to 60 seconds; actual model loads retain 900 seconds. An uncertain
+load timeout blocks further router switches until a deliberate restart.
+
+Regression suites exercise real subprocesses, inherited output handles, the
+PowerShell controller, loopback HTTP, failure reports, aliases and installation
+paths with spaces. LM Studio/GPU boundaries in lifecycle tests are simulated.
+Unsupported architecture, memory refusal and other load failures remain distinct;
+failed profiles require all chat/tool smoke checks again before verification.
+Router health and metadata-only events expose loading, generation and errors.
+Private exception details stay in the local controller report.
+
+Relevant suites: Test-ModelLoadFailures.ps1, Test-ModelPool.ps1,
+Test-SingleModelFit.ps1, Test-LmsCliCompatibility.ps1, Test-PartialGpuOffload.ps1,
+Test-ModelVariants.ps1, Test-ManualModels.ps1, Test-Embedding.ps1,
+Test-RouterLifecycle.ps1, Test-ModelAction.ps1, Test-ProvisionSettings.ps1,
+Test-Localization.ps1, Test-ModelRouter.mjs and Test-EmbeddingRouter.mjs.
+The manual-model suite previously assumed a top-level setup assignment; it now
+inspects the actual model-configuration branch. Its original failure was also
+confirmed against the unchanged source.
+
+The reported affected installation is on a different PC. Successful manual
+loading there does not prove managed context/offload settings or API access.
+These regressions establish the corrected waits and error handling, not the
+unobserved cause or successful real-model inference on that PC. No runtime or
+model selection is changed automatically by this correction.
+
 This document preserves the validation history and its original limitations.
 Older sections describe the behavior and evidence of their stated release, not
 necessarily the current defaults. Current usage is documented in [README.md](README.md).

@@ -14,6 +14,7 @@ $script:downloaded=[Collections.Generic.HashSet[string]]::new()
 $script:loaded=@();$script:server=$false;$script:public=$false;$script:badSmoke=$false;$script:badRest=$false
 $script:downloadCalls=0;$script:unloadCalls=0;$script:loadCalls=0;$script:inferenceCalls=0
 $script:noFitPath='';$script:rejectNoFit=$false
+$script:failurePhase='';$script:failureText=''
 $script:hiddenOptionsSupported=$true
 $script:fixtures=@(
     [pscustomobject]@{type='llm';deviceIdentifier=$null;path='lmstudio-community/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf';modelKey='qwen/qwen3.8-27b@q4_k_m'},
@@ -43,6 +44,11 @@ function Invoke-LrNative {
             else {
                 if($Arguments -notcontains '--exact' -or $Arguments -notcontains '--local'){throw 'Local exact-model guards were removed'}
                 $context=[int]$Arguments[[array]::IndexOf($Arguments,'--context-length')+1]
+                if($Arguments[1] -ceq $script:fixtures[0].path -and
+                   (($script:failurePhase -ceq 'estimate' -and $Arguments -contains '--estimate-only') -or
+                    ($script:failurePhase -ceq 'load' -and $Arguments -notcontains '--estimate-only'))){
+                    return [pscustomobject]@{Stdout='';Stderr=$script:failureText;LogPath='mock.log';ExitCode=1}
+                }
                 if($Arguments -contains '--estimate-only'){
                     $gpu=if($Arguments[1] -ceq $script:noFitPath){30}elseif($Arguments[1] -like '*Qwen3.8*' -and $context -gt 16384){22}else{17}
                     $total=if($Arguments[1] -ceq $script:noFitPath){26}else{19}
@@ -226,6 +232,27 @@ try {
     $overrideHigh=@($overridePool.Profiles|Where-Object {$_.Alias -ceq 'coder-high'})[0]
     Assert-Pool ($overrideHigh.VerificationState -ceq 'Verified' -and $overrideHigh.Estimate.ReserveOverride -eq $true) 'A successful load without LoKiEnte reserve still requires all smoke tests'
     $script:noFitPath='';$script:loaded=@()
+    foreach($phase in @('estimate','load')){
+        $script:failurePhase=$phase;$script:failureText="unknown model architecture: 'qwen35'"
+        $runtimeRoot=Join-Path $root ('runtime-failure-'+$phase)
+        $runtimePool=Configure-LocalModelPool -InstallRoot $runtimeRoot -ContextLength 16384 -DownloadModel:$false -AllowUnfitAttempt
+        $broken=@($runtimePool.Profiles|Where-Object {$_.Alias -ceq 'coder-high'})[0]
+        Assert-Pool ($broken.VerificationState -ceq 'Deferred' -and $broken.SmokeTests.Chat -ceq 'NotRun' -and
+            $broken.VerificationMessage -match 'compatible GPU runtime' -and $runtimePool.VerificationStatus -ceq 'Partial') 'Runtime incompatibility preserves the selected profile and does not claim verification'
+        $caught=$null
+        try{$null=Switch-ShadowLocalModel -InstallRoot $runtimeRoot -Alias coder-high}catch{$caught=$_.Exception}
+        Assert-Pool ($null -ne $caught -and $caught.Data['ShadowRuntimeCompatibilityFailure'] -eq $true -and
+            -not $caught.Data['ShadowResourceFitFailure']) 'Runtime incompatibility is not converted to a memory refusal on retry'
+        $script:failurePhase=''
+        $ready=Switch-ShadowLocalModel -InstallRoot $runtimeRoot -Alias coder-high
+        $saved=Get-Content -LiteralPath (Join-Path $runtimeRoot 'runtime/model-pool.json') -Raw|ConvertFrom-Json
+        Assert-Pool ($ready.VerificationState -ceq 'Verified' -and $saved.Profiles[0].SmokeTests.ToolResultRoundTrip -ceq 'Passed') 'A corrected runtime recovers the same profile through all inference checks'
+        $script:loaded=@()
+    }
+    $script:failurePhase='load';$script:failureText='Invalid GGUF header'
+    $invalidPool=Configure-LocalModelPool -InstallRoot (Join-Path $root 'invalid-model') -ContextLength 16384 -DownloadModel:$false
+    Assert-Pool ($invalidPool.Profiles[0].VerificationState -ceq 'Deferred' -and $invalidPool.Profiles[0].VerificationMessage -match 'command log') 'Non-memory load failures also remain explicit and recoverable'
+    $script:failurePhase='';$script:loaded=@()
     $legacyRoot=Join-Path $root 'legacy';[void][IO.Directory]::CreateDirectory((Join-Path $legacyRoot 'runtime'))
     $legacy=[ordered]@{SchemaVersion=1;Status='Ready';ModelId='shadow-local-coder';ModelPath='known.gguf';ReusedLoadedModel=$true;SmokeTests=@{Chat='Passed';ToolCall='Passed';ToolResultRoundTrip='Passed'}}
     [IO.File]::WriteAllText((Join-Path $legacyRoot 'runtime/runtime-state.json'),($legacy|ConvertTo-Json -Depth 8))

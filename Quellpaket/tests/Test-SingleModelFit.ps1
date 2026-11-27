@@ -8,6 +8,7 @@ $ErrorActionPreference='Stop'
 $root=Join-Path ([IO.Path]::GetTempPath()) ('shadow-single-fit-'+[guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($root)
 $script:loaded=@();$script:rejectLoad=$true;$script:badSmoke=$false;$script:loadAttempts=0
+$script:loadError='rejected';$script:estimateError=''
 function Resolve-LocalLmsCommand {param($LmsPath) return 'synthetic-lms'}
 function Assert-LrLoadCapabilities {param($LmsPath,$LogDirectory)}
 function Assert-LrLoopbackListener {param($Port)}
@@ -33,11 +34,12 @@ function Invoke-LrNative {
     if($Arguments[0] -eq '--version'){return [pscustomobject]@{Stdout='synthetic';Stderr='';ExitCode=0;LogPath='mock'}}
     if($Arguments[0] -ne 'load'){throw 'Unexpected CLI request'}
     if($Arguments -contains '--estimate-only'){
+        if($script:estimateError){return [pscustomobject]@{Stdout='';Stderr=$script:estimateError;ExitCode=1;LogPath='mock'}}
         return [pscustomobject]@{Stdout="Estimated GPU Memory: 10 GiB`nEstimated Total Memory: 12 GiB`nThis model may be loaded based on your resource guardrails settings.";Stderr='';ExitCode=0;LogPath='mock'}
     }
     if(-not $AllowFailure){throw 'Expected explicit best-effort load'}
     $script:loadAttempts++
-    if($script:rejectLoad){return [pscustomobject]@{Stdout='';Stderr='rejected';ExitCode=42;LogPath='mock'}}
+    if($script:rejectLoad){return [pscustomobject]@{Stdout='';Stderr=$script:loadError;ExitCode=42;LogPath='mock'}}
     $context=[int]$Arguments[[array]::IndexOf($Arguments,'--context-length')+1]
     $id=$Arguments[[array]::IndexOf($Arguments,'--identifier')+1]
     $script:loaded=@([pscustomobject]@{type='llm';path='local/model';modelKey='local/model';identifier=$id;deviceIdentifier=$null;status='idle';queued=0;parallel=1;contextLength=$context})
@@ -65,7 +67,18 @@ try {
        $saved.ModelPath -cne 'local/model' -or $script:loadAttempts -ne 1){
         throw 'Rejected low-memory model was not preserved as explicitly unverified.'
     }
-    $script:rejectLoad=$false
+    $script:loadError="unknown model architecture: 'qwen35'"
+    $result=Configure-LocalRuntime @arguments
+    if($result.Status -cne 'Deferred' -or $result.VerificationMessage -notmatch 'compatible GPU runtime' -or
+       $result.SmokeTests.Chat -cne 'NotRun'){
+        throw 'A runtime-incompatible single model was reported as a memory refusal or verified.'
+    }
+    $script:estimateError=$script:loadError;$before=$script:loadAttempts
+    $result=Configure-LocalRuntime @arguments
+    if($result.Status -cne 'Deferred' -or $result.VerificationMessage -notmatch 'compatible GPU runtime' -or $script:loadAttempts -ne $before){
+        throw 'An unsupported estimate attempted to load a single model.'
+    }
+    $script:estimateError='';$script:rejectLoad=$false
     $result=Configure-LocalRuntime @arguments
     if($result.Status -cne 'Ready' -or -not $result.Estimate.ReserveOverride -or $result.SmokeTests.ToolCall -cne 'Passed'){
         throw 'Successful best-effort single model was not tested and recorded.'
@@ -76,7 +89,7 @@ try {
        $result.VerificationMessage -notmatch 'Synthetic model test failed'){
         throw 'Failed inference test was not surfaced as a deferred warning.'
     }
-    [pscustomobject]@{suite='Single model low-memory behavior';passed=$true;checks=4;limitations='LM Studio and GPU boundaries are mocked.'}|ConvertTo-Json
+    [pscustomobject]@{suite='Single model low-memory behavior';passed=$true;checks=6;limitations='LM Studio and GPU boundaries are mocked.'}|ConvertTo-Json
 } finally {
     if(Test-Path -LiteralPath $root){Remove-Item -LiteralPath $root -Recurse -Force}
 }

@@ -22,10 +22,10 @@ function Invoke-LrNative {
         $total=if($script:mode -eq 'context' -and $context -gt 8192){23}else{19.24}
         $guard=if($script:mode -eq 'guardrail'){'This model will fail to load based on your resource guardrails settings.'}else{'This model may be loaded based on your resource guardrails settings.'}
         $confidence=if($script:mode -eq 'low'){"`nConfidence: LOW"}else{''}
-        return [pscustomobject]@{Stdout="Estimated GPU Memory: $vram GiB`nEstimated Total Memory: $total GiB`n$guard$confidence";Stderr='';LogPath='synthetic.log'}
+        return [pscustomobject]@{Stdout="Estimated GPU Memory: $vram GiB`nEstimated Total Memory: $total GiB`n$guard$confidence";Stderr='';LogPath='synthetic.log';ExitCode=0}
     }
     $script:loads+=("$gpu/$context")
-    return [pscustomobject]@{Stdout='';Stderr='';LogPath='synthetic.log'}
+    return [pscustomobject]@{Stdout='';Stderr='';LogPath='synthetic.log';ExitCode=0}
 }
 function New-Fixture([bool]$Allow){
     return [pscustomobject]@{

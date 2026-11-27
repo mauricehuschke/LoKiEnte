@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.24.5 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.1 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 Use **Run E.T. model rule test** in the LoKiEnte sidebar to test a selected local model in your normal Windows session. It uses Kilo instructions and checks Kilo tool permissions. The optional Hyper-V check is separate.
 
@@ -749,6 +749,40 @@ downstream installers/services may still be running; inspect their state before
 retrying. Manual edits to installed application files are backed up and replaced
 by the embedded package on the next bootstrap. Use the updated standalone PS1,
 not just a locally patched extracted file.
+
+### A model loads in LM Studio but not in Kilo
+
+Status/catalog queries and memory estimates have a 60-second deadline. A real
+model load retains its 15-minute deadline. Both limits also cover output pipes
+held open by child processes after the CLI exits. An uncertain load timeout
+blocks further model switches until LM Studio is checked and LoKiEnte restarted.
+Router health exposes the current alias and Loading/Generating phase, and its
+latest error code; the event log records model-switch starts and readiness.
+
+LoKiEnte uses a managed instance with its own context, GPU offload and single
+inference slot. A successful manual load does not verify this configuration.
+The installation directory is configurable; no particular drive or folder name
+is required. Start the managed VS Code window through the LoKiEnte shortcut and
+select one of its `[CODER HIGH]`, `[CODER FAST]` or `[REVIEW]` models.
+
+Model-switch errors now distinguish memory refusal, unsupported architecture,
+other load failures, a manually loaded external model, a busy instance, a public
+server listener and denied API access. A failed model stays downloaded and
+explicitly unverified. A later request retries the same profile and must pass
+the chat and tool checks before it becomes verified again. Existing runtime
+selections are preserved; a failed request does not download or switch runtimes.
+
+After updating, close the managed VS Code windows, relaunch LoKiEnte and reproduce
+the failure once. The latest controller failure is recorded locally at
+`runtime/model-switch-failure.json`, with its time, alias, cause and script
+location. Native command output remains in `runtime/pool-logs`. The HTTP response
+contains fixed recovery instructions rather than private exception details.
+The failure report can contain local paths; inspect it before sharing it.
+
+For an existing installation, update the standalone installer and run it with
+your usual installation path. `-ModelAction Keep` installs the updated scripts
+while retaining the saved models and options. Check the new Kilo error and the
+local report before changing model or memory settings.
 
 | Message/condition | Next step |
 |---|---|
