@@ -97,7 +97,10 @@ on a target Windows machine is separate from synthetic regression tests.
 
 4. Every release description must include a changelog and these permanent links,
    even when GitHub already shows the assets below. Keep the latest Windows
-   download and provisioning-guide buttons at the top of both user READMEs.
+   download and provisioning-guide buttons in the installation section of both
+   user READMEs, after the project introduction and security overview. Preserve
+   the existing quick-install anchors. Detailed setup variants, parameters and
+   troubleshooting belong in [the usage reference](../usage/README.md).
 
    - [Always download the latest Windows installer](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
    - [Latest installer SHA-256](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1.sha256)

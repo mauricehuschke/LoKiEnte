@@ -103,8 +103,11 @@ einem Windows-Zielrechner ist zusätzlich zu synthetischen Regressionstests erfo
 
 4. Jede Release-Beschreibung enthält ein Changelog und diese dauerhaften Links,
    auch wenn GitHub darunter bereits die Artefakte auflistet. Die Buttons zum
-   aktuellen Windows-Download und zur Provisionierungsanleitung bleiben oben
-   in beiden Anwender-READMEs.
+   aktuellen Windows-Download und zur Provisionierungsanleitung stehen im
+   Installationsabschnitt beider Anwender-READMEs, nach Projektvorstellung und
+   Sicherheitsübersicht. Die bisherigen Schnellinstallationsanker bleiben
+   erhalten. Ausführliche Varianten, Parameter und Fehlerhilfen gehören in
+   [die Nutzungsreferenz](../usage/README.de.md).
 
    - [Immer den aktuellen Windows-Installer herunterladen](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1)
    - [SHA-256 des aktuellen Installers](https://github.com/mauricehuschke/LoKiEnte/releases/latest/download/Provision-LoKiEnte.ps1.sha256)
