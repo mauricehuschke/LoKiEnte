@@ -1,0 +1,268 @@
+'use strict';
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { spawn } = require('node:child_process');
+const { redact, loopback, readJsonResponse, LogTail } = require('./diagnostics.cjs');
+
+async function withDeadline(action, milliseconds, message) {
+    let timer;
+    try { return await Promise.race([Promise.resolve().then(action), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), milliseconds); timer.unref?.(); })]); }
+    finally { clearTimeout(timer); }
+}
+
+async function waitForWorkspaceTrust(vscode, logger, timeoutMs = 120000) {
+    if (vscode.workspace.isTrusted) return;
+    logger.warn('VS Code', 'Waiting for you to trust the generated acceptance workspace in the VS Code Workspace Trust dialog.');
+    await new Promise((resolve, reject) => {
+        let subscription, settled = false;
+        const finish = error => { if (settled) return; settled = true; clearTimeout(timer); subscription?.dispose(); error ? reject(error) : resolve(); };
+        const timer = setTimeout(() => finish(Object.assign(new Error('Workspace trust was not granted before the acceptance deadline. No trust setting was changed.'), { blocked: true })), timeoutMs);
+        subscription = vscode.workspace.onDidGrantWorkspaceTrust(() => finish());
+        if (vscode.workspace.isTrusted) finish();
+        void vscode.window.showWarningMessage('LoKiEnte acceptance is waiting for Workspace Trust. Review and trust this generated test workspace in VS Code to continue.', 'Cancel acceptance')
+            .then(answer => { if (answer === 'Cancel acceptance') finish(Object.assign(new Error('Acceptance cancelled while waiting for Workspace Trust.'), { blocked: true })); }).catch(error => finish(error));
+    });
+    if (!vscode.workspace.isTrusted) throw Object.assign(new Error('Workspace trust is still unavailable.'), { blocked: true });
+}
+
+function runNative(file, args, { cwd, env = process.env, timeoutMs = 120000 } = {}) {
+    return new Promise((resolve, reject) => {
+        const started = Date.now();
+        const child = spawn(file, args, { cwd, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        let stdout = '', stderr = '', settled = false;
+        const finish = (error, value) => {
+            if (settled) return; settled = true; clearTimeout(timer);
+            if (error) { error.nativeResult = { code: child.exitCode, stdout, stderr, durationMs: Date.now() - started }; child.stdout.destroy(); child.stderr.destroy(); reject(error); } else resolve(value);
+        };
+        const timer = setTimeout(() => {
+            if (child.exitCode === null) child.kill();
+            finish(Object.assign(new Error(`Command deadline exceeded: ${path.basename(file)} (${child.exitCode === null ? 'process still running' : 'output remained open after process exit'}). No successful result was assumed.`), { code: 'LOKIENTE_NATIVE_TIMEOUT', processExited: child.exitCode !== null }));
+        }, timeoutMs);
+        child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
+        child.stdout.on('data', text => { stdout += text; if (stdout.length > 6 * 1024 * 1024) { child.kill(); finish(new Error('Command output limit exceeded.')); } });
+        child.stderr.on('data', text => { stderr += text; if (stderr.length > 2 * 1024 * 1024) { child.kill(); finish(new Error('Command error output limit exceeded.')); } });
+        child.once('error', error => finish(new Error(`Cannot start ${path.basename(file)}: ${error.code || error.message}`)));
+        child.once('close', code => finish(null, { code, stdout, stderr }));
+    });
+}
+
+function inspectKiloEvents(stdout, marker, file) {
+    const events = stdout.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+    const equalPath = value => typeof value === 'string' && path.resolve(value).toLowerCase() === path.resolve(file).toLowerCase();
+    const read = events.some(e => e.type === 'tool_use' && e.part?.tool === 'read' && e.part.state?.status === 'completed' && equalPath(e.part.state.input?.filePath) && e.part.state.output?.includes(marker));
+    const reply = events.filter(e => e.type === 'text').map(e => e.part?.text || '').join('');
+    const finished = events.some(e => e.type === 'step_finish' && ['stop', 'end_turn'].includes(e.part?.reason));
+    const error = events.some(e => e.type === 'error' || e.part?.state?.status === 'error');
+    return { read, replyMatches: reply.includes(marker), finished, error };
+}
+
+function summarize(cases, required) {
+    if (cases.some(c => c.status === 'FAIL')) return 'FAIL';
+    if (required.some(id => !cases.some(c => c.id === id && c.status === 'PASS')) || cases.some(c => c.status === 'BLOCKED')) return 'BLOCKED';
+    return 'PASS';
+}
+
+function junit(report) {
+    const xml = s => String(s ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    const fail = report.cases.filter(c => c.status === 'FAIL').length;
+    const skipped = report.cases.filter(c => !['PASS', 'FAIL'].includes(c.status)).length;
+    return `<?xml version="1.0" encoding="utf-8"?>\n<testsuites><testsuite name="LoKiEnte live toolchain" tests="${report.cases.length}" failures="${fail}" skipped="${skipped}">` +
+        report.cases.map(c => `<testcase classname="${xml(c.component)}" name="${xml(c.id)}">` +
+            (c.status === 'FAIL' ? `<failure message="${xml(c.evidence)}"/>` : c.status !== 'PASS' ? `<skipped message="${xml(c.evidence)}"/>` : '') + '</testcase>').join('') + '</testsuite></testsuites>\n';
+}
+
+async function atomic(file, text) {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    try { await fs.writeFile(temporary, text, 'utf8'); await fs.rename(temporary, file); }
+    finally { await fs.unlink(temporary).catch(() => {}); }
+}
+
+async function checkToolchain({ vscode, root, logger, env = process.env, reportPath, project, runId, interactive = true }) {
+    runId ||= crypto.randomUUID().replaceAll('-', '');
+    const directory = path.join(root, 'diagnostics', 'toolchain', runId);
+    reportPath ||= path.join(directory, 'acceptance.json');
+    project ||= path.join(directory, 'project');
+    await fs.mkdir(project, { recursive: true });
+    const required = ['vscode-host', 'workspace-trust', 'kilo-activation', 'installed-runtime', 'dependencies', 'model-catalog', 'kilo-webview-request', 'kilo-visible-response'];
+    const report = { schema: 1, kind: 'live-toolchain-acceptance', runId, status: 'RUNNING', startedAtUtc: new Date().toISOString(),
+        executionMode: 'native-windows-applications', requirements: { docker: false, hyperV: false },
+        versions: { vscode: vscode.version, node: process.versions.node, electron: process.versions.electron || null }, cases: [], nativeCommands: [], reportPath };
+    const secrets = Object.entries(env).filter(([name]) => /token|key|password/i.test(name)).map(([, value]) => value);
+    const save = async () => {
+        await atomic(reportPath, JSON.stringify(report, null, 2));
+        await atomic(reportPath.replace(/\.json$/i, '') + '.junit.xml', junit(report));
+    };
+    const native = async (file, args, options) => {
+        const start = Date.now(); let result, failure;
+        try { result = await runNative(file, args, options); return result; }
+        catch (error) { failure = error; result = error.nativeResult; throw error; }
+        finally {
+            const streams = {};
+            for (const name of ['stdout', 'stderr']) {
+                const value = redact(result?.[name] || '', secrets);
+                streams[name] = { characters: value.length, text: value.slice(0, 262144), truncated: value.length > 262144 };
+                if (streams[name].truncated) {
+                    const fullLog = path.join(directory, `command-${report.nativeCommands.length}-${name}.log`);
+                    await atomic(fullLog, value); streams[name].fullLog = fullLog;
+                }
+            }
+            report.nativeCommands.push({ utc: new Date().toISOString(), file, args: args.map(value => redact(value, secrets)), cwd: options?.cwd,
+                timeoutMs: options?.timeoutMs, durationMs: Date.now() - start, exitCode: result?.code ?? null, error: failure ? redact(failure.message, secrets) : null, streams });
+            await save();
+        }
+    };
+    const record = async (id, component, status, evidence, metadata = {}) => {
+        const entry = { id, component, status, evidence: redact(evidence, secrets), ...metadata };
+        report.cases.push(entry); logger[status === 'FAIL' ? 'error' : status === 'BLOCKED' ? 'warn' : 'info'](component, `${status}: ${id}: ${entry.evidence}`);
+        await save(); return entry;
+    };
+    const check = async (id, component, action) => {
+        logger.info(component, `START: ${id}`);
+        try { return await record(id, component, 'PASS', await action()); }
+        catch (e) { return await record(id, component, e.blocked ? 'BLOCKED' : 'FAIL', e.message); }
+    };
+    const blocked = message => Object.assign(new Error(message), { blocked: true });
+    try {
+        const host = await record('vscode-host', 'VS Code', vscode.env.appHost === 'desktop' && !!process.versions.electron ? 'PASS' : 'BLOCKED',
+            'Requires the real desktop VS Code Extension Host, not a simulated API.', { appHost: vscode.env.appHost });
+        if (host.status !== 'PASS') throw blocked('This test must run in the actual desktop Extension Host.');
+        await waitForWorkspaceTrust(vscode, logger);
+        await record('workspace-trust', 'VS Code', 'PASS', 'The test workspace is trusted.');
+        const config = JSON.parse(env.KILO_CONFIG_CONTENT || '{}');
+        const chain = JSON.parse(await fs.readFile(path.join(root, 'toolchain.json'), 'utf8'));
+        const options = config.provider?.lmstudio?.options;
+        if (!options?.baseURL || config.enabled_providers?.length !== 1 || config.enabled_providers[0] !== 'lmstudio') throw new Error('A single managed local provider is required.');
+        const base = loopback(options.baseURL), models = config.provider.lmstudio.models;
+        const aliases = Object.keys(models || {});
+        if (!aliases.length || aliases.some(alias => !/^[a-z][a-z0-9-]{0,63}$/.test(alias))) throw new Error('Managed model aliases are missing or invalid.');
+        required.push(...aliases.map(alias => `model-roundtrip:${alias}`));
+        if (config.indexing?.enabled) required.push('embeddings', 'lancedb');
+        report.configurationSha256 = crypto.createHash('sha256').update(JSON.stringify(config)).digest('hex');
+        for (const file of ['extension.cjs', 'diagnostics.cjs', 'toolchain-check.cjs']) {
+            report.sourceSha256 ||= {};
+            report.sourceSha256[file] = crypto.createHash('sha256').update(await fs.readFile(path.join(__dirname, file))).digest('hex');
+        }
+        const kilo = vscode.extensions.getExtension('kilocode.kilo-code');
+        if (!kilo) throw blocked('Kilo Code is not installed in this VS Code profile.');
+        const activation = await check('kilo-activation', 'Kilo Code', async () => {
+            await withDeadline(() => kilo.activate(), 90000, 'Kilo activation exceeded 90 seconds.');
+            if (!kilo.isActive) throw new Error('Kilo did not become active.');
+            report.versions.kilo = kilo.packageJSON.version;
+            for (const id of kilo.packageJSON.extensionDependencies || []) {
+                const dependency = vscode.extensions.getExtension(id);
+                if (!dependency) throw new Error(`Required extension is missing: ${id}`);
+                await withDeadline(() => dependency.activate(), 90000, `Extension dependency activation timed out: ${id}`);
+                if (!dependency.isActive) throw new Error(`Required extension did not activate: ${id}`);
+            }
+            return 'The installed Kilo extension and its declared extension dependencies activated in the real host.';
+        });
+        if (activation.status !== 'PASS') throw blocked('Kilo activation failed; dependent live checks were not executed.');
+        const binary = path.join(kilo.extensionPath, 'bin', process.platform === 'win32' ? 'kilo.exe' : 'kilo');
+        const runtime = await check('installed-runtime', 'Kilo Code', async () => {
+            if (path.resolve(binary).toLowerCase() !== path.resolve(env.LOKIENTE_ET_KILO || '').toLowerCase()) throw new Error('The tested CLI is not the runtime bundled with this Kilo extension.');
+            const bytes = await fs.readFile(binary); report.runtimeSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+            const result = await native(binary, ['--version'], { cwd: project, env, timeoutMs: 30000 });
+            if (result.code !== 0 || !/\d+\.\d+\.\d+/.test(result.stdout)) throw new Error('Embedded Kilo version check failed.');
+            report.versions.embeddedKilo = result.stdout.trim(); return 'Installed embedded runtime is executable; its SHA-256 is recorded.';
+        });
+        if (runtime.status !== 'PASS') throw blocked('The installed Kilo runtime is unavailable; dependent checks were not executed.');
+        const dependencies = await check('dependencies', 'LoKiEnte -> Kilo Code', async () => {
+            const file = path.join(directory, 'dependencies.json');
+            const result = await native(chain.powerShellExecutable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-File', path.join(root, 'app', 'Test-Toolchain.ps1'),
+                '-InstallRoot', root, '-DependenciesOnly', '-WorkingDirectory', project, '-ResultPath', file], { cwd: project, env, timeoutMs: 300000 });
+            const dependency = JSON.parse(await fs.readFile(file, 'utf8'));
+            report.dependencies = dependency;
+            if (result.code !== 0 || dependency.status !== 'PASS' || dependency.cases.length < 10 || dependency.cases.some(c => c.status !== 'PASS')) throw new Error('Installed desktop/Git/CLI/config/tool/search checks failed. See dependencies.json.');
+            return 'Standalone and embedded Kilo passed effective configuration, tool-import and actual file-search checks.';
+        });
+        if (dependencies.status !== 'PASS') throw blocked('Installed toolchain dependencies failed; dependent inference checks were not executed.');
+        const headers = {};
+        const ref = /^\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/.exec(options.apiKey || '');
+        const token = ref ? env[ref[1]] : options.apiKey;
+        if (token) headers.authorization = `Bearer ${token}`;
+        await check('model-catalog', 'Kilo Code -> LoKiEnte', async () => {
+            const catalog = await readJsonResponse(new URL('models', base.href.replace(/\/?$/, '/')).href, headers);
+            for (const model of Object.values(models)) if (!catalog.data?.some(item => item.id === model.id)) throw new Error(`Configured model is missing from the live API: ${model.id}`);
+            return 'All configured route IDs are present in the live local model API.';
+        });
+        for (const alias of aliases) {
+            const id = `model-roundtrip:${alias}`;
+            await check(id, 'Kilo Code -> LoKiEnte -> LM Studio', async () => {
+                const marker = `LOKIENTE_ACCEPTANCE_${crypto.randomBytes(16).toString('hex')}`;
+                const file = path.join(project, `probe-${alias}.txt`); await fs.writeFile(file, marker + '\n', 'utf8');
+                // The marker is NOT in the prompt: a real completed Kilo read
+                // and the model's subsequent final response must both prove it.
+                const prompt = `Explanation-only question: what exact string is in ${file}? Use your read tool to read that file and answer only with its contents. Do not edit files, execute commands or start a development workflow.`;
+                const result = await native(binary, ['run', '--format', 'json', '--agent', 'shadow-chat', '--model', `lmstudio/${alias}`, '--title', `LoKiEnte acceptance ${runId}`, prompt], { cwd: project, env, timeoutMs: 300000 });
+                if (result.code !== 0) throw new Error(`Kilo model run failed (exit ${result.code}). Read the LoKiEnte output for Kilo/runtime errors.`);
+                const evidence = inspectKiloEvents(result.stdout, marker, file);
+                if (!evidence.read || !evidence.replyMatches || !evidence.finished || evidence.error) throw new Error('No complete real read-tool -> model-response round trip was observed.');
+                return `Real embedded Kilo, read tool and final LM Studio response passed for ${alias}; no scripted responses were supplied.`;
+            });
+        }
+        if (config.indexing?.enabled) {
+            await check('lancedb', 'Kilo indexing -> LanceDB', async () => {
+                const module = env.KILO_LANCEDB_PATH;
+                const expected = path.join(root, 'tooling', 'lancedb', 'node_modules', '@lancedb', 'lancedb', 'dist', 'index.js');
+                if (!module || path.resolve(module).toLowerCase() !== path.resolve(expected).toLowerCase()) throw new Error('The installed local LanceDB dependency is not configured.');
+                const script = `const fs=require('node:fs/promises');(async()=>{const db=await require(process.argv[1]).connect(process.argv[2]);const t=await db.createTable('acceptance',[{id:'probe',vector:Array.from({length:768},(_,i)=>i===0?1:0)}]);const r=await t.search(Array.from({length:768},(_,i)=>i===0?1:0)).limit(1).toArray();if(r[0]?.id!=='probe')throw Error('Vector search failed');await db.dropTable('acceptance');console.log('LANCEDB_PASS')})().catch(()=>{process.exitCode=1})`;
+                const result = await native(chain.nodeExecutable, ['-e', script, module, path.join(directory, 'lancedb-probe')], { cwd: project, env, timeoutMs: 60000 });
+                if (result.code !== 0 || !result.stdout.includes('LANCEDB_PASS')) throw new Error('Real LanceDB native import, table write and vector search failed.');
+                return 'Installed LanceDB native dependency passed actual local table write and vector search. Full repository indexing is a separate workload.';
+            });
+            await check('embeddings', 'Kilo indexing -> LM Studio', async () => {
+                const index = config.indexing;
+                const endpoint = loopback(index['openai-compatible'].baseUrl);
+                const response = await fetch(new URL('embeddings', endpoint.href.replace(/\/?$/, '/')), { method: 'POST', headers: { ...headers, 'content-type': 'application/json' },
+                    body: JSON.stringify({ model: index.model, input: 'LoKiEnte acceptance', dimensions: 768 }), signal: AbortSignal.timeout(60000), redirect: 'error' });
+                const value = await response.json();
+                if (!response.ok || !Array.isArray(value.data?.[0]?.embedding) || value.data[0].embedding.length !== 768 || !value.data[0].embedding.every(Number.isFinite)) throw new Error('Real fixed-size embedding inference failed.');
+                return 'Actual embedding inference returned 768 finite values.';
+            });
+        } else await record('embeddings', 'Kilo indexing', 'NOT_APPLICABLE', 'Indexing is disabled in the prepared configuration.');
+        const marker = `LOKIENTE_ACCEPTANCE_${crypto.randomBytes(16).toString('hex')}`;
+        const hash = crypto.createHash('sha256').update(marker).digest('hex');
+        const started = Date.now();
+        const webview = await check('kilo-webview-request', 'VS Code -> Kilo webview -> LM Studio', async () => {
+            const commands = await vscode.commands.getCommands(true);
+            if (!commands.includes('kilo-code.new.terminalExplainCommand')) throw blocked('This Kilo version does not expose the tested explanation command.');
+            // This explains supplied text. It never creates or executes a terminal command.
+            await withDeadline(() => vscode.commands.executeCommand('kilo-code.new.terminalExplainCommand', { selection: `printf '${marker}'\n# Include this exact literal marker in the explanation.` }), 90000, 'Kilo webview did not become ready.');
+            const pool = await fs.readFile(path.join(root, 'runtime', 'model-pool.json'), 'utf8').then(JSON.parse).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
+            if (!pool) return 'The real Kilo webview accepted the explanation action. Single-mode response delivery requires the following visible check.';
+            let completion, failure;
+            const tail = new LogTail(path.join(root, 'runtime', 'router-events.jsonl'), line => {
+                let event; try { event = JSON.parse(line); } catch { return; }
+                if (event.probeHash !== hash) return;
+                if (event.event === 'request_failed') failure = event.code;
+                if (event.event === 'request_completed' && event.probeReplyMatched === true) completion = event;
+            }, { replayBytes: 1024 * 1024 });
+            while (Date.now() - started < 300000) {
+                await tail.read();
+                if (failure) throw new Error(`The real Kilo webview request failed: ${failure}`);
+                if (completion) return 'A nonce-correlated real webview request reached LM Studio and completed with the expected literal response.';
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            throw new Error('No completed nonce-correlated Kilo webview -> router -> LM Studio exchange was observed.');
+        });
+        if (webview.status !== 'PASS') await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'The webview request failed; no visible response can be accepted.');
+        else if (!interactive) await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'Visible webview rendering has not been observed. Noninteractive checks cannot claim this evidence.');
+        else {
+            const answer = await vscode.window.showInformationMessage(`LoKiEnte acceptance: is the completed Kilo explanation containing ${marker} visible in this test window?`,
+                { modal: true, detail: 'Confirm the actual Kilo chat response, not the Output log or this question. A missing/unconfirmed response prevents full acceptance.' }, 'Response is visible', 'Response is missing', 'Skip visual check');
+            await record('kilo-visible-response', 'Kilo Code UI', answer === 'Response is visible' ? 'PASS' : answer === 'Response is missing' ? 'FAIL' : 'BLOCKED',
+                answer === 'Response is visible' ? 'User observed the nonce-bearing response in the real Kilo webview.' : 'The real Kilo response was not confirmed visible.', { evidenceKind: 'manual-visual-observation' });
+        }
+    } catch (e) { await record('acceptance-prerequisite', 'LoKiEnte', e.blocked ? 'BLOCKED' : 'FAIL', e.message); }
+    for (const id of required) if (!report.cases.some(c => c.id === id)) await record(id, 'LoKiEnte', 'BLOCKED', 'Not executed because a prerequisite was unavailable.');
+    report.status = summarize(report.cases, required); report.required = required; report.finishedAtUtc = new Date().toISOString();
+    await save();
+    await atomic(path.join(root, 'diagnostics', 'toolchain', 'latest.json'), JSON.stringify(report, null, 2));
+    await atomic(path.join(root, 'diagnostics', 'toolchain', 'latest.junit.xml'), junit(report));
+    logger[report.status === 'PASS' ? 'info' : 'error']('LoKiEnte', `Toolchain acceptance: ${report.status}. Report: ${reportPath}`);
+    return report;
+}
+
+module.exports = { runNative, inspectKiloEvents, summarize, junit, atomic, checkToolchain, withDeadline, waitForWorkspaceTrust };

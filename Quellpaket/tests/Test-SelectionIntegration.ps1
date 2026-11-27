@@ -31,6 +31,11 @@ $ModelMode='Dual';$PreferredModel='Auto';$ModelKey='';$IncludeFastModel=$true;$A
 $SkipModelDownload=$false;$ContextLength=32768;$Port=1234;$RouterPort=1235;$ApiTokenEnvironmentVariable='';$studio='fixture'
 $ProjectPath=@();$NoShortcut=$true;$node='node-fixture';$toolchain=@{powerShellExecutable='pwsh-fixture'}
 $kilo=@{kiloExecutable='cli-fixture';kiloArgumentPrefix=@()};$bundledKilo='gui-fixture'
+$RunAcceptanceTest=$true;$SkipAcceptanceTest=$false
+# Synthetic acceptance boundary: this suite proves model-selection propagation only.
+function Select-ShadowAcceptanceMode {param($RunAcceptanceTest,$SkipAcceptanceTest) return 'Run'}
+function Invoke-ShadowToolchainAcceptance {param($InstallRoot) return @{status='PASS'}}
+function Install-ShadowDesktopRunner {param($InstallRoot,$PowerShellPath) return (Join-Path $InstallRoot 'synthetic-desktop-runner.exe')}
 $script:selectionPrompt=0
 function Read-Host {param($Prompt) if($Prompt -like '*Confirm*'){return 'y'};$script:selectionPrompt++;if($script:selectionPrompt -eq 1){return '3'};return ''}
 '@
@@ -64,7 +69,8 @@ function Update-ShadowWorkspaces {param($Root,$ProjectPath,$PwshPath) return @{E
 function New-ShadowWelcomeTestProject {param($InstallRoot) return @{project=(Join-Path $InstallRoot 'welcome/workflow-test')}}
 function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPaths) return 'synthetic-start-command'}
 '@
-    $harness+="`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
+    $reportModule=(Join-Path $SourceRoot 'ProvisionReport.ps1').Replace("'","''")
+    $harness+="`n. '$reportModule'`nStart-ShadowProvisionReport -InstallRoot `$InstallRoot -Report `$report`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
     Copy-Item -LiteralPath (Join-Path $SourceRoot 'templates') -Destination (Join-Path $root 'templates') -Recurse
     $harnessPath=Join-Path $root 'harness.ps1'
     [IO.File]::WriteAllText($harnessPath,$harness)

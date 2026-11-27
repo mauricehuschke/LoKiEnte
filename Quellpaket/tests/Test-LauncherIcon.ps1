@@ -13,6 +13,7 @@ $root=Join-Path ([IO.Path]::GetTempPath()) ('lokiente-icon-'+[guid]::NewGuid().T
 $desktop=Join-Path $root 'desktop'
 $InstallRoot=Join-Path $root 'installation with spaces'
 $toolchain=@{powerShellExecutable=(Get-Process -Id $PID).Path}
+$desktopRunner=Join-Path $InstallRoot 'tooling/desktop-runner/LoKiEnte.exe'
 try {
     [void][IO.Directory]::CreateDirectory($desktop)
     [void][IO.Directory]::CreateDirectory((Join-Path $InstallRoot 'app/assets'))
@@ -30,7 +31,7 @@ try {
     $shell=New-Object -ComObject WScript.Shell
     $linkPath=Join-Path $desktop 'LoKiEnte.lnk'
     $link=$shell.CreateShortcut($linkPath)
-    if($link.IconLocation -cne ($installedIcon+',0') -or $link.TargetPath -ine $toolchain.powerShellExecutable -or $link.Arguments -notlike '*-PauseOnError' -or $link.WorkingDirectory -cne $InstallRoot){throw 'New launcher properties incorrect'}
+    if($link.IconLocation -cne ($installedIcon+',0') -or $link.TargetPath -ine $desktopRunner -or $link.Arguments -ne '' -or $link.WorkingDirectory -cne $InstallRoot){throw 'Desktop shortcut must use the console-free executable without PauseOnError.'}
     $oldPath=Join-Path $desktop 'Shadow Local AI.lnk'
     Copy-Item -LiteralPath $linkPath -Destination $oldPath
     $unrelated=$shell.CreateShortcut((Join-Path $desktop 'LoKi.lnk'))

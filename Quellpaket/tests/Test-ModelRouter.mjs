@@ -93,6 +93,7 @@ test('resource refusal is reported explicitly by the real controller process', a
   const script = path.join(root, 'Switch-LocalModel.ps1');
   try {
     await copyFile(fileURLToPath(new URL('../Switch-LocalModel.ps1', import.meta.url)), script);
+    await copyFile(fileURLToPath(new URL('../Common.ps1', import.meta.url)), path.join(root, 'Common.ps1'));
     await writeFile(path.join(root, 'ModelPool.ps1'), `function Switch-ShadowLocalModel {\n` +
       `param($InstallRoot,$Alias)\n$error=[InvalidOperationException]::new('synthetic')\n` +
       `if($Alias -eq 'coder-fast'){$error.Data['ShadowModelVerificationFailure']=$true}` +
@@ -155,6 +156,7 @@ test('controller refusals name the actionable cause and retain private details l
   const script = path.join(root, 'Switch-LocalModel.ps1');
   try {
     await copyFile(fileURLToPath(new URL('../Switch-LocalModel.ps1', import.meta.url)), script);
+    await copyFile(fileURLToPath(new URL('../Common.ps1', import.meta.url)), path.join(root, 'Common.ps1'));
     for (const [flag, code, message, status = 503, uncertain = false] of [
       ['ShadowModelConflict', 'model_conflict', 'manually loaded'],
       ['ShadowModelBusy', 'model_busy', 'still busy'],

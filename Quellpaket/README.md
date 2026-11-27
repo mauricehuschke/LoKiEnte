@@ -2,7 +2,83 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.27.1 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.3 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+
+## Desktop projects and provisioning diagnostics
+
+The desktop shortcut starts a Windows GUI-subsystem launcher. PowerShell runs
+without a console; project selection uses a dialog. It retains registered projects
+and offers **Browse folder**, **Find Git projects**, **Clone repository** and
+**Repair path**. Git discovery has explicit depth/directory limits and skips links
+and generated dependency directories. Cloning accepts HTTPS/SSH repository URLs
+without embedded credentials, or a local repository, and requires a new destination
+directory. Existing destinations are preserved. Git's credential manager/SSH agent
+handles authentication. A failed partial clone is retained for inspection.
+
+**Repair path** reconnects a registered project to its new folder. The original
+LoKiEnte task/checks files, custom workspace settings and registration identity are
+retained; old paths in the managed workspace are updated. Index/workspace backups
+are made before writes. Missing entries stay listed until repaired. Reopening or
+reprovisioning a repaired project continues using its retained metadata.
+
+Startup is confirmed only by a launch-specific handshake from the expected
+LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
+not establish a running extension. Kilo discovery waits for registration and
+Workspace Trust before activation. Installed-but-unavailable, missing and activation
+failures have separate diagnostics. The helper version is 0.3.1; fully close old
+managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
+
+**Output → LoKiEnte** receives launcher/editor console logs as well as the managed
+toolchain logs. The native collector does not leave a terminal open. If normal
+startup fails, the launcher attempts a diagnostics-only VS Code window; when VS Code
+itself cannot open, a native error dialog points to `runtime/launcher-logs`.
+
+`provisioning-report.json` schema 2 is written before the first setup operation and
+updated incrementally. It includes bootstrap/version/package evidence, environment
+and hardware inventory, parameters, timed actions/tests, native command arguments,
+exit codes, stdout/stderr, exception locations/stacks, installed extension manifests,
+configuration/state snapshots and this run's local logs. Completed partial acceptance
+evidence survives a later launch failure. Prior reports are backed up. Very large
+streams/logs are explicitly marked truncated and link to their full local log;
+credentials are redacted. The report includes local paths and may contain private
+configuration/task diagnostics: inspect it before sharing.
+
+Provisioning acceptance uses native Windows applications and a synthetic local Git
+clone. **Docker and Hyper-V are not required or started.** The optional offline-VM
+feature is separate and is never an acceptance prerequisite. A skipped, blocked or
+failed case is never presented as a passed test.
+
+## Verify the installed toolchain
+
+Provisioning now asks **Run the real VS Code/Kilo/LM Studio acceptance? [Y/n]**.
+Enter runs it; `n` skips it. Use `-RunAcceptanceTest` to run without this question,
+or `-SkipAcceptanceTest` to skip explicitly. These switches are mutually exclusive
+and are not retained for the next update. A skipped test means **unverified**.
+
+The test opens a separate VS Code test window. Trust its synthetic workspace when
+asked, and confirm the completed response in the actual Kilo chat at the end.
+It checks installed dependencies, both Kilo runtimes, tool imports/search and a
+real file-read/model-response round trip for every configured model. Dual mode
+also correlates a real webview request through the router to LM Studio. Enabled
+indexing adds actual embedding inference and LanceDB write/search checks.
+Full repository indexing remains a separate workload.
+
+Open **Output → LoKiEnte** for component-tagged successes, failures and connection
+state changes. The channel combines available managed VS Code/Kilo logs, router
+events, model-controller logs and LM Studio server logs. Credentials are redacted;
+prompt/response JSON and debug/trace payloads are excluded. It cannot recover
+messages that a third-party process never logs. A reachable API alone is not an
+inference PASS.
+
+Results are local: `diagnostics/toolchain/latest.json` and `latest.junit.xml`, plus
+a separate directory for each run. `PASS` requires all mandatory checks, including
+the manual visual observation; `FAIL`, `BLOCKED` and `SKIPPED` never count as PASS.
+Run again from the LoKiEnte sidebar (**Run toolchain acceptance**) or PowerShell 7:
+
+```powershell
+pwsh -NoProfile -File D:\LoKi\app\Test-Toolchain.ps1 -InstallRoot D:\LoKi
+```
+
 
 Use **Run E.T. model rule test** in the LoKiEnte sidebar to test a selected local model in your normal Windows session. It uses Kilo instructions and checks Kilo tool permissions. The optional Hyper-V check is separate.
 

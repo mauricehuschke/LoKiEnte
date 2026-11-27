@@ -1,9 +1,34 @@
 # Shared helpers. PowerShell 7.4 or newer.
 Set-StrictMode -Version Latest
 
+function Initialize-ShadowToolchainLogging {
+    param([Parameter(Mandatory)][string]$InstallRoot)
+    $script:ShadowToolchainLogRoot=[IO.Path]::GetFullPath($InstallRoot)
+}
+
+function Write-ShadowToolchainEvent {
+    param([string]$Component='LoKiEnte',[ValidateSet('INFO','WARN','ERROR')][string]$Level='INFO',[string]$Message)
+    $root=Get-Variable -Name ShadowToolchainLogRoot -Scope Script -ValueOnly -ErrorAction SilentlyContinue
+    if(-not $root){return}
+    try{
+        $safe=[string]$Message
+        foreach($entry in [Environment]::GetEnvironmentVariables('Process').GetEnumerator()){
+            if($entry.Key -match '(?i)token|api.?key|password' -and ([string]$entry.Value).Length -gt 3){$safe=$safe.Replace([string]$entry.Value,'[REDACTED]')}
+        }
+        $safe=$safe -replace '(?i)(Bearer\s+|Basic\s+)[A-Za-z0-9+/_=.:-]+','$1[REDACTED]'
+        $safe=$safe -replace '(?i)((?:api[_-]?key|password|authorization|auth_token|access_token|refresh_token)\s*["'']?\s*[:=]\s*["'']?)[^\s"'',;}]+','$1[REDACTED]'
+        $safe=$safe -replace '(?i)([?&](?:token|key|password|auth_token)=)[^&\s]+','$1[REDACTED]'
+        $directory=Join-Path $root 'runtime';[void][IO.Directory]::CreateDirectory($directory)
+        $record=[ordered]@{utc=[DateTime]::UtcNow.ToString('o');level=$Level;component=$Component;message=$safe;pid=$PID}
+        [IO.File]::AppendAllText((Join-Path $directory 'toolchain-events.jsonl'),(($record|ConvertTo-Json -Compress)+[Environment]::NewLine),[Text.UTF8Encoding]::new($false))
+        if(Get-Command Add-ShadowProvisionEvidence -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionEvidence events $record}
+    }catch{Write-Verbose 'Could not append the local toolchain event.'}
+}
+
 function Write-ShadowMessage {
     param([string]$Message, [ValidateSet('INFO','WARN','OK')][string]$Level='INFO')
     Write-Host ('[{0}] {1}' -f $Level, $Message)
+    Write-ShadowToolchainEvent -Level $(if($Level -eq 'WARN'){'WARN'}else{'INFO'}) -Message $Message
 }
 
 function Invoke-ShadowNative {
@@ -15,7 +40,8 @@ function Invoke-ShadowNative {
         [int]$TimeoutSeconds=1800,
         [switch]$AllowFailure,
         [switch]$Quiet,
-        [hashtable]$Environment=@{}
+        [hashtable]$Environment=@{},
+        [scriptblock]$ProgressCallback
     )
     # Never use a shell to concatenate arguments. .cmd shims must be resolved to
     # their node/native entry point by the caller.
@@ -33,24 +59,44 @@ function Invoke-ShadowNative {
     foreach ($name in $Environment.Keys) { $start.Environment[[string]$name]=[string]$Environment[$name] }
     $process=[Diagnostics.Process]::new()
     $process.StartInfo=$start
+    $readCancellation=[Threading.CancellationTokenSource]::new()
+    $commandName=[IO.Path]::GetFileName($FilePath)
+    $evidenceClock=[Diagnostics.Stopwatch]::StartNew();$stdout='';$stderr='';$nativeFailure=$null;$nativeExit=$null
+    Write-ShadowToolchainEvent -Component $commandName -Message 'Starting native tool.'
     try {
         if (-not $process.Start()) { throw 'Process did not start.' }
-        $outTask=$process.StandardOutput.ReadToEndAsync()
-        $errTask=$process.StandardError.ReadToEndAsync()
+        if($PSVersionTable.PSVersion -ge [version]'7.4'){
+            $outTask=$process.StandardOutput.ReadToEndAsync($readCancellation.Token)
+            $errTask=$process.StandardError.ReadToEndAsync($readCancellation.Token)
+        }else{
+            $outTask=$process.StandardOutput.ReadToEndAsync()
+            $errTask=$process.StandardError.ReadToEndAsync()
+        }
         $clock=[Diagnostics.Stopwatch]::StartNew()
         while (-not $process.WaitForExit(1000)) {
+            if($ProgressCallback){$null=& $ProgressCallback}
             if ($clock.Elapsed.TotalSeconds -ge $TimeoutSeconds) {
                 $process.Kill($true)
-                $process.WaitForExit()
+                $readCancellation.Cancel()
                 throw "Timeout after $TimeoutSeconds seconds: $([IO.Path]::GetFileName($FilePath))"
             }
             if (-not $Quiet -and ([int]$clock.Elapsed.TotalSeconds % 30 -eq 0)) {
                 Write-Host ('  ... {0} has been running for {1}s' -f [IO.Path]::GetFileName($FilePath), [int]$clock.Elapsed.TotalSeconds)
             }
         }
+        while(-not $outTask.IsCompleted -or -not $errTask.IsCompleted){
+            if($clock.Elapsed.TotalSeconds -ge $TimeoutSeconds){
+                $readCancellation.Cancel()
+                throw "Timeout after $TimeoutSeconds seconds waiting for $commandName output to close."
+            }
+            Start-Sleep -Milliseconds 50
+        }
         $stdout=$outTask.GetAwaiter().GetResult()
         $stderr=$errTask.GetAwaiter().GetResult()
         $result=[pscustomobject]@{ExitCode=$process.ExitCode;StdOut=$stdout;StdErr=$stderr}
+        $nativeExit=$process.ExitCode
+        Write-ShadowToolchainEvent -Component $commandName -Level $(if($result.ExitCode -eq 0){'INFO'}else{'ERROR'}) -Message "Native tool exited with code $($result.ExitCode)."
+        if($stderr.Trim()){Write-ShadowToolchainEvent -Component $commandName -Level $(if($result.ExitCode -eq 0){'WARN'}else{'ERROR'}) -Message $stderr.TrimEnd()}
         if (-not $Quiet) {
             if ($stdout.Trim()) { Write-Host $stdout.TrimEnd() }
             if ($stderr.Trim()) { Write-Host $stderr.TrimEnd() }
@@ -60,7 +106,11 @@ function Invoke-ShadowNative {
         }
         return $result
     }
-    finally { $process.Dispose() }
+    catch { $nativeFailure=$_.Exception.Message;Write-ShadowToolchainEvent -Component $commandName -Level ERROR -Message $_.Exception.Message;throw }
+    finally {
+        $readCancellation.Cancel();$process.Dispose();$readCancellation.Dispose()
+        if(Get-Command Add-ShadowProvisionCommand -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionCommand -File $FilePath -Arguments $ArgumentList -WorkingDirectory $WorkingDirectory -TimeoutSeconds $TimeoutSeconds -ExitCode $nativeExit -Stdout $stdout -Stderr $stderr -DurationMs $evidenceClock.Elapsed.TotalMilliseconds -Failure $nativeFailure}
+    }
 }
 
 function Update-ShadowProcessPath {
@@ -263,7 +313,10 @@ function Write-ShadowManagedFile {
     if (Test-Path -LiteralPath $Path) {
         if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "File conflict: $Path" }
         $oldBytes=[IO.File]::ReadAllBytes($Path)
-        if ([Convert]::ToBase64String($oldBytes) -eq [Convert]::ToBase64String($newBytes)) { return $false }
+        if ([Convert]::ToBase64String($oldBytes) -eq [Convert]::ToBase64String($newBytes)) {
+            if(Get-Command Add-ShadowProvisionEvidence -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionEvidence activities @{kind='ManagedFile';path=$Path;status='UNCHANGED';bytes=$newBytes.Length}}
+            return $false
+        }
         if (-not $BackupRoot) { throw "Existing file would be overwritten: $Path" }
         [IO.Directory]::CreateDirectory($BackupRoot) | Out-Null
         $tag=[DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ')
@@ -276,6 +329,7 @@ function Write-ShadowManagedFile {
         [IO.File]::WriteAllBytes($temporary,$newBytes)
         [IO.File]::Move($temporary,$Path,$true)
     } finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force } }
+    if(Get-Command Add-ShadowProvisionEvidence -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionEvidence activities @{kind='ManagedFile';path=$Path;status='WRITTEN';bytes=$newBytes.Length;backupDirectory=$BackupRoot}}
     return $true
 }
 

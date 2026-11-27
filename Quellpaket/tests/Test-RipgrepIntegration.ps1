@@ -32,6 +32,12 @@ if($Scenario -eq 'deferred'){$pool.VerificationStatus='Partial';$embedding.Statu
 if($Scenario -eq 'single-deferred'){$ModelMode='Single';$runtime=[pscustomobject]@{Status='Deferred';Estimate=$null};$report.warnings=@('Synthetic unverified model')}
 if($Scenario -eq 'reserve'){$pool.Profiles=@([pscustomobject]@{Estimate=[pscustomobject]@{ReserveOverride=$true}});$report.warnings=@('Synthetic reserve override')}
 $ProjectPath=@();$NoShortcut=$true
+$RunAcceptanceTest=$true;$SkipAcceptanceTest=$false
+# This suite isolates the search/setup gate. Live acceptance is tested separately.
+function Select-ShadowAcceptanceMode {param($RunAcceptanceTest,$SkipAcceptanceTest) return 'Run'}
+function Invoke-ShadowToolchainAcceptance {param($InstallRoot) return @{status='PASS'}}
+function Write-ShadowToolchainEvent {param($Component,$Level,$Message)}
+function Install-ShadowDesktopRunner {param($InstallRoot,$PowerShellPath) return (Join-Path $InstallRoot 'synthetic-desktop-runner.exe')}
 $IndexingMode='Off';$IncludeFastModel=$false;$AllowPartialGpuOffload=$false;$AllowUnfitAttempt=$false
 $RouterPort=1235;$Port=1234;$ContextLength=32768;$PreferredModel='Auto';$ModelKey='';$ApiTokenEnvironmentVariable=''
 function Get-LrProperty {param($Object,$Name,$Default=$null) if($null -ne $Object -and $null -ne $Object.PSObject.Properties[$Name]){return $Object.$Name};return $Default}
@@ -47,7 +53,8 @@ function Test-ShadowKiloSearch {
 function Write-ShadowManagedFile {param($Path,$Content,$BackupRoot) [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path));[IO.File]::WriteAllText($Path,$Content);return $true}
 function Write-ShadowMessage {param($Message,$Level) Write-Host $Message}
 '@
-    $harness+="`n"+$startCommand.Extent.Text+"`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
+    $reportModule=(Join-Path $SourceRoot 'ProvisionReport.ps1').Replace("'","''")
+    $harness+="`n. '$reportModule'`nStart-ShadowProvisionReport -InstallRoot `$InstallRoot -Report `$report`n"+$startCommand.Extent.Text+"`ntry {`n"+$body+"`n} "+$main.CatchClauses[0].Extent.Text
     Copy-Item -LiteralPath (Join-Path $SourceRoot 'templates') -Destination (Join-Path $root 'templates') -Recurse
     $harnessPath=Join-Path $root 'harness.ps1'
     [IO.File]::WriteAllText($harnessPath,$harness)

@@ -113,7 +113,8 @@ function Assert-ShadowKiloEffectiveConfig {
         [string[]]$KiloArgumentPrefix=@(),
         [Parameter(Mandatory)][string]$InstallRoot,
         [Parameter(Mandatory)][Collections.IDictionary]$Config,
-        [Parameter(Mandatory)][string]$WorkingDirectory
+        [Parameter(Mandatory)][string]$WorkingDirectory,
+        [ValidateRange(1,1200)][int]$TimeoutSeconds=120
     )
     $environment=Get-ShadowLocalEnvironment -InstallRoot $InstallRoot -ConfigJson ($Config|ConvertTo-Json -Depth 40 -Compress)
     $start=[Diagnostics.ProcessStartInfo]::new()
@@ -122,11 +123,18 @@ function Assert-ShadowKiloEffectiveConfig {
     foreach($arg in @($KiloArgumentPrefix)+@('debug','config')){[void]$start.ArgumentList.Add($arg)}
     foreach($key in $environment.Keys){$start.Environment[$key]=[string]$environment[$key]}
     $process=[Diagnostics.Process]::new();$process.StartInfo=$start
+    $readCancellation=[Threading.CancellationTokenSource]::new()
+    $evidenceClock=[Diagnostics.Stopwatch]::StartNew();$raw='';$errorOutput='';$configurationExit=$null;$configurationFailure=$null
     try {
         [void]$process.Start()
-        $output=$process.StandardOutput.ReadToEndAsync();$errors=$process.StandardError.ReadToEndAsync()
-        if(-not $process.WaitForExit(120000)){$process.Kill($true);throw 'Kilo configuration verification timed out.'}
-        $raw=$output.GetAwaiter().GetResult();[void]$errors.GetAwaiter().GetResult()
+        $watch=[Diagnostics.Stopwatch]::StartNew()
+        $output=$process.StandardOutput.ReadToEndAsync($readCancellation.Token);$errors=$process.StandardError.ReadToEndAsync($readCancellation.Token)
+        if(-not $process.WaitForExit($TimeoutSeconds*1000)){$process.Kill($true);$readCancellation.Cancel();throw 'Kilo configuration verification timed out.'}
+        while(-not $output.IsCompleted -or -not $errors.IsCompleted){
+            if($watch.Elapsed.TotalSeconds -ge $TimeoutSeconds){$readCancellation.Cancel();throw 'Kilo configuration output did not close before its deadline.'}
+            Start-Sleep -Milliseconds 50
+        }
+        $raw=$output.GetAwaiter().GetResult();$errorOutput=$errors.GetAwaiter().GetResult();$configurationExit=$process.ExitCode
         if($process.ExitCode -ne 0){throw 'Kilo could not resolve its effective configuration. Check its installed version and managed policy; no configuration is bypassed.'}
         try{$effective=ConvertFrom-Json -InputObject $raw -AsHashtable -ErrorAction Stop}catch{throw 'Kilo debug config did not return a JSON configuration; verification cannot continue.'}
         if(-not $effective.Contains('experimental') -or $effective.experimental -isnot [Collections.IDictionary] -or -not $effective.experimental.Contains('openTelemetry') -or $effective.experimental.openTelemetry -isnot [bool] -or $effective.experimental.openTelemetry){throw 'Effective telemetry opt-out was overridden; the local profile cannot be verified.'}
@@ -188,7 +196,11 @@ function Assert-ShadowKiloEffectiveConfig {
         $mainAlias=([string]$Config.model).Substring('lmstudio/'.Length)
         $roleMap=[ordered]@{};foreach($role in $Config.agent.Keys){if($role -clike 'shadow-*'){$roleMap[$role]=[string]$Config.agent[$role].model}}
         [pscustomobject]@{Verified=$true;Provider='lmstudio';Model=[string]$Config.model;Context=[int]$Config.provider.lmstudio.models[$mainAlias].limit.context;Models=@($Config.provider.lmstudio.models.Keys);RoleModels=$roleMap}
-    } finally {$process.Dispose()}
+    } catch {$configurationFailure=$_.Exception.Message;throw}
+    finally {
+        $readCancellation.Cancel();$process.Dispose();$readCancellation.Dispose()
+        if(Get-Command Add-ShadowProvisionCommand -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionCommand -File $KiloExecutable -Arguments (@($KiloArgumentPrefix)+@('debug','config')) -WorkingDirectory $WorkingDirectory -TimeoutSeconds $TimeoutSeconds -ExitCode $configurationExit -Stdout $raw -Stderr $errorOutput -DurationMs $evidenceClock.Elapsed.TotalMilliseconds -Failure $configurationFailure}
+    }
 }
 
 function New-ShadowAgentConfiguration {

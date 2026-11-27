@@ -2,6 +2,88 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Provisioning diagnostics, native launcher and project repair - package 2026.11.27.3
+
+This build adds incremental schema-2 reporting, bootstrap handoff evidence, redacted
+native stdout/stderr and partial acceptance preservation. The desktop shortcut targets
+a compiled Windows GUI executable; real child-process/argument/redaction tests verify
+that the collector needs no console. A launch/version/profile handshake is required
+before the desktop script claims VS Code startup. Kilo discovery handles delayed
+registration and records installed manifests separately from active host extensions.
+
+Target acceptance has no Docker/Hyper-V prerequisite. Its native dependency checks
+include a synthetic local Git clone in addition to the installed Kilo/config/tools/search.
+Project selection retains existing folders and adds bounded Git discovery, cloning
+and repair with backups and preservation of task/checks/custom settings.
+
+Relevant new tests: Test-ProvisionReport.ps1 (real files/process outputs),
+Test-DesktopRunner.ps1 (real GUI-subsystem executable and child collector; synthetic
+host handshake), Test-KiloStartup.mjs (simulated extension registry), Test-ProjectGit.ps1
+(real Git and filesystem repair), Test-ProjectSelection.ps1 and Test-LauncherIcon.ps1.
+The GUI dialog and real VS Code/Kilo/LM Studio inference still require target acceptance.
+
+The native Git clone test is BLOCKED in this agent session because Windows denies
+MSYS NtCreateDirectoryObject with 0xC0000022. Independent Git discovery/repair checks
+continue against a separately initialized fixture and are not counted as successful
+cloning. Existing junction tests are likewise blocked by access denial. Neither a VM
+nor a container would turn these into evidence for the target machine; no such workaround
+is used. Missing target-machine evidence remains explicitly unverified.
+
+## Live toolchain acceptance and unified output - package 2026.11.27.2
+
+Provisioning offers a live acceptance run after setup. Explicit RunAcceptanceTest
+and SkipAcceptanceTest switches pass through the standalone bootstrap and request
+handoff. Empty interactive input selects Run. Skipping records SKIPPED in both
+JSON and JUnit and leaves provisioning with an unverified warning. FAIL exits 1;
+BLOCKED exits 2; an explicit skip exits 0 without claiming verification.
+
+The live runner uses the installed desktop VS Code and its real Extension Host
+test interface, installed Kilo extension/bundled executable, prepared local-only
+configuration and LM Studio. It checks extension dependencies, standalone and
+embedded CLI configuration/tool imports/search, each configured model's actual
+read-tool/final-answer round trip, and a real Kilo webview request. Dual-mode
+router evidence correlates only a random nonce hash and response-match flag;
+raw prompts and completions are not added to router events. A separate manual
+visual observation confirms the actual chat response. Noninteractive, incomplete,
+missing, failed or skipped evidence cannot produce a full PASS. Enabled indexing
+also requires real embedding inference and a native LanceDB write/search probe;
+this is not a full repository-indexing workload test.
+
+The LoKiEnte Output channel merges available managed VS Code/Kilo logs, router
+events, controller logs, local tool events and LM Studio server logs with source
+and severity. Health checks report connectivity, not inference success. Tests
+exercise redaction, bounded log replay, UTF-8 splits, rotation, HTTP failure and
+recovery, malformed/oversized data, router nonce correlation, interrupted streams,
+actual native subprocess deadlines and inherited output pipes. Startup UI unit
+tests simulate VS Code; they are not live-host evidence.
+
+Relevant suites: Test-ToolchainAcceptance.mjs, Test-ToolchainDiagnostics.mjs,
+Test-RouterEvidence.mjs, Test-ToolchainNative.ps1, Test-ToolchainPolicy.ps1,
+Test-ToolchainProvisioning.ps1, Test-VsCodeStartup.mjs, Test-VsCodeProfile.ps1,
+Test-RouterLifecycle.ps1, Test-RipgrepIntegration.ps1 and Test-SelectionIntegration.ps1.
+The installed live test is app/Test-Toolchain.ps1, with vscode-tests/toolchain.cjs
+as the real Extension Host entry. Reports remain local under diagnostics/toolchain.
+
+Local validation on 2026-11-27: the combined nine-suite JavaScript run passed
+61 cases. The final startup-specific run additionally checks the sidebar-focus
+deadline (11 cases). Acceptance policy/preparation passed 21 checks, provisioning
+skip/report integration 13, native/config/LM Studio log wrappers 7, VSIX/profile
+packaging 36 and router lifecycle 18. The Windows PowerShell 5.1 audit passed
+51 checks; native model-command failure tests passed 25. Settings preservation,
+selection/search integration, indexing policy/launch, CLI resolution, workflow
+discovery, workspace guides and localization also passed. Kilo-import junction
+preflight is BLOCKED by Windows access denial, not passed. The installer payload
+is compared byte-for-byte with every package source and both public sources and
+decoded payload are scanned with Gitleaks; these checks do not establish inference.
+
+Target acceptance is still UNVERIFIED in this development environment: there is
+no managed D:\LoKi installation/Kilo runtime here. An isolated real desktop-host
+launch attempt produced no Extension Host report before its deadline; it is not
+counted as passed. The affected installation on the other PC must run the new
+installer/test and produce its own report. The existing bootstrap and Kilo-import junction tests
+are blocked here by Windows junction-creation access denial; that check
+was not weakened or declared passed.
+
 ## Bounded model switching and actionable errors - package 2026.11.27.1
 
 The original native-command implementation was reproduced returning after

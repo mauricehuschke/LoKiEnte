@@ -5,7 +5,8 @@ param(
     [string]$ProjectPath,
     [switch]$StartIndexing,
     [switch]$ResetSecurityProfile,
-    [switch]$PauseOnError
+    [switch]$PauseOnError,
+    [switch]$Desktop
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -19,6 +20,8 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'AgentTemplates.ps1')
 . (Join-Path $PSScriptRoot 'Workspace.ps1')
 . (Join-Path $PSScriptRoot 'ProjectSelection.ps1')
+. (Join-Path $PSScriptRoot 'DesktopRunner.ps1')
+Initialize-ShadowToolchainLogging -InstallRoot $InstallRoot
 function Get-ShadowVsCodeLaunchArguments {
     param([string]$InstallRoot,[string]$OpenPath)
     return @('--user-data-dir',(Join-Path $InstallRoot 'vscode-data'),
@@ -36,7 +39,7 @@ try {
         $policy=Get-Content -LiteralPath $policyFile -Raw | ConvertFrom-Json -ErrorAction Stop
         if($policy.schema -ne 1 -or $policy.mode -cnotin @('standard','offline-vm')){throw 'Invalid security profile. Repair it or explicitly reset the profile.'}
         if($policy.mode -ceq 'offline-vm'){
-            if($PauseOnError){
+            if($PauseOnError -or $Desktop){
                 Add-Type -AssemblyName System.Windows.Forms
                 $choice=[Windows.Forms.MessageBox]::Show(
                     "Open your isolated guest now?"+[Environment]::NewLine+"Yes: start the guest. No: reset to Standard for the next launch. Cancel: close.",
@@ -48,7 +51,7 @@ try {
             return
         }
     }
-    $ProjectPath=Select-ShadowProject -InstallRoot $InstallRoot -ProjectPath $ProjectPath
+    $ProjectPath=Select-ShadowProject -InstallRoot $InstallRoot -ProjectPath $ProjectPath -Desktop:$Desktop
     if(-not $ProjectPath){
         Write-Host 'Startup cancelled. No model environment started.'
         return
@@ -62,7 +65,7 @@ try {
     $chain=Get-Content -LiteralPath $toolchainFile -Raw|ConvertFrom-Json -AsHashtable
     $indexingMode=Get-ShadowIndexingMode -Toolchain $chain
     if((Get-LrProperty $chain 'modelMode' 'Single') -ne 'Dual' -and $indexingMode -cne 'Off'){throw 'Semantic indexing requires a provisioned Dual model pool.'}
-    $startIndex=Select-ShadowIndexingForLaunch -Mode $indexingMode -StartIndexing:$StartIndexing
+    $startIndex=Select-ShadowIndexingForLaunch -Mode $indexingMode -StartIndexing:$StartIndexing -Desktop:$Desktop
     if($chain.ContainsKey('modelMode') -and $chain.modelMode -eq 'Dual'){
         $pool=Get-Content -LiteralPath (Join-Path $InstallRoot 'runtime/model-pool.json') -Raw|ConvertFrom-Json
         $router=Start-ShadowModelRouter -InstallRoot $InstallRoot -Pool $pool -NodePath $chain.nodeExecutable -PowerShellPath $chain.powerShellExecutable
@@ -103,30 +106,27 @@ try {
         $environment['PATH']=$npmPrefix+';'+[IO.Path]::GetDirectoryName($chain.nodeExecutable)+';'+$inheritedPath
     }
     $environment['LOKIENTE_MANAGED_VSCODE']='1'
+    $environment['LOKIENTE_INSTALL_ROOT']=[IO.Path]::GetFullPath($InstallRoot)
     $environment['LOKIENTE_ET_KILO']=$bundledKilo
     $environment['LOKIENTE_VSCODE_DATA_DIR']=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
-    $start=[Diagnostics.ProcessStartInfo]::new()
-    $start.FileName=[string]$chain.codeExecutable
-    $start.WorkingDirectory=$workingDirectory
-    $start.UseShellExecute=$false
-    foreach($arg in (Get-ShadowVsCodeLaunchArguments -InstallRoot $InstallRoot -OpenPath $openPath)){
-        [void]$start.ArgumentList.Add($arg)
-    }
-    foreach($key in $environment.Keys){$start.Environment[$key]=[string]$environment[$key]}
-    # GUI launch must not inherit Electron's CLI-only switch from a parent terminal.
-    foreach($key in @($start.Environment.Keys)){
-        if($key -match '^(VSCODE|ELECTRON)_'){[void]$start.Environment.Remove($key)}
-    }
-    $process=[Diagnostics.Process]::Start($start)
-    $process.Dispose()
+    $environment['LOKIENTE_STARTUP_VERSION']=(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'vscode-startup/package.json') -Raw|ConvertFrom-Json).version
+    $null=Start-ShadowEditor -InstallRoot $InstallRoot -CodePath $chain.codeExecutable -Arguments (Get-ShadowVsCodeLaunchArguments -InstallRoot $InstallRoot -OpenPath $openPath) -WorkingDirectory $workingDirectory -Environment $environment -WaitForHost
     if($startIndex -and $ProjectPath -and $chain.modelMode -eq 'Dual' -and $embedding.Status -ceq 'Ready'){
         Write-ShadowMessage 'Indexing: enable it in Kilo for this project; first exclude sensitive files in .gitignore or .kilocodeignore. Wait for Complete status.'
     }
     if(-not $startIndex){Write-ShadowMessage "Indexing is off for this launch (provisioned mode: $indexingMode). File search, subagents and tests remain available."}
-    Write-ShadowMessage 'VS Code started with the local profile. After configuration changes, fully close existing windows of this profile and restart.' 'OK'
+    Write-ShadowMessage 'VS Code confirmed the current LoKiEnte helper in the managed profile. Kilo readiness and connection messages are in Output -> LoKiEnte.' 'OK'
 } catch {
+    Write-ShadowToolchainEvent -Component 'Launcher' -Level ERROR -Message $_.Exception.Message
     Write-Error -Message $_.Exception.Message -ErrorAction Continue
-    if($PauseOnError){
+    if($Desktop){
+        try{
+            $chain=Get-Content -LiteralPath (Join-Path $InstallRoot 'toolchain.json') -Raw|ConvertFrom-Json
+            $environment=@{LOKIENTE_MANAGED_VSCODE='1';LOKIENTE_INSTALL_ROOT=$InstallRoot;LOKIENTE_VSCODE_DATA_DIR=(Join-Path $InstallRoot 'vscode-data');LOKIENTE_STARTUP_DIAGNOSTICS_ONLY='1';LOKIENTE_STARTUP_VERSION=(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'vscode-startup/package.json') -Raw|ConvertFrom-Json).version}
+            $null=Start-ShadowEditor -InstallRoot $InstallRoot -CodePath $chain.codeExecutable -Arguments (Get-ShadowVsCodeLaunchArguments -InstallRoot $InstallRoot -OpenPath $InstallRoot) -WorkingDirectory $InstallRoot -Environment $environment -WaitForHost
+            if($env:LOKIENTE_LAUNCH_ID -match '^[a-f0-9]{32}$'){[IO.File]::WriteAllText((Join-Path $InstallRoot ('runtime/launch-requests/'+$env:LOKIENTE_LAUNCH_ID+'.diagnostic-started')),'Diagnostic editor requested.')}
+        }catch{Write-ShadowToolchainEvent -Component 'Desktop runner' -Level ERROR -Message ('Unable to open diagnostic editor: '+$_.Exception.Message)}
+    }elseif($PauseOnError){
         try { $null=Read-Host 'Press Enter to close' } catch {}
     }
     exit 1
