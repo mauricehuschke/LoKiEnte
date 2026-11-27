@@ -48,7 +48,7 @@ Startup is confirmed only by a launch-specific handshake from the expected
 LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
 not establish a running extension. Kilo discovery waits for registration and
 Workspace Trust before activation. Installed-but-unavailable, missing and activation
-failures have separate diagnostics. The helper version is 0.3.1; fully close old
+failures have separate diagnostics. The helper version is 0.3.2; fully close old
 managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
 
 **Output → LoKiEnte** receives launcher/editor console logs as well as the managed
@@ -78,8 +78,11 @@ Enter runs it; `n` skips it. Use `-RunAcceptanceTest` to run without this questi
 or `-SkipAcceptanceTest` to skip explicitly. These switches are mutually exclusive
 and are not retained for the next update. A skipped test means **unverified**.
 
-The test opens a separate VS Code test window. Trust its synthetic workspace when
-asked, and confirm the completed response in the actual Kilo chat at the end.
+The test opens an ordinary VS Code window with an isolated test profile and the
+installed LoKiEnte helper. Review and trust its generated workspace when asked.
+If needed, choose **Manage Workspace Trust** in the LoKiEnte notification. The
+report records `waitingFor: workspace-trust` until you decide (up to ten minutes).
+Confirm the completed response in the actual Kilo chat at the end.
 It checks installed dependencies, both Kilo runtimes, tool imports/search and a
 real file-read/model-response round trip for every configured model. Dual mode
 also correlates a real webview request through the router to LM Studio. Enabled
@@ -92,6 +95,14 @@ events, model-controller logs and LM Studio server logs. Credentials are redacte
 prompt/response JSON and debug/trace payloads are excluded. It cannot recover
 messages that a third-party process never logs. A reachable API alone is not an
 inference PASS.
+
+Existing log backfill is labelled `[history INFO/WARN/ERROR]` and does not raise
+a new live error notification. New errors retain their actual severity. The
+intentional no-model LM Studio capability probe keeps exit code 1 with the report
+status `EXPECTED_NONZERO_EXIT`; actual model/authentication failures remain errors.
+GPU estimates are checked against VRAM and the remaining host allocation
+(`total - GPU`) against RAM, with the existing 1 GiB/3 GiB reserves.
+
 
 Results are local: `diagnostics/toolchain/latest.json` and `latest.junit.xml`, plus
 a separate directory for each run. `PASS` requires all mandatory checks, including

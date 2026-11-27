@@ -72,7 +72,20 @@ async function activate(context) {
         void vscode.window.showErrorMessage(`LoKiEnte acceptance failed: ${error.message}`);
     })));
     context.subscriptions.push(vscode.commands.registerCommand('lokiente.openKilo', openKilo));
-    if (process.env.LOKIENTE_STARTUP_DIAGNOSTICS_ONLY === '1') output.show(true);
+    if (process.env.LOKIENTE_TOOLCHAIN_RUN_ID) {
+        const runId = process.env.LOKIENTE_TOOLCHAIN_RUN_ID;
+        const directory = path.join(root, 'diagnostics', 'toolchain', runId);
+        const equal = (left, right) => typeof left === 'string' && path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
+        if (!/^[a-f0-9]{32}$/.test(runId) || !equal(dataDirectory, path.join(directory, 'vscode-data')) ||
+            !equal(process.env.LOKIENTE_TOOLCHAIN_REPORT, path.join(directory, 'acceptance.json')) ||
+            !equal(process.env.LOKIENTE_TOOLCHAIN_PROJECT, path.join(directory, 'project')) ||
+            !equal(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath, path.join(directory, 'project'))) {
+            logger.error('LoKiEnte', 'Acceptance launch does not match its isolated profile, report and workspace. No test started.');
+        } else {
+            void runAcceptance({ runId, reportPath: process.env.LOKIENTE_TOOLCHAIN_REPORT, project: process.env.LOKIENTE_TOOLCHAIN_PROJECT })
+                .catch(error => logger.error('LoKiEnte', `Acceptance could not complete: ${error.message}`));
+        }
+    } else if (process.env.LOKIENTE_STARTUP_DIAGNOSTICS_ONLY === '1') output.show(true);
     else if (!process.env.LOKIENTE_TOOLCHAIN_RUN_ID && vscode.workspace.getConfiguration('lokiente.startup').get('openKilo', true)) await openKilo();
     return { runAcceptance };
 }

@@ -20,6 +20,7 @@ try{
     $failure=$null;try{Invoke-ShadowProvisionStep -Id 'failing-check' -Kind Test -Action {throw 'synthetic-report-secret check failed'}}catch{$failure=$_}
     Assert-Report ($report.tests[-1].status -eq 'FAIL') 'A failed test must be saved before final cleanup.'
     $report.smokeTests=[pscustomobject]@{Chat='Passed';ToolCall='Passed';ToolResultRoundTrip='NotRun'}
+    $report.scalarEvidence=@{context=(32768|Select-Object -Unique);bytes=23255183360L;enabled=$true;values=@((16384|Select-Object -Unique),8192)}
     $report.status='INCOMPLETE';Complete-ShadowProvisionReport -Failure $failure
     $text=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw;$saved=$text|ConvertFrom-Json
     Assert-Report ($saved.schema -eq 2 -and $saved.failure.stack -and $saved.snapshots.'inventory.json'.cpu -eq 'synthetic') 'Main report must embed environment, snapshots and exception stack.'
@@ -27,6 +28,10 @@ try{
     Assert-Report ($saved.runtimeRequirements.dockerRequired -eq $false -and $saved.runtimeRequirements.hyperVRequired -eq $false) 'Acceptance must not depend on a VM/container runtime.'
     Assert-Report ($saved.commands[0].arguments.Count -eq 2 -and $saved.commands[0].durationMs -ge 0 -and $saved.environment.powerShell) 'Report must retain command arguments, timing and process environment metadata.'
     Assert-Report (@($saved.tests|Where-Object {$_.id -eq 'model:single:ToolResultRoundTrip' -and $_.status -eq 'SKIPPED'}).Count -eq 1) 'PSCustomObject model results must retain passed versus unexecuted smoke evidence.'
+    Assert-Report ($saved.scalarEvidence.context -eq 32768 -and $saved.scalarEvidence.context -is [ValueType] -and $saved.scalarEvidence.bytes -eq 23255183360L) 'Pipeline-decorated context and memory numbers must remain JSON numbers, never empty objects.'
+    Assert-Report ($saved.scalarEvidence.enabled -eq $true -and ($saved.scalarEvidence.values -join ',') -eq '16384,8192') 'Booleans and numeric array entries must retain their values.'
+    Add-ShadowProvisionCommand -File 'synthetic-capability-probe' -Arguments @('load','--estimate-only') -ExitCode 1 -ExpectedFailure -Stderr 'Expected negative fixture' -DurationMs 1
+    Assert-Report ($report.commands[-1].status -ceq 'EXPECTED_NONZERO_EXIT' -and $report.commands[-1].exitCode -eq 1 -and $report.commands[-1].expectedFailure) 'Expected negative probes retain native exit/output evidence with an explicit expected-result classification.'
     Start-ShadowProvisionReport -InstallRoot $root -Report ([ordered]@{status='IN_PROGRESS'})
     Assert-Report (@(Get-ChildItem -LiteralPath (Join-Path $root 'backups/reports')).Count -eq 1) 'A later run must preserve the preceding report.'
     @{suite='Incremental self-contained provisioning diagnostics';passed=$true;checks=$checks;limitations='Real processes/files; synthetic environment data; no model inference.'}|ConvertTo-Json

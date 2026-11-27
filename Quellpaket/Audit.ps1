@@ -38,7 +38,7 @@ $token=$null
 $tokens=$null;$parseErrors=$null
 $runtimeAst=[Management.Automation.Language.Parser]::ParseInput($PackageFiles['Runtime.ps1'],[ref]$tokens,[ref]$parseErrors)
 if($parseErrors.Count){throw 'Runtime module in the package contains syntax errors.'}
-foreach($name in @('Get-LrProperty','ConvertFrom-LrModelList','Get-LrMissingLoadOptions','Select-LrProfile','Add-LrVariantMetadata','Find-LrModel')){
+foreach($name in @('Get-LrProperty','ConvertFrom-LrModelList','Test-LrExpectedLoadProbe','Get-LrMissingLoadOptions','Select-LrProfile','Add-LrVariantMetadata','Find-LrModel')){
     $definition=$runtimeAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$false)
     if($null -eq $definition){throw "Audit helper missing from package: $name"}
     . ([scriptblock]::Create($definition.Extent.Text))

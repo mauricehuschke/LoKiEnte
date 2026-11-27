@@ -59,7 +59,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.1; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.2; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
@@ -91,9 +91,12 @@ diese Konsolenabfrage, mit `-SkipAcceptanceTest` wird er ausdrücklich überspru
 Beide Schalter schließen sich aus und werden beim nächsten Update erneut gewählt.
 Überspringen bedeutet **ungeprüft**.
 
-Der Test öffnet ein eigenes VS-Code-Testfenster. Bestätige bei Bedarf das Vertrauen
-für dessen synthetischen Arbeitsbereich und am Ende die fertig angezeigte Antwort
-im echten Kilo-Chat. Geprüft werden installierte Abhängigkeiten, beide Kilo-Runtimes,
+Der Test öffnet ein normales VS-Code-Fenster mit isoliertem Testprofil und dem
+installierten LoKiEnte-Helfer. Prüfe und bestätige das Vertrauen für den erzeugten
+Arbeitsbereich. Bei Bedarf öffnet **Manage Workspace Trust** in der LoKiEnte-Meldung
+die Vertrauensverwaltung. Bis zu deiner Entscheidung steht im Report
+`waitingFor: workspace-trust` (höchstens zehn Minuten). Bestätige am Ende die
+fertig angezeigte Antwort im echten Kilo-Chat. Geprüft werden installierte Abhängigkeiten, beide Kilo-Runtimes,
 Werkzeugimporte/Dateisuche sowie ein echter Datei-Leseaufruf mit Modellantwort für
 jedes konfigurierte Modell. Im Dual-Modus wird zusätzlich eine echte Anfrage aus
 dem Kilo-Webview über den Router bis LM Studio zugeordnet. Aktiviertes Indexing
@@ -106,6 +109,14 @@ Router-Ereignisse, Modellcontroller-Logs und LM-Studio-Serverlogs. Zugangsdaten
 werden geschwärzt; Prompt-/Antwort-JSON und Debug-/Trace-Inhalte werden ausgelassen.
 Meldungen, die ein Drittprogramm gar nicht protokolliert, lassen sich daraus nicht
 rekonstruieren. Ein erreichbarer API-Port allein belegt keine funktionierende Inferenz.
+
+Ältere Logeinträge tragen `[history INFO/WARN/ERROR]` und lösen keine neue
+Live-Fehlermeldung aus. Neue Fehler behalten ihre tatsächliche Schwere. Der
+absichtliche LM-Studio-Fähigkeitstest ohne Modell behält Exitcode 1 mit dem
+Reportstatus `EXPECTED_NONZERO_EXIT`; echte Modell-/Authentifizierungsfehler bleiben
+Fehler. GPU-Schätzungen werden gegen VRAM und der verbleibende Hostanteil
+(`gesamt - GPU`) gegen RAM geprüft; die Reserven von 1 GiB/3 GiB bleiben bestehen.
+
 
 Die lokalen Nachweise liegen unter `diagnostics/toolchain/latest.json` und
 `latest.junit.xml`, außerdem in einem eigenen Ordner je Lauf. `PASS` erfordert alle

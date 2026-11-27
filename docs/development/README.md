@@ -36,6 +36,24 @@ credentials, local installation data, embedded archives and Git author metadata.
 Use synthetic test data and the public GitHub username/no-reply address for commits.
 Never commit reports, runtime profiles, private example projects or tokens.
 
+## Local Git workflow
+
+Work directly in the existing project directory and use the local `git` CLI
+for branches, staging, commits, tags, fetches and pushes. Confirm the repository
+root, active branch and working-tree status before changing files. Review the
+staged diff and commit the intended files locally before pushing them.
+
+Do not publish source changes through GitHub connectors, Git data APIs or the
+web editor. If local Git writes or authentication are blocked, report the blocker
+and pending changes instead of publishing through another interface. PR/release
+metadata and asset uploads may use GitHub tooling; source commits and pushed
+release tags must originate in this checkout. See [AGENTS.md](../../AGENTS.md).
+
+After merging a PR, fetch and fast-forward the local target branch. Verify local
+`HEAD` against the intended remote commit and check `git status --short --branch`
+before reporting completion. Preserve and explicitly report remaining user
+changes; never reset or clean them away to make the status appear clean.
+
 ## Build the installer
 
 Use Python 3 and Windows PowerShell 7 on the development machine. Edit sources in

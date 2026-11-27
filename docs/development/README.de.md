@@ -39,6 +39,26 @@ und Git-Autorenmetadaten. Nutze synthetische Testdaten sowie den öffentlichen
 GitHub-Benutzernamen mit No-Reply-Adresse für Commits. Berichte, Laufzeitprofile,
 private Beispielprojekte und Tokens gehören nicht ins Repository.
 
+## Lokaler Git-Ablauf
+
+Arbeite direkt im bestehenden Projektverzeichnis und verwende die lokale
+`git`-CLI für Branches, Staging, Commits, Tags, Fetches und Pushes. Prüfe vor
+Dateiänderungen den Repository-Stamm, den aktiven Branch und den Arbeitsstand.
+Prüfe den gestagten Diff und committe die vorgesehenen Dateien lokal vor dem Push.
+
+Veröffentliche Quellcodeänderungen nicht über GitHub-Anbindungen, Git-Daten-APIs
+oder den Webeditor. Sind lokale Git-Schreibzugriffe oder die Authentifizierung
+blockiert, melde den Blocker und offene Änderungen, statt einen anderen
+Veröffentlichungsweg zu nutzen. PR-/Release-Metadaten und Datei-Uploads dürfen
+GitHub-Werkzeuge verwenden; Quellcode-Commits und gepushte Release-Tags müssen
+aus diesem Checkout stammen. Siehe [AGENTS.md](../../AGENTS.md).
+
+Führe nach einem PR-Merge einen Fetch und einen Fast-Forward des lokalen
+Zielbranches aus. Vergleiche den lokalen `HEAD` mit dem vorgesehenen Remote-Commit
+und prüfe vor der Abschlussmeldung `git status --short --branch`. Erhalte und
+benenne verbleibende Nutzeränderungen ausdrücklich; verwende weder Reset noch
+Clean, um den Arbeitsstand lediglich sauber erscheinen zu lassen.
+
 ## Installer bauen
 
 Nutze Python 3 und Windows PowerShell 7 auf dem Entwicklungsrechner. Bearbeite

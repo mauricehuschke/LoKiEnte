@@ -25,6 +25,26 @@ test('missing Workspace Trust blocks acceptance without changing trust policy', 
     await assert.rejects(waitForWorkspaceTrust({ workspace, window: { async showWarningMessage() {} } }, { warn() {} }, 20), error => error.blocked === true);
     assert.equal(workspace.isTrusted, false); assert.equal(disposed, true);
 });
+
+test('trust guidance opens the supported management UI and waits for the user grant', async () => {
+    let grant, opened = false;
+    const workspace = { isTrusted: false, onDidGrantWorkspaceTrust(fn) { grant = fn; return { dispose() {} }; } };
+    const pending = waitForWorkspaceTrust({ workspace,
+        window: { async showWarningMessage(message, ...actions) { assert.ok(actions.includes('Manage Workspace Trust')); return 'Manage Workspace Trust'; } },
+        commands: { async executeCommand(id) { assert.equal(id, 'workbench.trust.manage'); opened = true; } },
+    }, { warn() {} }, 1000);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(opened, true); assert.equal(workspace.isTrusted, false);
+    workspace.isTrusted = true; grant(); await pending;
+});
+
+test('cancelling the trust prompt blocks without a grant or policy change', async () => {
+    let disposed = false;
+    const workspace = { isTrusted: false, onDidGrantWorkspaceTrust() { return { dispose() { disposed = true; } }; } };
+    await assert.rejects(waitForWorkspaceTrust({ workspace, window: { async showWarningMessage() { return 'Cancel acceptance'; } } },
+        { warn() {} }, 1000), error => error.blocked === true && /cancelled/.test(error.message));
+    assert.equal(disposed, true); assert.equal(workspace.isTrusted, false);
+});
 test('a completed tool result and completed final answer are both required', () => {
     assert.deepEqual(inspect(events), { read: true, replyMatches: true, finished: true, error: false });
     assert.equal(inspect(events.slice(1)).read, false);

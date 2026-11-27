@@ -40,6 +40,7 @@ function Get-ShadowLocalEnvironment {
     $profile=Join-Path $InstallRoot 'runtime-profile'
     $environment=@{
         KILO_CONFIG_CONTENT=$ConfigJson
+        LOKIENTE_LOG_SINCE_UTC=[DateTime]::UtcNow.ToString('o')
         KILO_CONFIG_DIR=(Join-Path $InstallRoot 'kilo-managed')
         KILO_PURE='1'
         KILO_TELEMETRY_LEVEL='off'
@@ -127,9 +128,10 @@ function Assert-ShadowKiloEffectiveConfig {
     $evidenceClock=[Diagnostics.Stopwatch]::StartNew();$raw='';$errorOutput='';$configurationExit=$null;$configurationFailure=$null
     try {
         [void]$process.Start()
-        $watch=[Diagnostics.Stopwatch]::StartNew()
+        $watch=$evidenceClock
         $output=$process.StandardOutput.ReadToEndAsync($readCancellation.Token);$errors=$process.StandardError.ReadToEndAsync($readCancellation.Token)
-        if(-not $process.WaitForExit($TimeoutSeconds*1000)){$process.Kill($true);$readCancellation.Cancel();throw 'Kilo configuration verification timed out.'}
+        $remainingMs=[int][math]::Max(0,($TimeoutSeconds*1000-$watch.Elapsed.TotalMilliseconds))
+        if(-not $process.WaitForExit($remainingMs)){$process.Kill($true);$readCancellation.Cancel();throw 'Kilo configuration verification timed out.'}
         while(-not $output.IsCompleted -or -not $errors.IsCompleted){
             if($watch.Elapsed.TotalSeconds -ge $TimeoutSeconds){$readCancellation.Cancel();throw 'Kilo configuration output did not close before its deadline.'}
             Start-Sleep -Milliseconds 50

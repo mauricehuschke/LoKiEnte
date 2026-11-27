@@ -19,6 +19,12 @@ function Invoke-LrNative {
     & $script:nativeCommand -FilePath (Get-Process -Id $PID).Path -Arguments @('-NoProfile','-NonInteractive','-Command',$script:childCommand) -LogDirectory $LogDirectory -TimeoutSeconds 15 -AllowFailure
 }
 try {
+    $probeArgs=@('load','--exact','--local','--estimate-only','--yes')
+    $probeText='Path not provided. The parameter [model-key] is required when using the --exact flag.'
+    Assert-Load (Test-LrExpectedLoadProbe -Arguments $probeArgs -ExitCode 1 -Text $probeText) 'The deliberate missing-model capability probe is an expected negative result.'
+    Assert-Load (-not (Test-LrExpectedLoadProbe -Arguments @('load','real-model','--exact','--local','--estimate-only','--yes') -ExitCode 1 -Text $probeText)) 'A real selected-model failure must never be hidden as a capability probe.'
+    Assert-Load (-not (Test-LrExpectedLoadProbe -Arguments $probeArgs -ExitCode 2 -Text $probeText)) 'An unexpected probe exit code remains an error.'
+    Assert-Load (-not (Test-LrExpectedLoadProbe -Arguments $probeArgs -ExitCode 1 -Text 'Authentication failed')) 'Authentication and other native failures remain errors.'
     $cases=@(
         @{Command='[Console]::Error.Write("unknown model architecture: ''qwen35''"); exit 1';Flag='ShadowRuntimeCompatibilityFailure';Match='compatible GPU runtime'},
         @{Command='[Console]::Out.Write("unsupported model architecture: qwen35"); [Console]::Error.Write("out of memory"); exit 1';Flag='ShadowRuntimeCompatibilityFailure';Match='More memory'},

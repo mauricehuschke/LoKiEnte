@@ -27,6 +27,50 @@ Klon. Bestehende Junction-Prüfungen bleiben ebenfalls durch Zugriffsverweigerun
 Es werden dafür weder VM noch Container verwendet. Fehlender Nachweis auf dem Ziel-PC
 bleibt ausdrücklich ungeprüft.
 
+## Nachbesserung zum Zielrechner-Bericht - Paket 2026.11.27.4
+
+Der gelieferte Windows-Lauf von Build 2026.11.27.3 endete mit Warnungen. Die echte
+Abnahme meldete einen Host-PASS und acht BLOCKED-Fälle wegen fehlendem Workspace
+Trust. Kilo-/UI-Inferenz wurde in dieser Abnahme nicht ausgeführt. Die separaten
+Provisioning-Smoke-Tests bestanden für drei Modelle; coder-high blieb ungeprüft.
+Der absichtliche CLI-Fähigkeitstest ohne Modell war der einzige native Befehl mit
+Exitcode ungleich null. Ein fehlender registrierter Projektordner ist eine eigene
+Reparaturwarnung.
+
+Korrekturen dieses Builds:
+- Normaler VS-Code-Start mit isoliertem Profil und installiertem Helfer 0.3.2
+  ersetzt den Extension-Entwicklungs-/Teststart. Workspace Trust bleibt aktiv;
+  Manage Workspace Trust öffnet die Verwaltung. Die Entscheidung hat bis zu zehn
+  Minuten Zeit; laufender Report und Konsole zeigen die Wartephase. Es werden
+  weder Vertrauensdatenbank noch globale Sicherheitseinstellungen geändert.
+- LM-Studio-Gesamtschätzung minus GPU-Anteil wird gegen Host-RAM geprüft,
+  GPU-Anteil gegen VRAM; Reserven von 3 GiB/1 GiB bleiben bestehen. Einzelmodell
+  und Modellpool verwenden dieselbe Prüfung. Ungültige Schätzungen oder geringe
+  Sicherheit erlauben weiterhin keinen normalen Ladevorgang. Die gemeldete
+  Hardware-/Schätzkombination ist synthetisch abgedeckt; echtes Laden ist auf dem
+  Zielrechner erneut zu prüfen.
+- Kontext-/Speicherzahlen und Wahrheitswerte bleiben im JSON erhalten;
+  Pipeline-Zahlen werden nicht mehr zu leeren Objekten.
+- Nur der genaue negative Fähigkeitstest traegt EXPECTED_NONZERO_EXIT; Exitcode
+  und Streams bleiben erhalten. Echte Modell-/Runtime-/Authentifizierungsfehler
+  bleiben Fehler. Historische Logs behalten ihren Schweregrad als Kennzeichnung,
+  erzeugen aber keine neue Live-Fehlermeldung.
+
+Lokale Regressionen: 70 JavaScript-Fälle im gemeinsamen Lauf von zehn Dateien
+bestanden; Modellpool 51, Teil-Offload/Speichergrenzen 14, Einzelmodell-Fit 6,
+native Modellfehler 29, CLI-Kompatibilität 16, CPU-Embedding 47, Reportwerte 13
+und Abnahmerichtlinie 25 Prüfungen bestanden. Im ersten breiten Lauf überschritt
+der Deadline-Test unter Last seine Grenze. Prozessstart und Befehlsausführung
+nutzen jetzt ein gemeinsames Zeitbudget; danach bestand die unveränderte Suite
+für native Befehle/Kilo-Konfiguration/Logging mit sieben Prüfungen. Lokaler
+Git-Klon und Junction-Erstellung bleiben durch die Agentenumgebung BLOCKED.
+Der Audit unter Windows PowerShell 5.1 bestand alle 51 Prüfungen, einschließlich
+der extrahierten Fähigkeits-Hilfsfunktion. Die abschließenden Diagnose-/Starttests
+bestanden 20 Fälle, darunter aktuelle Startfehler gegenüber datierter Loghistorie.
+Dies ist ein Fix-Kandidat auf eigenem Branch. Ein neuer bestandener
+Zielrechner-Lauf mit echten Kilo-Antworten ist Voraussetzung für PR, Main-Merge
+und Release.
+
 ## Echte Toolketten-Abnahme und gemeinsame Ausgabe - Paket 2026.11.27.2
 
 Nach der Einrichtung bietet das Provisioning die echte Abnahme an. RunAcceptanceTest
@@ -61,7 +105,8 @@ Test-RouterEvidence.mjs, Test-ToolchainNative.ps1, Test-ToolchainPolicy.ps1,
 Test-ToolchainProvisioning.ps1, Test-VsCodeStartup.mjs, Test-VsCodeProfile.ps1,
 Test-RouterLifecycle.ps1, Test-RipgrepIntegration.ps1 und Test-SelectionIntegration.ps1.
 Die installierte Abnahme startet über app/Test-Toolchain.ps1; vscode-tests/toolchain.cjs
-ist der echte Extension-Host-Einstieg. Berichte bleiben lokal unter diagnostics/toolchain.
+ist der historische Extension-Host-Testeinstieg. Seit Build 2026.11.27.4 startet stattdessen
+der installierte Helfer im normalen Fenster. Berichte bleiben lokal unter diagnostics/toolchain.
 
 Lokale Validierung vom 27.11.2026: Der kombinierte JavaScript-Lauf mit neun Suiten
 bestand 61 Fälle. Der abschließende Startup-Einzellauf prüft zusätzlich das Zeitlimit

@@ -7,9 +7,10 @@ import { createRequire } from 'node:module';
 const { createLogger } = createRequire(import.meta.url)('../vscode-startup/diagnostics.cjs');
 
 const source = await readFile(new URL('../vscode-startup/extension.cjs', import.meta.url), 'utf8');
-function fixture({ managed = true, open = true, available = true, focus = true, failure = false, foreignProfile = false, scheme = 'file', activation, focusAction, shortDeadline = false } = {}) {
-    const calls = [], warnings = [], lines = [], registrations = new Map();
-    const dataDirectory = path.resolve('synthetic-managed-profile');
+function fixture({ managed = true, open = true, available = true, focus = true, failure = false, foreignProfile = false, scheme = 'file', activation, focusAction, shortDeadline = false, acceptance = false, wrongAcceptancePath = false } = {}) {
+    const calls = [], warnings = [], lines = [], registrations = new Map(), acceptanceRuns = [];
+    const root = path.resolve('synthetic-install'), runId = 'a'.repeat(32), directory = path.join(root, 'diagnostics', 'toolchain', runId);
+    const dataDirectory = acceptance ? path.join(directory, 'vscode-data') : path.resolve('synthetic-managed-profile');
     const context = { subscriptions: [], globalStorageUri: { scheme, fsPath: path.join(foreignProfile ? dataDirectory + '-personal' : dataDirectory, 'User', 'globalStorage', 'lokiente.managed-startup') } };
     const api = {
         window: {
@@ -25,12 +26,14 @@ function fixture({ managed = true, open = true, available = true, focus = true, 
             getCommands: async () => focus ? ['kilo-code.SidebarProvider.focus'] : [],
             executeCommand: async id => { calls.push(id); await focusAction; },
         },
-        workspace: { getConfiguration(section) { assert.equal(section, 'lokiente.startup'); return { get: () => open }; } },
+        workspace: { workspaceFolders: [{ uri: { fsPath: path.join(directory, 'project') } }], getConfiguration(section) { assert.equal(section, 'lokiente.startup'); return { get: () => open }; } },
     };
     const sandbox = { module: { exports: {} }, setTimeout: (fn, ms) => setTimeout(fn, shortDeadline ? 20 : ms), clearTimeout, process: { env: managed ? { LOKIENTE_MANAGED_VSCODE: '1', LOKIENTE_VSCODE_DATA_DIR: dataDirectory } : {} },
-        require(id) { if (id === 'node:path') return path; if (id === './kilo-startup.cjs') return { startupSnapshot: async () => {}, async waitForKilo() { const kilo=api.extensions.getExtension('kilocode.kilo-code'); if(!kilo)throw new Error('Kilo is not installed.');return kilo; } }; if (id === './diagnostics.cjs') return { createLogger, startDiagnostics() { return { dispose() {} }; } }; if (id === './security-view.cjs') return { registerSecurityView() {} }; if (id === './sync-guide.cjs') return { registerSyncGuide() {} }; assert.equal(id, 'vscode'); return api; } };
+        require(id) { if (id === 'node:path') return path; if (id === './toolchain-check.cjs') return { async checkToolchain(options) { acceptanceRuns.push(options); return { status: 'synthetic' }; } }; if (id === './kilo-startup.cjs') return { startupSnapshot: async () => {}, async waitForKilo() { const kilo=api.extensions.getExtension('kilocode.kilo-code'); if(!kilo)throw new Error('Kilo is not installed.');return kilo; } }; if (id === './diagnostics.cjs') return { createLogger, startDiagnostics() { return { dispose() {} }; } }; if (id === './security-view.cjs') return { registerSecurityView() {} }; if (id === './sync-guide.cjs') return { registerSyncGuide() {} }; assert.equal(id, 'vscode'); return api; } };
+    if (acceptance) Object.assign(sandbox.process.env, { LOKIENTE_INSTALL_ROOT: root, LOKIENTE_TOOLCHAIN_RUN_ID: runId,
+        LOKIENTE_TOOLCHAIN_PROJECT: path.join(directory, 'project'), LOKIENTE_TOOLCHAIN_REPORT: path.join(directory, wrongAcceptancePath ? 'other.json' : 'acceptance.json') });
     vm.runInNewContext(source, sandbox);
-    return { run: () => sandbox.module.exports.activate(context), context, calls, warnings, lines, registrations };
+    return { run: () => sandbox.module.exports.activate(context), context, calls, warnings, lines, registrations, acceptanceRuns };
 }
 
 test('personal windows are untouched even if the helper is installed', async () => {
@@ -56,6 +59,19 @@ test('managed startup activates Kilo before focusing its own view once', async (
 test('startup preference is respected and a manual retry stays available', async () => {
     const f = fixture({ open: false }); await f.run(); assert.deepEqual(f.calls, []);
     await f.registrations.get('lokiente.openKilo')(); assert.deepEqual(f.calls, ['activate', 'kilo-code.SidebarProvider.focus']);
+});
+
+test('installed helper starts acceptance in its ordinary isolated window without a development host', async () => {
+    const f = fixture({ acceptance: true }); await f.run();
+    assert.equal(f.acceptanceRuns.length, 1); assert.deepEqual(f.calls, []);
+    assert.equal(f.acceptanceRuns[0].runId, 'a'.repeat(32));
+    assert.equal(path.basename(f.acceptanceRuns[0].reportPath), 'acceptance.json');
+});
+
+test('acceptance environment cannot start a test for another report or workspace', async () => {
+    const f = fixture({ acceptance: true, wrongAcceptancePath: true }); await f.run();
+    assert.equal(f.acceptanceRuns.length, 0); assert.deepEqual(f.calls, []);
+    assert.ok(f.lines.some(line => line.includes('Acceptance launch does not match')));
 });
 for (const [name, options] of [['missing Kilo', { available: false }], ['changed Kilo command', { focus: false }], ['activation error', { failure: true }]]) {
     test(`${name} produces a visible warning without opening the built-in chat`, async () => {

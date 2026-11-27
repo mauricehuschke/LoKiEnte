@@ -35,11 +35,16 @@ function ConvertFrom-LrModelList {
     foreach($model in $models){$model}
 }
 
+function Test-LrExpectedLoadProbe {
+    param([string[]]$Arguments,[int]$ExitCode,[string]$Text)
+    return (($Arguments -join ' ') -ceq 'load --exact --local --estimate-only --yes' -and $ExitCode -eq 1 -and
+        $Text -match 'Path not provided' -and $Text -match '\[model-key\]' -and $Text -match '\-\-exact')
+}
+
 function Get-LrMissingLoadOptions {
     param([string]$Help,$ExactLocalProbe=$null)
     $probeText=[string](Get-LrProperty $ExactLocalProbe 'Stdout')+"`n"+[string](Get-LrProperty $ExactLocalProbe 'Stderr')
-    $hiddenVerified=(Get-LrProperty $ExactLocalProbe 'ExitCode' -1) -eq 1 -and
-        $probeText -match 'Path not provided' -and $probeText -match '\[model-key\]' -and $probeText -match '\-\-exact'
+    $hiddenVerified=Test-LrExpectedLoadProbe -Arguments @('load','--exact','--local','--estimate-only','--yes') -ExitCode (Get-LrProperty $ExactLocalProbe 'ExitCode' -1) -Text $probeText
     foreach($flag in @('--parallel','--context-length','--estimate-only','--identifier','--gpu','--exact','--local')){
         if($flag -in @('--exact','--local') -and $hiddenVerified){continue}
         if($Help -notmatch ([regex]::Escape($flag)+'(?=[\s<,=]|$)')){$flag}
@@ -128,13 +133,13 @@ function Invoke-LrNative {
     $readCancellation=[Threading.CancellationTokenSource]::new()
     $logPath = Join-Path $LogDirectory ((Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.log')
     $eventWriter=Get-Command Write-ShadowToolchainEvent -CommandType Function -ErrorAction SilentlyContinue
-    $evidenceClock=[Diagnostics.Stopwatch]::StartNew();$stdout='';$stderr='';$nativeExit=$null;$nativeFailure=$null
+    $evidenceClock=[Diagnostics.Stopwatch]::StartNew();$stdout='';$stderr='';$nativeExit=$null;$nativeFailure=$null;$expectedProbe=$false
     if($eventWriter){Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Message ("Starting native command: "+$Arguments[0])}
     try {
         $null = $process.Start()
         $stdoutTask = $process.StandardOutput.ReadToEndAsync($readCancellation.Token)
         $stderrTask = $process.StandardError.ReadToEndAsync($readCancellation.Token)
-        $watch = [Diagnostics.Stopwatch]::StartNew()
+        $watch = $evidenceClock
         while (-not $process.WaitForExit(1000)) {
             if ($watch.Elapsed.TotalSeconds -gt $TimeoutSeconds) {
                 # Stop this CLI invocation only, never the running model server.
@@ -157,10 +162,13 @@ function Invoke-LrNative {
         $stdout = $stdoutTask.GetAwaiter().GetResult()
         $stderr = $stderrTask.GetAwaiter().GetResult()
         $nativeExit=$process.ExitCode
+        $expectedProbe=$AllowFailure -and (Test-LrExpectedLoadProbe -Arguments $Arguments -ExitCode $nativeExit -Text ($stdout+"`n"+$stderr))
         [IO.File]::WriteAllText($logPath, ($stdout + [Environment]::NewLine + $stderr), [Text.UTF8Encoding]::new($false))
         if($eventWriter){
-            Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Level $(if($process.ExitCode -eq 0){'INFO'}else{'ERROR'}) -Message ("Command $($Arguments[0]) exited with code $($process.ExitCode). Details: $logPath")
-            if($stderr.Trim()){Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Level $(if($process.ExitCode -eq 0){'WARN'}else{'ERROR'}) -Message $stderr.TrimEnd()}
+            $level=if($process.ExitCode -eq 0 -or $expectedProbe){'INFO'}else{'ERROR'}
+            $label=if($expectedProbe){'Expected no-model capability probe'}else{"Command $($Arguments[0])"}
+            Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Level $level -Message ("$label exited with code $($process.ExitCode). Details: $logPath")
+            if($stderr.Trim()){Write-ShadowToolchainEvent -Component 'LM Studio CLI' -Level $level -Message $stderr.TrimEnd()}
         }
         if ($process.ExitCode -ne 0 -and -not $AllowFailure) {
             throw "LM Studio command '$($Arguments[0])' failed (exit $($process.ExitCode)). Details: $logPath"
@@ -175,7 +183,7 @@ function Invoke-LrNative {
         $readCancellation.Cancel()
         $process.Dispose()
         $readCancellation.Dispose()
-        if(Get-Command Add-ShadowProvisionCommand -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionCommand -File $FilePath -Arguments $Arguments -WorkingDirectory ([string]$PWD) -TimeoutSeconds $TimeoutSeconds -ExitCode $nativeExit -Stdout $stdout -Stderr $stderr -DurationMs $evidenceClock.Elapsed.TotalMilliseconds -Failure $nativeFailure}
+        if(Get-Command Add-ShadowProvisionCommand -CommandType Function -ErrorAction SilentlyContinue){Add-ShadowProvisionCommand -File $FilePath -Arguments $Arguments -WorkingDirectory ([string]$PWD) -TimeoutSeconds $TimeoutSeconds -ExitCode $nativeExit -Stdout $stdout -Stderr $stderr -DurationMs $evidenceClock.Elapsed.TotalMilliseconds -Failure $nativeFailure -ExpectedFailure:$expectedProbe}
     }
 }
 
@@ -419,6 +427,20 @@ function Convert-LrEstimatedBytes {
     return [long][Math]::Ceiling($amount * [Math]::Pow(1024, $power))
 }
 
+function Get-LrMemoryFit {
+    param([long]$GpuBytes,[long]$TotalBytes,[Parameter(Mandatory)]$Hardware)
+    if($GpuBytes -lt 0 -or $TotalBytes -le 0 -or $GpuBytes -gt $TotalBytes){throw 'Invalid LM Studio GPU/total memory estimate.'}
+    # LM Studio totalBytes includes totalVramBytes. On the supported discrete
+    # NVIDIA hardware, charge the remaining host allocation to RAM, not VRAM twice.
+    # https://github.com/lmstudio-ai/lmstudio-js/blob/main/packages/lms-shared-types/src/EstimatedResourcesUsage.ts
+    $ramBytes=$TotalBytes-$GpuBytes
+    return [pscustomobject]@{
+        GpuBytes=$GpuBytes;TotalBytes=$TotalBytes;RamBytes=$ramBytes
+        GpuReserveBytes=[long]1GB;RamReserveBytes=[long]3GB
+        Fits=($GpuBytes -le ($Hardware.Gpu.FreeBytes-1GB) -and $ramBytes -le ($Hardware.FreeRamBytes-3GB))
+    }
+}
+
 function Get-LrApiHeaders {
     param([string]$ApiTokenEnvironmentVariable)
     $headers = @{}
@@ -638,12 +660,12 @@ function Configure-LocalRuntime {
                 $totalBytes = Convert-LrEstimatedBytes -Text $estimateText -Label 'Estimated Total Memory'
                 $freshHardware = Get-LocalNvidiaGpu -LogDirectory $logDirectory
                 $allowed = $estimateText -match 'This model may be loaded based on your resource guardrails settings\.'
-                $candidate=[pscustomobject]@{GpuBytes=$gpuBytes;TotalBytes=$totalBytes;ContextLength=$context;LogPath=$estimate.LogPath;ReserveOverride=$false}
+                $memoryFit=Get-LrMemoryFit -GpuBytes $gpuBytes -TotalBytes $totalBytes -Hardware $freshHardware
+                $candidate=[pscustomobject]@{GpuBytes=$gpuBytes;TotalBytes=$totalBytes;RamBytes=$memoryFit.RamBytes;ContextLength=[int]$context;LogPath=$estimate.LogPath;ReserveOverride=$false}
                 $lastCandidate=$candidate
                 if($allowed -and -not $guardrailCandidate){$guardrailCandidate=$candidate}
                 if ($allowed -and $estimateText -notmatch 'Confidence:\s*LOW' -and
-                    $gpuBytes -le ($freshHardware.Gpu.FreeBytes - 1GB) -and
-                    $totalBytes -le ($freshHardware.FreeRamBytes - 3GB)) {
+                    $memoryFit.Fits) {
                     $effectiveContext = $context
                     $memoryEstimate = $candidate
                     break

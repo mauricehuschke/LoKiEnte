@@ -11,7 +11,7 @@ async function withDeadline(action, milliseconds, message) {
     finally { clearTimeout(timer); }
 }
 
-async function waitForWorkspaceTrust(vscode, logger, timeoutMs = 120000) {
+async function waitForWorkspaceTrust(vscode, logger, timeoutMs = 600000) {
     if (vscode.workspace.isTrusted) return;
     logger.warn('VS Code', 'Waiting for you to trust the generated acceptance workspace in the VS Code Workspace Trust dialog.');
     await new Promise((resolve, reject) => {
@@ -20,8 +20,11 @@ async function waitForWorkspaceTrust(vscode, logger, timeoutMs = 120000) {
         const timer = setTimeout(() => finish(Object.assign(new Error('Workspace trust was not granted before the acceptance deadline. No trust setting was changed.'), { blocked: true })), timeoutMs);
         subscription = vscode.workspace.onDidGrantWorkspaceTrust(() => finish());
         if (vscode.workspace.isTrusted) finish();
-        void vscode.window.showWarningMessage('LoKiEnte acceptance is waiting for Workspace Trust. Review and trust this generated test workspace in VS Code to continue.', 'Cancel acceptance')
-            .then(answer => { if (answer === 'Cancel acceptance') finish(Object.assign(new Error('Acceptance cancelled while waiting for Workspace Trust.'), { blocked: true })); }).catch(error => finish(error));
+        void vscode.window.showWarningMessage('LoKiEnte acceptance is waiting for Workspace Trust. Review and trust this generated test workspace in VS Code to continue.', 'Manage Workspace Trust', 'Cancel acceptance')
+            .then(async answer => {
+                if (answer === 'Cancel acceptance') finish(Object.assign(new Error('Acceptance cancelled while waiting for Workspace Trust.'), { blocked: true }));
+                else if (!settled && answer === 'Manage Workspace Trust') await vscode.commands.executeCommand('workbench.trust.manage');
+            }).catch(error => finish(error));
     });
     if (!vscode.workspace.isTrusted) throw Object.assign(new Error('Workspace trust is still unavailable.'), { blocked: true });
 }
@@ -128,8 +131,13 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         const host = await record('vscode-host', 'VS Code', vscode.env.appHost === 'desktop' && !!process.versions.electron ? 'PASS' : 'BLOCKED',
             'Requires the real desktop VS Code Extension Host, not a simulated API.', { appHost: vscode.env.appHost });
         if (host.status !== 'PASS') throw blocked('This test must run in the actual desktop Extension Host.');
-        await waitForWorkspaceTrust(vscode, logger);
-        await record('workspace-trust', 'VS Code', 'PASS', 'The test workspace is trusted.');
+        report.waitingFor = 'workspace-trust'; await save();
+        const trust = await check('workspace-trust', 'VS Code', async () => {
+            await waitForWorkspaceTrust(vscode, logger);
+            return 'The test workspace is trusted by a user decision in VS Code.';
+        });
+        delete report.waitingFor; await save();
+        if (trust.status !== 'PASS') throw blocked('Workspace Trust is required before Kilo can run. Review trust in the test window and rerun acceptance.');
         const config = JSON.parse(env.KILO_CONFIG_CONTENT || '{}');
         const chain = JSON.parse(await fs.readFile(path.join(root, 'toolchain.json'), 'utf8'));
         const options = config.provider?.lmstudio?.options;

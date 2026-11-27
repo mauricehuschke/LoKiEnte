@@ -5,6 +5,10 @@ $ErrorActionPreference='Stop'
 . (Join-Path $SourceRoot 'ToolchainAcceptance.ps1')
 $checks=0
 function Assert-Policy($Value,[string]$Message){if(-not $Value){throw $Message};$script:checks++}
+$launch=@(Get-ShadowAcceptanceLaunchArguments -Project 'D:\Synthetic Test\project' -DataDirectory 'D:\Synthetic Test\profile' -ExtensionsDirectory 'D:\Synthetic Test\extensions')
+Assert-Policy ($launch[0] -ceq 'D:\Synthetic Test\project' -and $launch[[array]::IndexOf($launch,'--user-data-dir')+1] -ceq 'D:\Synthetic Test\profile') 'Normal acceptance launch must retain isolated workspace and profile paths with spaces.'
+Assert-Policy ($launch -notcontains '--extensionTestsPath' -and $launch -notcontains '--extensionDevelopmentPath') 'Live acceptance must use the installed helper in an ordinary window, allowing the real trust workflow.'
+Assert-Policy ($launch -notcontains '--disable-workspace-trust' -and $launch -notcontains '--disable-extensions' -and $launch -contains '--extensions-dir') 'Acceptance must preserve trust policy and load the installed extensions.'
 function Read-Host { param($Prompt) throw 'Explicit switches must not prompt.' }
 Assert-Policy ((Select-ShadowAcceptanceMode -RunAcceptanceTest) -ceq 'Run') 'Explicit run must run.'
 Assert-Policy ((Select-ShadowAcceptanceMode -SkipAcceptanceTest) -ceq 'Skip') 'Explicit skip must skip.'

@@ -51,7 +51,7 @@ function Invoke-LrNative {
                 }
                 if($Arguments -contains '--estimate-only'){
                     $gpu=if($Arguments[1] -ceq $script:noFitPath){30}elseif($Arguments[1] -like '*Qwen3.8*' -and $context -gt 16384){22}else{17}
-                    $total=if($Arguments[1] -ceq $script:noFitPath){26}else{19}
+                    $total=if($Arguments[1] -ceq $script:noFitPath){32}elseif($gpu -gt 19){24}else{19}
                     $text="Estimated GPU Memory: $gpu GiB`nEstimated Total Memory: $total GiB`nThis model may be loaded based on your resource guardrails settings."
                 } else {
                     if($Arguments[1] -ceq $script:noFitPath -and $script:rejectNoFit){

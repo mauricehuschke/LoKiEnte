@@ -72,7 +72,8 @@ function Invoke-ShadowNative {
             $outTask=$process.StandardOutput.ReadToEndAsync()
             $errTask=$process.StandardError.ReadToEndAsync()
         }
-        $clock=[Diagnostics.Stopwatch]::StartNew()
+        # Process creation and initial logging consume the same command budget.
+        $clock=$evidenceClock
         while (-not $process.WaitForExit(1000)) {
             if($ProgressCallback){$null=& $ProgressCallback}
             if ($clock.Elapsed.TotalSeconds -ge $TimeoutSeconds) {

@@ -12,6 +12,9 @@ function Protect-ShadowDiagnosticValue {
         }
         return ($safe -replace '(?i)(Bearer\s+|Basic\s+)[A-Za-z0-9+/_=.:-]+','$1[REDACTED]' -replace '(?i)((?:api[_-]?key|password|authorization|access_token|refresh_token)\s*["'']?\s*[:=]\s*["'']?)[^\s"'',;}]+','$1[REDACTED]' -replace '(?i)([?&](?:token|key|password)=)[^&\s]+','$1[REDACTED]')
     }
+    # Pipeline-decorated numbers (e.g. Select-Object -Unique) can also satisfy
+    # -is [pscustomobject]. Preserve their scalar value instead of serializing {}.
+    if($Value -is [ValueType]){return $Value}
     if($Value -is [Collections.IDictionary]){
         $result=[ordered]@{};foreach($key in $Value.Keys){$result[[string]$key]=Protect-ShadowDiagnosticValue $Value[$key] ([string]$key)};return ,$result
     }
@@ -69,7 +72,7 @@ function Add-ShadowProvisionEvidence {
 }
 
 function Add-ShadowProvisionCommand {
-    param([string]$File,[string[]]$Arguments,[string]$WorkingDirectory,[int]$TimeoutSeconds,$ExitCode,[string]$Stdout,[string]$Stderr,[double]$DurationMs,[string]$Failure)
+    param([string]$File,[string[]]$Arguments,[string]$WorkingDirectory,[int]$TimeoutSeconds,$ExitCode,[string]$Stdout,[string]$Stderr,[double]$DurationMs,[string]$Failure,[switch]$ExpectedFailure)
     $session=Get-Variable ShadowProvisionSession -Scope Script -ValueOnly -ErrorAction SilentlyContinue
     if(-not $session){return}
     $streams=[ordered]@{}
@@ -86,7 +89,7 @@ function Add-ShadowProvisionCommand {
         }
         $streams[$entry.name]=$stream
     }
-    Add-ShadowProvisionEvidence commands @{file=$File;arguments=$Arguments;workingDirectory=$WorkingDirectory;timeoutSeconds=$TimeoutSeconds;exitCode=$ExitCode;durationMs=[math]::Round($DurationMs,1);status=$(if($Failure){'ERROR'}elseif($null -ne $ExitCode -and $ExitCode -ne 0){'NONZERO_EXIT'}else{'COMPLETED'});failure=$Failure;streamsCaptureComplete=($Failure -notmatch 'timeout|deadline|output.*close');streams=$streams}
+    Add-ShadowProvisionEvidence commands @{file=$File;arguments=$Arguments;workingDirectory=$WorkingDirectory;timeoutSeconds=$TimeoutSeconds;exitCode=$ExitCode;durationMs=[math]::Round($DurationMs,1);status=$(if($Failure){'ERROR'}elseif($null -ne $ExitCode -and $ExitCode -ne 0){if($ExpectedFailure){'EXPECTED_NONZERO_EXIT'}else{'NONZERO_EXIT'}}else{'COMPLETED'});expectedFailure=[bool]$ExpectedFailure;failure=$Failure;streamsCaptureComplete=($Failure -notmatch 'timeout|deadline|output.*close');streams=$streams}
 }
 
 function Invoke-ShadowProvisionStep {

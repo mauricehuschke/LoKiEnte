@@ -307,13 +307,14 @@ function Set-SmpActiveProfile {
         $gpuBytes=Convert-LrEstimatedBytes -Text $text -Label 'Estimated GPU Memory'
         $totalBytes=Convert-LrEstimatedBytes -Text $text -Label 'Estimated Total Memory'
         $hardware=Get-LocalNvidiaGpu -LogDirectory $LogDirectory
-        $candidate=[pscustomobject]@{ContextLength=$context;GpuOffload=$gpu;GpuBytes=$gpuBytes;TotalBytes=$totalBytes;LogPath=$estimate.LogPath;ReserveOverride=$false}
+        $memoryFit=Get-LrMemoryFit -GpuBytes $gpuBytes -TotalBytes $totalBytes -Hardware $hardware
+        $candidate=[pscustomobject]@{ContextLength=[int]$context;GpuOffload=$gpu;GpuBytes=$gpuBytes;TotalBytes=$totalBytes;RamBytes=$memoryFit.RamBytes;LogPath=$estimate.LogPath;ReserveOverride=$false}
         $lastCandidate=$candidate
         if(-not $guardrailCandidate -and $text -match 'This model may be loaded based on your resource guardrails settings\.'){
             $guardrailCandidate=$candidate
         }
         if($text -match 'This model may be loaded based on your resource guardrails settings\.' -and $text -notmatch 'Confidence:\s*LOW' -and
-           $gpuBytes -le ($hardware.Gpu.FreeBytes-1GB) -and $totalBytes -le ($hardware.FreeRamBytes-3GB)){
+           $memoryFit.Fits){
             $fit=$candidate;break
         }
       }
@@ -322,7 +323,7 @@ function Set-SmpActiveProfile {
     if(-not $fit){
         $freeGpu=[math]::Round($hardware.Gpu.FreeBytes/1GB,2)
         $freeRam=[math]::Round($hardware.FreeRamBytes/1GB,2)
-        $fitMessage="No verified memory fit for $Alias. Last available: VRAM $freeGpu GiB, RAM $freeRam GiB; reserves: 1 GiB VRAM and 3 GiB RAM. Last estimate: $gpuBytes bytes GPU, $totalBytes bytes total. LM Studio estimates: $LogDirectory."
+        $fitMessage="No verified memory fit for $Alias. Last available: VRAM $freeGpu GiB, RAM $freeRam GiB; reserves: 1 GiB VRAM and 3 GiB RAM. Last estimate: $gpuBytes bytes GPU, $($memoryFit.RamBytes) bytes host RAM, $totalBytes bytes total. LM Studio estimates: $LogDirectory."
         if(-not $AllowUnfitAttempt){
             $error=[InvalidOperationException]::new($fitMessage)
             $error.Data['ShadowResourceFitFailure']=$true

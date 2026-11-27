@@ -2,6 +2,46 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Target report follow-up - package 2026.11.27.4
+
+The supplied Windows run of build 2026.11.27.3 finished with warnings. Its live
+acceptance recorded one host PASS and eight BLOCKED cases because Workspace Trust
+was not granted. Kilo/UI inference was not executed in that acceptance run.
+The other provisioning smoke checks passed for three models; coder-high remained
+deferred. The deliberate no-model CLI capability probe was the only nonzero
+native command. A missing registered project directory is a separate repair warning.
+
+Corrections in this build:
+- Launch the installed startup helper 0.3.2 in an ordinary, isolated VS Code
+  window, replacing the extension-development/test launch. Trust remains enabled;
+  the user can open Manage Workspace Trust, has ten minutes to decide, and the
+  incremental report/console identifies the waiting phase. No trust database or
+  global security setting is edited.
+- Compare the LM Studio total-minus-GPU allocation against host RAM, and the GPU
+  allocation against VRAM, retaining the 3 GiB/1 GiB reserves. Both single-model
+  and pool paths use the same check. Invalid or low-confidence estimates still
+  cannot authorize a normal load. The reported hardware/estimate combination is
+  covered by a synthetic regression; real loading must be retested on the target.
+- Preserve scalar context/memory/boolean values in JSON rather than converting
+  pipeline-decorated numbers to empty objects.
+- Mark the exact negative capability probe EXPECTED_NONZERO_EXIT while retaining
+  its exit code and streams. Actual model/runtime/authentication failures remain
+  errors. Historical log replay retains its severity label without producing a
+  new live error notification.
+
+Local regression evidence: 70 JavaScript cases across the combined ten-file run
+passed; model-pool lifecycle 51, partial GPU offload/memory boundaries 14,
+single-model fit 6, native model failures 29, CLI compatibility 16, CPU embedding
+47, report serialization 13 and acceptance policy 25 checks passed. The initial
+broad native-deadline check exceeded its limit under load; process startup now
+uses the same command budget, and the unchanged seven-case native/config/logging
+suite passed after that correction. Native Git clone and junction creation remain
+BLOCKED by this agent host. Windows PowerShell 5.1 audit passed all 51 checks, including its extracted
+capability-helper dependency. Final targeted diagnostics/startup checks passed
+20 cases, including current startup errors versus dated historical backfill.
+This fix is a candidate on its own branch. A new successful target run, including real Kilo
+responses, is required before a PR, main merge or release.
+
 ## Provisioning diagnostics, native launcher and project repair - package 2026.11.27.3
 
 This build adds incremental schema-2 reporting, bootstrap handoff evidence, redacted
@@ -61,8 +101,9 @@ Relevant suites: Test-ToolchainAcceptance.mjs, Test-ToolchainDiagnostics.mjs,
 Test-RouterEvidence.mjs, Test-ToolchainNative.ps1, Test-ToolchainPolicy.ps1,
 Test-ToolchainProvisioning.ps1, Test-VsCodeStartup.mjs, Test-VsCodeProfile.ps1,
 Test-RouterLifecycle.ps1, Test-RipgrepIntegration.ps1 and Test-SelectionIntegration.ps1.
-The installed live test is app/Test-Toolchain.ps1, with vscode-tests/toolchain.cjs
-as the real Extension Host entry. Reports remain local under diagnostics/toolchain.
+The installed live test is app/Test-Toolchain.ps1. Since build 2026.11.27.4 the
+installed helper starts it in an ordinary window; vscode-tests/toolchain.cjs is
+only the legacy development-host entry. Reports remain local under diagnostics/toolchain.
 
 Local validation on 2026-11-27: the combined nine-suite JavaScript run passed
 61 cases. The final startup-specific run additionally checks the sidebar-focus

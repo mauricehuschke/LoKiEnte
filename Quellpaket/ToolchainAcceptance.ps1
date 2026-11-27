@@ -76,6 +76,13 @@ function Write-ShadowAcceptanceJUnit {
     [IO.File]::WriteAllText($Path,($xml+'</testsuite></testsuites>'),[Text.UTF8Encoding]::new($false))
 }
 
+function Get-ShadowAcceptanceLaunchArguments {
+    param([Parameter(Mandatory)][string]$Project,[Parameter(Mandatory)][string]$DataDirectory,[Parameter(Mandatory)][string]$ExtensionsDirectory)
+    return @($Project,'--new-window','--user-data-dir',$DataDirectory,'--extensions-dir',$ExtensionsDirectory,
+        '--skip-welcome','--skip-release-notes','--telemetry-level','off',
+        '--disable-extension','GitHub.copilot','--disable-extension','GitHub.copilot-chat')
+}
+
 function Invoke-ShadowToolchainAcceptance {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$InstallRoot,[ValidateRange(60,3600)][int]$TimeoutSeconds=1800)
@@ -122,17 +129,21 @@ function Invoke-ShadowToolchainAcceptance {
         $environment.LOKIENTE_STARTUP_VERSION=$expected.version
         $start=[Diagnostics.ProcessStartInfo]::new()
         $start.FileName=$chain.codeExecutable;$start.WorkingDirectory=$project;$start.UseShellExecute=$false
-        foreach($arg in @($project,'--new-window','--user-data-dir',$environment.LOKIENTE_VSCODE_DATA_DIR,'--extensions-dir',(Join-Path $InstallRoot 'vscode-extensions'),
-            '--extensionDevelopmentPath',$helper[0].FullName,'--extensionTestsPath',(Join-Path $InstallRoot 'app/vscode-tests/toolchain.cjs'),'--skip-welcome','--skip-release-notes','--telemetry-level','off',
-            '--disable-extension','GitHub.copilot','--disable-extension','GitHub.copilot-chat')){[void]$start.ArgumentList.Add($arg)}
+        [IO.File]::WriteAllText((Join-Path $project 'README.md'),"# LoKiEnte acceptance workspace`n`nThis folder was generated locally for the LoKiEnte toolchain test.`nReview VS Code's Workspace Trust prompt and trust this test folder to run the checks.`nThe test reads generated probe files and requests local LM Studio inference.`nRun ID: $id`n",[Text.UTF8Encoding]::new($false))
+        # Use the installed helper in an ordinary window. Extension test mode
+        # suppresses the normal trust workflow and does not test installed startup.
+        foreach($arg in (Get-ShadowAcceptanceLaunchArguments -Project $project -DataDirectory $environment.LOKIENTE_VSCODE_DATA_DIR -ExtensionsDirectory (Join-Path $InstallRoot 'vscode-extensions'))){[void]$start.ArgumentList.Add($arg)}
         foreach($key in $environment.Keys){$start.Environment[$key]=[string]$environment[$key]}
         foreach($key in @($start.Environment.Keys)){if($key -match '^(VSCODE|ELECTRON)_'){[void]$start.Environment.Remove($key)}}
-        Write-ShadowMessage 'Starting real VS Code acceptance. The test window must be trusted; do not close it while checks are running.'
+        Write-ShadowMessage 'Starting real VS Code acceptance. In the new window, review and trust the generated test folder. Use Manage Workspace Trust if prompted; do not close the window during checks.'
         $process=[Diagnostics.Process]::Start($start)
         try{
             $watch=[Diagnostics.Stopwatch]::StartNew()
+            $lastProgress=''
             while($watch.Elapsed.TotalSeconds -lt $TimeoutSeconds){
                 $state=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
+                $progress=[string](Get-LrProperty $state 'waitingFor')
+                if($progress -and $progress -cne $lastProgress){Write-ShadowMessage "Acceptance waiting for: $progress. Continue in the VS Code test window.";$lastProgress=$progress}
                 if($state.status -in @('PASS','FAIL','BLOCKED')){break}
                 if($process.HasExited -and $watch.Elapsed.TotalSeconds -gt 30){throw "VS Code exited without a completed acceptance report (exit $($process.ExitCode))."}
                 Start-Sleep -Milliseconds 500

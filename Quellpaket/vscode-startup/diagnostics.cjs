@@ -86,7 +86,12 @@ async function logFiles(root, depth = 4, limit = 150) {
     await walk(root, depth); return result;
 }
 
-function consumeLine(logger, component, line) {
+function consumeLine(logger, component, line, { historical = false } = {}) {
+    if (historical) {
+        const target = logger;
+        logger = Object.fromEntries(['info', 'warn', 'error'].map(level => [level, (source, message) =>
+            target.info(source, `[history ${level.toUpperCase()}] ${message}`)]));
+    }
     if (!line.trim()) return;
     if (line.startsWith('{')) {
         let event; try { event = JSON.parse(line); } catch { return; }
@@ -134,6 +139,21 @@ async function readJsonResponse(url, headers, timeout = 3000) {
 
 function startDiagnostics({ logger, root, dataDirectory, env = process.env, intervalMs = 5000 }) {
     let disposed = false, busy = false;
+    const launchTime = Date.parse(env.LOKIENTE_LOG_SINCE_UTC || '');
+    const since = Number.isFinite(launchTime) ? launchTime : Date.now() - 60000;
+    const predatesLaunch = line => {
+        let value;
+        if (line.startsWith('{')) {
+            try { const event = JSON.parse(line); value = event.utc || event.timestamp; } catch {}
+        }
+        if (!value) {
+            const match = /(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z|[+-]\d{2}:?\d{2})?/.exec(line);
+            if (match) value = `${match[1]}T${match[2]}${match[3] || ''}`;
+        }
+        const timestamp = Date.parse(value || '');
+        // Keep current startup errors and undated errors visible as live errors.
+        return Number.isFinite(timestamp) && timestamp < since;
+    };
     const tails = new Map(), states = new Map();
     const changed = (key, state, component, message, error = false) => {
         if (states.get(key) === state) return;
@@ -174,8 +194,15 @@ function startDiagnostics({ logger, root, dataDirectory, env = process.env, inte
             const active = new Set(files.map(([file]) => file));
             for (const file of tails.keys()) if (!active.has(file)) tails.delete(file);
             for (const [file, component] of files) {
-                if (!tails.has(file)) tails.set(file, new LogTail(file, line => consumeLine(logger, component, line)));
-                try { await tails.get(file).read(); } catch (e) { changed(file, e.code, component, `Log read failed: ${e.code || e.message}`, true); }
+                if (!tails.has(file)) {
+                    let historical = true;
+                    const tail = new LogTail(file, line => consumeLine(logger, component, line, { historical: historical && predatesLaunch(line) }));
+                    tails.set(file, tail);
+                    try { await tail.read(); } catch (e) { changed(file, e.code, component, `Log read failed: ${e.code || e.message}`, true); }
+                    finally { historical = false; }
+                } else {
+                    try { await tails.get(file).read(); } catch (e) { changed(file, e.code, component, `Log read failed: ${e.code || e.message}`, true); }
+                }
             }
             let config;
             try { config = JSON.parse(env.KILO_CONFIG_CONTENT || '{}'); } catch { changed('config', 'invalid', 'LoKiEnte', 'KILO_CONFIG_CONTENT is invalid JSON.', true); return; }
