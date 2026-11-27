@@ -86,6 +86,10 @@ erneute Provisionierung einer bestehenden Umgebung einschließlich Erhalt eigene
 Einstellungen und Projekte zu testen. Echte GPU-, Modell- und GUI-Abnahme auf
 einem Windows-Zielrechner ist zusätzlich zu synthetischen Regressionstests erforderlich.
 
+Die Git-Attribute des eigenständigen Installers verhindern Zeilenumwandlung, damit
+committete und heruntergeladene Bytes zur veröffentlichten SHA-256 passen. Prüfe
+die Prüfsumme nach dem Build und vor dem Hochladen des Assets.
+
 ## Release veröffentlichen
 
 1. Prüfe Quellen, Installer-Nutzlast und betroffene Tests. Scanne Dateistand,

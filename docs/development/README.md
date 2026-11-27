@@ -80,6 +80,10 @@ reprovisioning of an existing environment, including preservation of custom
 settings and projects, when setup behavior changes. Real GPU/model/GUI acceptance
 on a target Windows machine is separate from synthetic regression tests.
 
+The standalone installer's Git attributes disable line-ending conversion so the
+committed/downloaded bytes retain the published SHA-256. Validate the checksum
+after building and before uploading the asset.
+
 ## Publish a release
 
 1. Validate source changes, the installer payload and the relevant tests. Scan

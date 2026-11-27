@@ -1,3 +1,56 @@
+## Kilo-Start, Output-Rückkopplung und Abnahme im Arbeitsprofil - Paket 2026.11.27.5
+
+Die nächste Zieldiagnose zeigt einen vertrauten Host und danach eine in weniger
+als vier Sekunden blockierte Abnahme: Kilo wurde vor abgeschlossener Erkennung
+abgefragt. Derselbe Host aktivierte Kilo etwa zwölf Sekunden später. Kein
+Modell-Roundtrip lief. Dem erzeugten Projekt fehlten Git-Repository und erster
+Commit. Ein Handler des Swagger Viewers für Dokumentänderungen erzeugte 153
+Renderer-Fehler, während das bereits fertige Testfenster weiter Logs übernahm.
+Der Upload enthält Diagnose-/Abnahmenachweise, keinen neuen Provisioning-Report.
+
+Dieser Kandidat wartet auf Kilos Erkennung und erfasst installierte und im Host
+sichtbare Erweiterungen getrennt. Das synthetische Projekt erhält per echtem,
+zeitlich begrenztem Git ein eigenes Repository mit erstem Commit. Geerbte
+Git-Schreibumleitungen, Hooks und Signierung werden dabei nicht verwendet.
+Benutzer-Repositories bleiben erhalten. Kilos Worktree-Verwaltung benötigt einen
+vorhandenen Commit als Ausgangspunkt.
+
+Die Abnahme nutzt jetzt das tatsächliche verwaltete Arbeitsprofil und installierte
+Erweiterungsverzeichnis. Desktop und Test teilen nativen Sammler, Startargumente,
+Umgebungsaufbau und Workspace-Generator. Offene verwaltete Fenster blockieren den
+Start. Datei-Prüfsummen der Konfiguration/Quellen, ausdrücklich gesetzte wirksame
+Einstellungen, verfügbare Benutzer-/Workspace-Werte und gespeicherte gegenüber
+laufender Kilo-Konfiguration müssen übereinstimmen. Geerbte Standard-Objektschlüssel
+bleiben zulässig. Die im echten Host sichtbaren Erweiterungen werden erfasst.
+Der Seitenleistenbefehl fragt nach dem Schließen seines Fensters und startet danach
+dieselbe native Abnahme durch einen unsichtbaren Runner.
+
+Identische kürzlich erfasste VS-Code-Warnungen/-Fehler samt Stackfortsetzungen
+werden je Quelle mit stillen Zählern und Originalpfaden zusammengefasst. Andere
+Fehler bleiben sichtbar; die Original-Logs behalten alle Vorkommnisse. Das
+unterbricht die Output-Rückkopplung ohne Änderung der Dritterweiterung. Erst nach
+gespeichertem Bericht erscheint das Ergebnis, die Weiterleitung im Testfenster
+stoppt, und ein Host-Neuladen wiederholt keinen fertigen Lauf. Abbruch und
+Gesamtfrist blockieren die Abnahme, beenden deren nativen Kindprozess und erhalten
+Befehlsnachweise. Ein späterer Inferenz-PASS lässt sich daraus nicht ableiten.
+
+Lokale Nachweise: 89 JavaScript-Fälle im gemeinsamen Lauf von 13 Dateien bestanden.
+Der PowerShell-Lauf bestand 22 Suiten; nativer lokaler Git-Klon und Junction-Anlage
+bleiben durch Windows-Einschränkungen dieses Entwicklungshosts BLOCKED. Die neue
+Startprüfung bestand 28 Checks mit echtem Node/Git/Dateisystem/Workspace-Aufbau
+und simulierter GUI-Grenze einschließlich vorzeitig beendetem Editor. Der native
+Sammler schreibt den Exitstatus atomar mit begrenzten temporären Pfadlängen. Die
+zusätzliche Bootstrap-Suite ist bei der Junction-Anlage auf diesem Host BLOCKED.
+Der kontrollierte Dokumentänderungs-Test kommt zur
+Ruhe und leitet neue andere Fehler weiterhin weiter. Der gelieferte Renderer-Log
+reduziert sich von 153 Swagger-Meldungen auf seine zwei unterschiedlichen Blöcke;
+insgesamt werden 170 identische Warn-/Fehlerblöcke mit 3.643 Zeilen unterdrückt.
+
+Echte VS-Code-/Kilo-/LM-Studio- und Sichtabnahme auf dem Ziel-PC bleiben UNVERIFIED.
+Docker und Hyper-V werden nicht benötigt. Mit dem erzeugten Installer dieses
+Branches neu provisionieren, verwaltete Fenster schließen und den nativen Test
+wiederholen. Erst erfolgreiche Zielnachweise erlauben PR, Main-Merge und Release.
+
 ## Provisioning-Diagnose, nativer Launcher und Projektreparatur - Paket 2026.11.27.3
 
 Dieser Stand ergänzt laufende Berichte mit Schema 2, Bootstrap-Übergabenachweise,

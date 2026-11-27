@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { StringDecoder } = require('node:string_decoder');
 
 function redact(value, secrets = []) {
@@ -13,19 +14,57 @@ function redact(value, secrets = []) {
 
 function createLogger(output, secrets = []) {
     const listeners = new Set();
-    const write = (level, component, message) => {
+    const write = (level, component, message, { reveal = true } = {}) => {
         const event = { utc: new Date().toISOString(), level, component, message: redact(message, secrets).slice(0, 16384) };
         const line = `[${event.component}] ${event.message}`;
         const method = level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info';
         if (typeof output[method] === 'function') output[method](line); else output.appendLine(`${event.utc} [${level}] ${line}`);
-        if (level === 'ERROR') output.show(true);
+        if (level === 'ERROR' && reveal) output.show(true);
         for (const listener of listeners) { try { listener(event); } catch {} }
         return event;
     };
     return {
-        info: (c, m) => write('INFO', c, m), warn: (c, m) => write('WARN', c, m), error: (c, m) => write('ERROR', c, m),
+        info: (c, m, o) => write('INFO', c, m, o), warn: (c, m, o) => write('WARN', c, m, o), error: (c, m, o) => write('ERROR', c, m, o),
         subscribe(fn) { listeners.add(fn); return { dispose: () => listeners.delete(fn) }; },
     };
+}
+
+// Some third-party extensions observe changes to Output documents and log an
+// error from that handler. Forwarding the same error/stack into Output would
+// trigger the handler again indefinitely. Keep the first complete block and
+// count identical repeats silently; the original source log retains every one.
+class LogForwarder {
+    constructor(logger, component, source) {
+        Object.assign(this, { logger, component, source });
+        this.pending = []; this.seen = new Map(); this.suppressedBlocks = 0; this.suppressedLines = 0;
+    }
+    consume(line, options) {
+        if (/\[(?:error|warn(?:ing)?|info|debug|trace)\]/i.test(line) || line.startsWith('{')) this.flush();
+        this.pending.push({ line, options });
+        // Bound multiline blocks even when a broken source omits record headers.
+        if (this.pending.length >= 128) this.flush();
+    }
+    flush() {
+        const block = this.pending; this.pending = [];
+        if (!block.length) return;
+        if (this.component === 'VS Code' && /\[(?:error|warn(?:ing)?)\]/i.test(block[0].line)) {
+            const normalized = block.map(({ line }) => line.replace(/^\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\]?\s*/, '')).join('\n');
+            const fingerprint = crypto.createHash('sha256').update(String(!!block[0].options?.historical) + normalized).digest('hex');
+            const previous = this.seen.get(fingerprint);
+            if (previous) {
+                previous.repeats++; previous.lastSeenUtc = new Date().toISOString();
+                this.suppressedBlocks++; this.suppressedLines += block.length; return;
+            }
+            if (this.seen.size >= 512) this.seen.delete(this.seen.keys().next().value);
+            this.seen.set(fingerprint, { fingerprint, repeats: 0, firstSeenUtc: new Date().toISOString() });
+        }
+        const quiet = Object.fromEntries(['info', 'warn', 'error'].map(level => [level, (c, m) => this.logger[level](c, m, { reveal: false })]));
+        for (const { line, options } of block) consumeLine(quiet, this.component, line, options);
+    }
+    snapshot() {
+        return { source: this.source, suppressedBlocks: this.suppressedBlocks, suppressedLines: this.suppressedLines,
+            repeated: [...this.seen.values()].filter(value => value.repeats) };
+    }
 }
 
 class LogTail {
@@ -154,9 +193,9 @@ function startDiagnostics({ logger, root, dataDirectory, env = process.env, inte
         // Keep current startup errors and undated errors visible as live errors.
         return Number.isFinite(timestamp) && timestamp < since;
     };
-    const tails = new Map(), states = new Map();
+    const tails = new Map(), forwarders = new Map(), states = new Map();
     const changed = (key, state, component, message, error = false) => {
-        if (states.get(key) === state) return;
+        if (disposed || states.get(key) === state) return;
         states.set(key, state); logger[error ? 'error' : 'info'](component, message);
     };
     const poll = async () => {
@@ -194,14 +233,18 @@ function startDiagnostics({ logger, root, dataDirectory, env = process.env, inte
             const active = new Set(files.map(([file]) => file));
             for (const file of tails.keys()) if (!active.has(file)) tails.delete(file);
             for (const [file, component] of files) {
+                if (disposed) break;
                 if (!tails.has(file)) {
                     let historical = true;
-                    const tail = new LogTail(file, line => consumeLine(logger, component, line, { historical: historical && predatesLaunch(line) }));
+                    const forwarder = forwarders.get(file) || new LogForwarder(logger, component, file);
+                    forwarders.set(file, forwarder);
+                    const tail = new LogTail(file, line => { if (!disposed) forwarder.consume(line, { historical: historical && predatesLaunch(line) }); });
                     tails.set(file, tail);
                     try { await tail.read(); } catch (e) { changed(file, e.code, component, `Log read failed: ${e.code || e.message}`, true); }
-                    finally { historical = false; }
+                    finally { historical = false; if (!disposed) forwarder.flush(); }
                 } else {
                     try { await tails.get(file).read(); } catch (e) { changed(file, e.code, component, `Log read failed: ${e.code || e.message}`, true); }
+                    finally { if (!disposed) forwarders.get(file)?.flush(); }
                 }
             }
             let config;
@@ -233,7 +276,8 @@ function startDiagnostics({ logger, root, dataDirectory, env = process.env, inte
     };
     const timer = setInterval(() => void poll(), intervalMs); timer.unref?.();
     const ready = poll();
-    return { ready, poll, dispose() { disposed = true; clearInterval(timer); } };
+    return { ready, poll, snapshot: () => ({ repeatPolicy: 'Identical VS Code warning/error blocks are shown once per source; original logs retain all repeats.',
+        sources: [...forwarders.values()].map(value => value.snapshot()) }), dispose() { disposed = true; clearInterval(timer); } };
 }
 
-module.exports = { redact, createLogger, LogTail, logFiles, consumeLine, loopback, readJsonResponse, startDiagnostics };
+module.exports = { redact, createLogger, LogTail, LogForwarder, logFiles, consumeLine, loopback, readJsonResponse, startDiagnostics };

@@ -22,13 +22,6 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'ProjectSelection.ps1')
 . (Join-Path $PSScriptRoot 'DesktopRunner.ps1')
 Initialize-ShadowToolchainLogging -InstallRoot $InstallRoot
-function Get-ShadowVsCodeLaunchArguments {
-    param([string]$InstallRoot,[string]$OpenPath)
-    return @('--user-data-dir',(Join-Path $InstallRoot 'vscode-data'),
-        '--extensions-dir',(Join-Path $InstallRoot 'vscode-extensions'),
-        '--telemetry-level','off','--disable-extension','GitHub.copilot',
-        '--disable-extension','GitHub.copilot-chat','--new-window',$OpenPath)
-}
 try {
     if(-not $IsWindows){throw 'This launcher is designed for Windows.'}
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
@@ -96,20 +89,7 @@ try {
     $bundledKilo=Get-ShadowBundledKilo -CodePath $chain.codeExecutable -InstallRoot $InstallRoot
     $null=Assert-ShadowKiloEffectiveConfig -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $workingDirectory
     $null=Assert-ShadowKiloWorkflowTools -KiloExecutable $bundledKilo -InstallRoot $InstallRoot -Config $configuration.Config -WorkingDirectory $workingDirectory
-    $environment=Get-ShadowLocalEnvironment -InstallRoot $InstallRoot -ConfigJson ($configuration.Config|ConvertTo-Json -Depth 40 -Compress)
-    if ($chain['npmVersion']) {
-        # Both the Node installer and a Windows npm global prefix place the shims
-        # three directories above node_modules/npm/bin/npm-cli.js.
-        $npmBin=[IO.Path]::GetDirectoryName($chain.npmEntry)
-        $npmPrefix=[IO.Directory]::GetParent($npmBin).Parent.Parent.FullName
-        $inheritedPath=if ($environment.Contains('PATH')) {$environment['PATH']} else {$env:PATH}
-        $environment['PATH']=$npmPrefix+';'+[IO.Path]::GetDirectoryName($chain.nodeExecutable)+';'+$inheritedPath
-    }
-    $environment['LOKIENTE_MANAGED_VSCODE']='1'
-    $environment['LOKIENTE_INSTALL_ROOT']=[IO.Path]::GetFullPath($InstallRoot)
-    $environment['LOKIENTE_ET_KILO']=$bundledKilo
-    $environment['LOKIENTE_VSCODE_DATA_DIR']=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
-    $environment['LOKIENTE_STARTUP_VERSION']=(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'vscode-startup/package.json') -Raw|ConvertFrom-Json).version
+    $environment=Get-ShadowEditorEnvironment -InstallRoot $InstallRoot -ConfigJson ($configuration.Config|ConvertTo-Json -Depth 40 -Compress) -BundledKilo $bundledKilo -Toolchain $chain
     $null=Start-ShadowEditor -InstallRoot $InstallRoot -CodePath $chain.codeExecutable -Arguments (Get-ShadowVsCodeLaunchArguments -InstallRoot $InstallRoot -OpenPath $openPath) -WorkingDirectory $workingDirectory -Environment $environment -WaitForHost
     if($startIndex -and $ProjectPath -and $chain.modelMode -eq 'Dual' -and $embedding.Status -ceq 'Ready'){
         Write-ShadowMessage 'Indexing: enable it in Kilo for this project; first exclude sensitive files in .gitignore or .kilocodeignore. Wait for Complete status.'

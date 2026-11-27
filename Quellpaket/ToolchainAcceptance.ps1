@@ -8,7 +8,7 @@ function Select-ShadowAcceptanceMode {
     if($SkipAcceptanceTest){return 'Skip'}
     if($RunAcceptanceTest){return 'Run'}
     while($true){
-        try{$answer=Read-Host 'Run the real VS Code/Kilo/LM Studio acceptance now? Close other managed windows first. [Y/n]'}
+        try{$answer=Read-Host 'Run the real VS Code/Kilo/LM Studio acceptance in your managed work profile now? Close its VS Code windows first. [Y/n]'}
         catch{return 'Blocked'}
         if([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^(?i:y|yes|j|ja)$'){return 'Run'}
         if($answer -match '^(?i:n|no|nein)$'){return 'Skip'}
@@ -29,7 +29,7 @@ function Write-ShadowAcceptanceJson {
 function Test-ShadowToolchainDependencies {
     param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$WorkingDirectory)
     $cases=[Collections.Generic.List[object]]::new()
-    $chain=Get-Content -LiteralPath (Join-Path $InstallRoot 'toolchain.json') -Raw|ConvertFrom-Json
+    $chain=Get-Content -LiteralPath (Join-Path $InstallRoot 'toolchain.json') -Raw|ConvertFrom-Json -AsHashtable
     $config=Get-Content -LiteralPath (Join-Path $InstallRoot 'kilo-managed/kilo.json') -Raw|ConvertFrom-Json -AsHashtable
     $bundled=$null
     foreach($spec in @(
@@ -77,15 +77,13 @@ function Write-ShadowAcceptanceJUnit {
 }
 
 function Get-ShadowAcceptanceLaunchArguments {
-    param([Parameter(Mandatory)][string]$Project,[Parameter(Mandatory)][string]$DataDirectory,[Parameter(Mandatory)][string]$ExtensionsDirectory)
-    return @($Project,'--new-window','--user-data-dir',$DataDirectory,'--extensions-dir',$ExtensionsDirectory,
-        '--skip-welcome','--skip-release-notes','--telemetry-level','off',
-        '--disable-extension','GitHub.copilot','--disable-extension','GitHub.copilot-chat')
+    param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$OpenPath)
+    return Get-ShadowVsCodeLaunchArguments -InstallRoot $InstallRoot -OpenPath $OpenPath
 }
 
 function Invoke-ShadowToolchainAcceptance {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$InstallRoot,[ValidateRange(60,3600)][int]$TimeoutSeconds=1800)
+    param([Parameter(Mandatory)][string]$InstallRoot,[ValidateRange(60,3600)][int]$TimeoutSeconds=3600)
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
     $id=[guid]::NewGuid().ToString('N')
     $directory=Join-Path $InstallRoot ('diagnostics/toolchain/'+$id)
@@ -96,13 +94,14 @@ function Invoke-ShadowToolchainAcceptance {
     $initial=[ordered]@{schema=1;kind='live-toolchain-acceptance';runId=$id;status='RUNNING';startedAtUtc=[DateTime]::UtcNow.ToString('o');cases=@();reportPath=$resultPath}
     Write-ShadowAcceptanceJson -Path $resultPath -Value $initial
     try{
-        $chain=Get-Content -LiteralPath (Join-Path $InstallRoot 'toolchain.json') -Raw|ConvertFrom-Json
+        $chain=Get-Content -LiteralPath (Join-Path $InstallRoot 'toolchain.json') -Raw|ConvertFrom-Json -AsHashtable
         $configPath=Join-Path $InstallRoot 'kilo-managed/kilo.json'
         $configJson=Get-Content -LiteralPath $configPath -Raw
         $null=$configJson|ConvertFrom-Json -AsHashtable
-        foreach($tool in @('codeExecutable','powerShellExecutable','nodeExecutable')){
+        foreach($tool in @('codeExecutable','powerShellExecutable','nodeExecutable','gitExecutable')){
             if(-not(Test-Path -LiteralPath $chain.$tool -PathType Leaf)){throw "Installed tool is unavailable: $tool"}
         }
+        Assert-ShadowAcceptanceProfileClosed -InstallRoot $InstallRoot -CodePath $chain.codeExecutable
         $poolPath=Join-Path $InstallRoot 'runtime/model-pool.json'
         if(Test-Path -LiteralPath $poolPath -PathType Leaf){
             $pool=Get-Content -LiteralPath $poolPath -Raw|ConvertFrom-Json
@@ -117,45 +116,63 @@ function Invoke-ShadowToolchainAcceptance {
             $manifest.publisher -ceq 'lokiente' -and $manifest.name -ceq 'managed-startup' -and $manifest.version -ceq $expected.version
         })
         if($helper.Count -ne 1){throw 'The current LoKiEnte startup extension is missing or ambiguous. Reprovision before acceptance.'}
-        $environment=Get-ShadowLocalEnvironment -InstallRoot $InstallRoot -ConfigJson $configJson
+        $preparation=Invoke-ShadowNative -FilePath $chain.nodeExecutable -ArgumentList @((Join-Path $InstallRoot 'app/vscode-startup/acceptance-project.cjs'),$InstallRoot,$id,$chain.gitExecutable) -WorkingDirectory $directory -TimeoutSeconds 180 -Quiet
+        $gitEvidence=$preparation.StdOut|ConvertFrom-Json
+        Write-ShadowAcceptanceJson -Path (Join-Path $directory 'project-preparation.json') -Value $gitEvidence
+        $initial.projectGit=$gitEvidence
+        $initial.cases=@(@{id='acceptance-project-git';component='Git';status='PASS';evidence="Generated test project initialized with commit $($gitEvidence.head)."})
+        Write-ShadowAcceptanceJson -Path $resultPath -Value $initial
+        $workspace=New-ShadowWorkspace -Root $InstallRoot -Project $project -PwshPath $chain.powerShellExecutable
+        $settingsPath=Join-Path $InstallRoot 'vscode-data/User/settings.json'
+        $baselineFiles=@($settingsPath,$workspace.workspace,(Join-Path $InstallRoot 'kilo-managed/kilo.json'),(Join-Path $InstallRoot 'toolchain.json'),(Join-Path $InstallRoot 'app/DesktopRunner.ps1'),(Join-Path $InstallRoot 'app/Workspace.ps1'))
+        $baseline=@{runId=$id;dataDirectory=(Join-Path $InstallRoot 'vscode-data');workspace=$workspace.workspace
+            userSettings=(Get-Content -LiteralPath $settingsPath -Raw|ConvertFrom-Json -AsHashtable)
+            workspaceSettings=(Get-Content -LiteralPath $workspace.workspace -Raw|ConvertFrom-Json -AsHashtable).settings
+            files=@($baselineFiles|ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()}})}
+        Write-ShadowAcceptanceJson -Path (Join-Path $directory 'configuration-baseline.json') -Value $baseline
+        $environment=Get-ShadowEditorEnvironment -InstallRoot $InstallRoot -ConfigJson $configJson -BundledKilo $bundled -Toolchain $chain
         $environment.LOKIENTE_MANAGED_VSCODE='1'
         $environment.LOKIENTE_INSTALL_ROOT=[IO.Path]::GetFullPath($InstallRoot)
-        $environment.LOKIENTE_VSCODE_DATA_DIR=Join-Path $directory 'vscode-data'
+        $environment.LOKIENTE_VSCODE_DATA_DIR=Join-Path $InstallRoot 'vscode-data'
         $environment.LOKIENTE_ET_KILO=$bundled
         $environment.LOKIENTE_TOOLCHAIN_REPORT=$resultPath
         $environment.LOKIENTE_TOOLCHAIN_PROJECT=$project
         $environment.LOKIENTE_TOOLCHAIN_RUN_ID=$id
-        $environment.LOKIENTE_EDITOR_LAUNCH_ID=''
+        $environment.LOKIENTE_TOOLCHAIN_DEADLINE_UTC=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds).ToString('o')
+        $environment.LOKIENTE_TOOLCHAIN_WORKSPACE=$workspace.workspace
         $environment.LOKIENTE_STARTUP_VERSION=$expected.version
-        $start=[Diagnostics.ProcessStartInfo]::new()
-        $start.FileName=$chain.codeExecutable;$start.WorkingDirectory=$project;$start.UseShellExecute=$false
-        [IO.File]::WriteAllText((Join-Path $project 'README.md'),"# LoKiEnte acceptance workspace`n`nThis folder was generated locally for the LoKiEnte toolchain test.`nReview VS Code's Workspace Trust prompt and trust this test folder to run the checks.`nThe test reads generated probe files and requests local LM Studio inference.`nRun ID: $id`n",[Text.UTF8Encoding]::new($false))
-        # Use the installed helper in an ordinary window. Extension test mode
-        # suppresses the normal trust workflow and does not test installed startup.
-        foreach($arg in (Get-ShadowAcceptanceLaunchArguments -Project $project -DataDirectory $environment.LOKIENTE_VSCODE_DATA_DIR -ExtensionsDirectory (Join-Path $InstallRoot 'vscode-extensions'))){[void]$start.ArgumentList.Add($arg)}
-        foreach($key in $environment.Keys){$start.Environment[$key]=[string]$environment[$key]}
-        foreach($key in @($start.Environment.Keys)){if($key -match '^(VSCODE|ELECTRON)_'){[void]$start.Environment.Remove($key)}}
-        Write-ShadowMessage 'Starting real VS Code acceptance. In the new window, review and trust the generated test folder. Use Manage Workspace Trust if prompted; do not close the window during checks.'
-        $process=[Diagnostics.Process]::Start($start)
-        try{
-            $watch=[Diagnostics.Stopwatch]::StartNew()
-            $lastProgress=''
-            while($watch.Elapsed.TotalSeconds -lt $TimeoutSeconds){
-                $state=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
-                $progress=[string](Get-LrProperty $state 'waitingFor')
-                if($progress -and $progress -cne $lastProgress){Write-ShadowMessage "Acceptance waiting for: $progress. Continue in the VS Code test window.";$lastProgress=$progress}
-                if($state.status -in @('PASS','FAIL','BLOCKED')){break}
-                if($process.HasExited -and $watch.Elapsed.TotalSeconds -gt 30){throw "VS Code exited without a completed acceptance report (exit $($process.ExitCode))."}
-                Start-Sleep -Milliseconds 500
+        $arguments=Get-ShadowAcceptanceLaunchArguments -InstallRoot $InstallRoot -OpenPath $workspace.workspace
+        $initial.launch=@{mode='production-managed-profile';dataDirectory=$environment.LOKIENTE_VSCODE_DATA_DIR;extensionsDirectory=(Join-Path $InstallRoot 'vscode-extensions');arguments=@($arguments);workspace=$workspace.workspace;collector='desktop-runner'}
+        Write-ShadowAcceptanceJson -Path $resultPath -Value $initial
+        Write-ShadowMessage 'Starting acceptance with the real desktop launcher, managed VS Code profile, extensions and workspace template. Review Workspace Trust in the test window.'
+        $launchId=Start-ShadowEditor -InstallRoot $InstallRoot -CodePath $chain.codeExecutable -Arguments $arguments -WorkingDirectory $project -Environment $environment -WaitForHost
+        $watch=[Diagnostics.Stopwatch]::StartNew()
+        $lastProgress=''
+        while($watch.Elapsed.TotalSeconds -lt $TimeoutSeconds){
+            $state=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
+            $progress=[string](Get-LrProperty $state 'waitingFor')
+            if($progress -and $progress -cne $lastProgress){Write-ShadowMessage "Acceptance waiting for: $progress. Continue in the VS Code test window.";$lastProgress=$progress}
+            if($state.status -in @('PASS','FAIL','BLOCKED')){break}
+            $statusPath=Join-Path $InstallRoot ('runtime/launch-requests/'+$launchId+'.status.json')
+            if(Test-Path -LiteralPath $statusPath){
+                $launchStatus=Get-Content -LiteralPath $statusPath -Raw|ConvertFrom-Json
+                if($launchStatus.phase -ceq 'failed'){throw "Desktop launcher failed: $($launchStatus.error)"}
+                if($launchStatus.phase -ceq 'exited'){
+                    $state=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json
+                    if($state.status -in @('PASS','FAIL','BLOCKED')){break}
+                    throw "VS Code exited before acceptance completed (exit $($launchStatus.exitCode)). No PASS was recorded."
+                }
             }
-            if($state.status -notin @('PASS','FAIL','BLOCKED')){
-                # This is the unique test profile/process created above. Preserve normal windows and LM Studio.
-                if(-not $process.HasExited){$process.Kill($true)}
-                throw 'The live acceptance deadline expired. No PASS was recorded.'
-            }
-        }finally{$process.Dispose()}
+            Start-Sleep -Milliseconds 500
+        }
+        if($state.status -notin @('PASS','FAIL','BLOCKED')){
+            Write-ShadowAcceptanceJson -Path (Join-Path $directory 'cancellation.json') -Value @{runId=$id;reason='The native acceptance deadline expired. No PASS was recorded.';utc=[DateTime]::UtcNow.ToString('o')}
+            throw 'The live acceptance deadline expired. No PASS was recorded. Close the test window before retrying.'
+        }
+
     }catch{
         $failure=$_
+        Write-ShadowAcceptanceJson -Path (Join-Path $directory 'cancellation.json') -Value @{runId=$id;reason=$failure.Exception.Message;utc=[DateTime]::UtcNow.ToString('o')}
         try{$partial=Get-Content -LiteralPath $resultPath -Raw|ConvertFrom-Json -AsHashtable}catch{$partial=$initial}
         $partial.cases=@($partial.cases)+@(@{id='live-host';name='Real VS Code acceptance';status='BLOCKED';evidence=$failure.Exception.Message})
         $partial.status=if(@($partial.cases|Where-Object {$_.status -eq 'FAIL'}).Count){'FAIL'}else{'BLOCKED'}

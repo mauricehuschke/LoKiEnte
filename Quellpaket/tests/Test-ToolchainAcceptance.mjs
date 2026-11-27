@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import vm from 'node:vm';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 const { runNative, inspectKiloEvents, summarize, junit, checkToolchain, withDeadline, waitForWorkspaceTrust } = createRequire(import.meta.url)('../vscode-startup/toolchain-check.cjs');
@@ -45,6 +46,14 @@ test('cancelling the trust prompt blocks without a grant or policy change', asyn
         { warn() {} }, 1000), error => error.blocked === true && /cancelled/.test(error.message));
     assert.equal(disposed, true); assert.equal(workspace.isTrusted, false);
 });
+test('closing/cancelling a trust wait disposes the listener and cannot grant trust', async () => {
+    const controller = new AbortController(); let disposed = false;
+    const workspace = { isTrusted: false, onDidGrantWorkspaceTrust() { return { dispose() { disposed = true; } }; } };
+    const pending = waitForWorkspaceTrust({ workspace, window: { async showWarningMessage() {} } }, { warn() {} }, 1000, controller.signal);
+    controller.abort(new Error('synthetic window closed'));
+    await assert.rejects(pending, error => error.blocked && error.code === 'LOKIENTE_ACCEPTANCE_CANCELLED');
+    assert.equal(disposed, true); assert.equal(workspace.isTrusted, false);
+});
 test('a completed tool result and completed final answer are both required', () => {
     assert.deepEqual(inspect(events), { read: true, replyMatches: true, finished: true, error: false });
     assert.equal(inspect(events.slice(1)).read, false);
@@ -76,6 +85,19 @@ test('native deadline also covers inherited open pipes after parent exit', async
     await assert.rejects(runNative(process.execPath, ['-e', script], { timeoutMs: 3000 }), error => error.code === 'LOKIENTE_NATIVE_TIMEOUT' && error.processExited === true);
     assert.ok(Date.now() - start < 8000);
 });
+test('cancelling acceptance terminates its real native child and preserves command evidence', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lokiente-cancel-native-')), ready = path.join(root, 'ready'), later = path.join(root, 'later');
+    try {
+        const controller = new AbortController();
+        const pending = runNative(process.execPath, ['-e', 'const fs=require("node:fs");fs.writeFileSync(process.argv[1],"ready");process.stdout.write("started");setTimeout(()=>fs.writeFileSync(process.argv[2],"must not happen"),700)', ready, later], { signal: controller.signal });
+        const assertion = assert.rejects(pending, error => error.code === 'LOKIENTE_ACCEPTANCE_CANCELLED' && error.blocked && !!error.nativeResult);
+        const start = Date.now();
+        while (Date.now() - start < 5000) { try { await readFile(ready); break; } catch { await new Promise(resolve => setTimeout(resolve, 10)); } }
+        assert.equal(await readFile(ready, 'utf8'), 'ready'); controller.abort(new Error('synthetic acceptance cancelled')); await assertion;
+        await new Promise(resolve => setTimeout(resolve, 850));
+        await assert.rejects(readFile(later), error => error.code === 'ENOENT');
+    } finally { await rm(root, { recursive: true, force: true }); }
+});
 test('activation deadline fails instead of hanging indefinitely', async () => {
     const keepAlive = setInterval(() => {}, 100);
     try { await assert.rejects(withDeadline(() => new Promise(() => {}), 20, 'activation timeout'), /activation timeout/);
@@ -92,5 +114,59 @@ test('outside the real Electron host the live runner records BLOCKED and no infe
         for (const id of report.required) assert.ok(report.cases.some(c => c.id === id && c.status === 'BLOCKED'));
         assert.equal(JSON.parse(await readFile(report.reportPath, 'utf8')).status, 'BLOCKED');
         assert.match(await readFile(report.reportPath.replace('.json', '.junit.xml'), 'utf8'), /skipped=/);
+    } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('acceptance itself waits for delayed Kilo discovery before activating, with bounded mocked host boundaries', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lokiente-acceptance-discovery-'));
+    try {
+        const require = createRequire(import.meta.url), realRequire = createRequire(new URL('../vscode-startup/toolchain-check.cjs', import.meta.url));
+        const source = await readFile(new URL('../vscode-startup/toolchain-check.cjs', import.meta.url), 'utf8');
+        const helperSource = path.join(root, 'app', 'vscode-startup'); await mkdir(helperSource, { recursive: true });
+        for (const file of ['extension.cjs', 'diagnostics.cjs', 'toolchain-check.cjs', 'kilo-startup.cjs', 'acceptance-project.cjs', 'acceptance-lifecycle.cjs', 'acceptance-configuration.cjs']) {
+            await writeFile(path.join(helperSource, file), await readFile(new URL('../vscode-startup/' + file, import.meta.url)));
+        }
+        const installed = path.join(root, 'vscode-extensions', 'kilocode.kilo-code-synthetic'); await mkdir(installed, { recursive: true });
+        await writeFile(path.join(installed, 'package.json'), JSON.stringify({ publisher: 'kilocode', name: 'kilo-code', version: 'synthetic' }));
+        await writeFile(path.join(root, 'toolchain.json'), '{}');
+        let visible = false, activations = 0, hanging = false;
+        const kilo = { extensionPath: installed, async activate() { activations++; if (hanging) await new Promise(() => {}); throw new Error('SYNTHETIC_STOP_BEFORE_NATIVE_OR_INFERENCE'); } };
+        const sandbox = { module: { exports: {} }, __dirname: path.resolve('Quellpaket/vscode-startup'), setTimeout, clearTimeout, setInterval, clearInterval, AbortController,
+            process: { versions: { electron: 'synthetic', node: process.versions.node } },
+            require(id) {
+                if (id === './acceptance-project.cjs') return { prepareAcceptanceProject: async () => ({ project: path.join(root, 'diagnostics', 'toolchain', 'a'.repeat(32), 'project'), head: 'b'.repeat(40) }) };
+                if (id === './acceptance-configuration.cjs') return { verifyAcceptanceConfiguration: async () => ({ boundary: 'synthetic only' }) };
+                if (id === './kilo-startup.cjs') { const real = realRequire(id); return { ...real, waitForKilo: args => real.waitForKilo({ ...args, timeoutMs: 1000, pollMs: 5 }) }; }
+                return realRequire(id);
+            } };
+        vm.runInNewContext(source, sandbox);
+        const timer = setTimeout(() => { visible = true; }, 80);
+        const options = { root, runId: 'a'.repeat(32), interactive: false,
+            env: { KILO_CONFIG_CONTENT: JSON.stringify({ enabled_providers: ['lmstudio'], provider: { lmstudio: { options: { baseURL: 'http://127.0.0.1:1234/v1' }, models: { fast: { id: 'synthetic' } } } } }) },
+            logger: { info() {}, warn() {}, error() {} }, vscode: { version: 'synthetic', env: { appHost: 'desktop' }, workspace: { isTrusted: true },
+                extensions: { all: [], getExtension: () => visible ? kilo : undefined } } };
+        const report = await sandbox.module.exports.checkToolchain(options);
+        clearTimeout(timer);
+        assert.equal(activations, 1); assert.equal(report.cases.find(c => c.id === 'kilo-discovery').status, 'PASS');
+        assert.equal(report.cases.find(c => c.id === 'kilo-activation').status, 'FAIL');
+        assert.equal(report.status, 'FAIL'); assert.equal(report.nativeCommands.length, 0); assert.ok(!report.waitingFor);
+        assert.match(JSON.stringify(report), /SYNTHETIC_STOP_BEFORE_NATIVE/); assert.doesNotMatch(JSON.stringify(report), /Kilo Code is not installed/);
+        hanging = true;
+        const keepAlive = setInterval(() => {}, 100);
+        try {
+            const timed = await sandbox.module.exports.checkToolchain({ ...options, env: { ...options.env, LOKIENTE_TOOLCHAIN_DEADLINE_UTC: new Date(Date.now() + 200).toISOString() } });
+            assert.equal(timed.status, 'BLOCKED'); assert.equal(timed.cases.find(c => c.id === 'kilo-activation').status, 'BLOCKED');
+            assert.match(timed.cases.find(c => c.id === 'acceptance-cancelled').evidence, /overall acceptance deadline/);
+            assert.equal(timed.nativeCommands.length, 0); assert.equal(JSON.parse(await readFile(timed.reportPath, 'utf8')).status, 'BLOCKED');
+            const cancelFile = path.join(root, 'diagnostics', 'toolchain', 'a'.repeat(32), 'cancellation.json');
+            const cancel = setTimeout(() => { void writeFile(cancelFile, JSON.stringify({ runId: 'a'.repeat(32), reason: 'synthetic native runner stopped' })); }, 50);
+            const cancelled = await sandbox.module.exports.checkToolchain(options); clearTimeout(cancel);
+            assert.equal(cancelled.status, 'BLOCKED'); assert.match(cancelled.cases.find(c => c.id === 'acceptance-cancelled').evidence, /native runner stopped/);
+            await rm(cancelFile); hanging = false;
+            await writeFile(path.join(helperSource, 'extension.cjs'), 'synthetic stale helper');
+            const stale = await sandbox.module.exports.checkToolchain(options);
+            assert.equal(stale.status, 'FAIL'); assert.equal(stale.cases.find(c => c.id === 'managed-helper').status, 'FAIL');
+            assert.equal(stale.cases.find(c => c.id === 'kilo-activation').status, 'BLOCKED'); assert.equal(stale.nativeCommands.length, 0);
+        } finally { clearInterval(keepAlive); }
     } finally { await rm(root, { recursive: true, force: true }); }
 });

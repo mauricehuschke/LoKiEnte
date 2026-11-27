@@ -12,7 +12,7 @@ if($null -eq $definition){throw 'Start command helper missing'}
 . ([scriptblock]::Create($definition.Extent.Text))
 $launcherAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'Start-LocalAI.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Launcher syntax errors'}
-$launchDefinition=$launcherAst.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Get-ShadowVsCodeLaunchArguments'},$false)
+$launchDefinition=([Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'DesktopRunner.ps1'),[ref]$null,[ref]$null)).Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Get-ShadowVsCodeLaunchArguments'},$false)
 if($null -eq $launchDefinition){throw 'VS Code launch argument helper missing'}
 . ([scriptblock]::Create($launchDefinition.Extent.Text))
 $pwsh=(Get-Process -Id $PID).Path

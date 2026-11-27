@@ -3,7 +3,7 @@
   "displayName": "LoKiEnte",
   "description": "Manage the local LoKiEnte session, Kilo rules and optional Windows isolation.",
   "publisher": "lokiente",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "engines": {
     "vscode": "^1.105.1"
   },

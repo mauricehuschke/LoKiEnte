@@ -2,6 +2,56 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Startup discovery, Output feedback and production-profile acceptance - package 2026.11.27.5
+
+The next target diagnostics showed a trusted host, then BLOCKED acceptance in
+under four seconds because Kilo was queried before discovery completed. The same
+host activated Kilo about twelve seconds later. No model round trip ran. The
+generated project lacked a Git repository/first commit. A third-party Swagger
+Viewer document-change handler emitted 153 renderer errors while the already
+finished test window continued forwarding logs. This upload contained diagnostics
+and acceptance evidence, not a new provisioning report.
+
+This candidate waits for Kilo discovery and records installed/visible extension
+evidence separately. Its synthetic project gets an owned Git repository and
+initial commit through real bounded Git commands, without inherited Git write
+redirections, hooks or signing. User repositories are preserved. Kilo's worktree
+manager requires a commit as its starting point.
+
+Acceptance now uses the actual managed work profile and installed extension
+directory. Desktop and test share their native collector, launch arguments,
+environment builder and workspace generator. Already-open managed windows block
+the launch. Configuration/source file hashes, explicit effective settings, exposed
+user/workspace scopes and the saved versus running Kilo configuration must match.
+Inherited default object keys remain allowed. Extensions visible in the actual
+host are recorded. The sidebar command asks to close its window, then starts the
+same native acceptance through a hidden runner.
+
+Identical recent VS Code warning/error blocks, including stack continuations,
+are compressed per source with silent counters and original source paths. Distinct
+errors remain visible; original logs retain all occurrences. This breaks Output
+feedback without changing the third-party extension. Completion is announced after
+the report is saved, background forwarding stops in that test window, and a
+completed run is not replayed after an Extension Host reload. Cancellation and
+the overall deadline block acceptance, terminate its native child and retain
+command evidence. They cannot establish a late inference PASS.
+
+Local evidence: 89 JavaScript cases passed in the combined 13-file regression
+run. The PowerShell run passed 22 suites; native local Git clone and junction
+creation remain BLOCKED by the development host's Windows restrictions. The new
+production-launch regression passed 28 checks with actual Node/Git/files/workspace
+preparation and a synthetic GUI boundary, including early editor exit. Native
+collector exit status is written atomically using bounded temporary paths. The
+additional bootstrap suite is BLOCKED at junction creation on this host. The controlled document-change feedback
+test becomes quiescent while forwarding distinct new errors. Replaying the supplied
+renderer log compresses 153 Swagger messages to its two distinct blocks, suppressing
+170 duplicate warning/error blocks (3,643 lines) across that source.
+
+Real VS Code/Kilo/LM Studio and visual acceptance on the target PC are still
+UNVERIFIED. No Docker or Hyper-V is required. Reprovision this branch's generated
+installer, close the managed windows and rerun the native test. PR, main merge
+and release remain gated on successful target evidence.
+
 ## Target report follow-up - package 2026.11.27.4
 
 The supplied Windows run of build 2026.11.27.3 finished with warnings. Its live

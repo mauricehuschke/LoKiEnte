@@ -3,10 +3,13 @@ param([string]$SourceRoot=(Split-Path -Parent $PSScriptRoot))
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 . (Join-Path $SourceRoot 'ToolchainAcceptance.ps1')
+. (Join-Path $SourceRoot 'DesktopRunner.ps1')
 $checks=0
 function Assert-Policy($Value,[string]$Message){if(-not $Value){throw $Message};$script:checks++}
-$launch=@(Get-ShadowAcceptanceLaunchArguments -Project 'D:\Synthetic Test\project' -DataDirectory 'D:\Synthetic Test\profile' -ExtensionsDirectory 'D:\Synthetic Test\extensions')
-Assert-Policy ($launch[0] -ceq 'D:\Synthetic Test\project' -and $launch[[array]::IndexOf($launch,'--user-data-dir')+1] -ceq 'D:\Synthetic Test\profile') 'Normal acceptance launch must retain isolated workspace and profile paths with spaces.'
+$launch=@(Get-ShadowAcceptanceLaunchArguments -InstallRoot 'D:\Synthetic Test' -OpenPath 'D:\Synthetic Test\workspaces\test.code-workspace')
+$normal=@(Get-ShadowVsCodeLaunchArguments -InstallRoot 'D:\Synthetic Test' -OpenPath 'D:\Synthetic Test\workspaces\test.code-workspace')
+Assert-Policy (($launch|ConvertTo-Json -Compress) -ceq ($normal|ConvertTo-Json -Compress)) 'Acceptance and desktop launch arguments must be identical, using the same work profile and extension directory.'
+Assert-Policy ($launch[-1] -ceq 'D:\Synthetic Test\workspaces\test.code-workspace' -and $launch[[array]::IndexOf($launch,'--user-data-dir')+1] -ceq 'D:\Synthetic Test\vscode-data') 'Acceptance must load the actual managed work profile and production workspace format.'
 Assert-Policy ($launch -notcontains '--extensionTestsPath' -and $launch -notcontains '--extensionDevelopmentPath') 'Live acceptance must use the installed helper in an ordinary window, allowing the real trust workflow.'
 Assert-Policy ($launch -notcontains '--disable-workspace-trust' -and $launch -notcontains '--disable-extensions' -and $launch -contains '--extensions-dir') 'Acceptance must preserve trust policy and load the installed extensions.'
 function Read-Host { param($Prompt) throw 'Explicit switches must not prompt.' }
@@ -38,11 +41,12 @@ try{
     [void][IO.Directory]::CreateDirectory((Join-Path $fixture 'runtime'))
     [void][IO.Directory]::CreateDirectory((Join-Path $fixture 'kilo-managed'))
     $executable=(Get-Process -Id $PID).Path
-    Write-ShadowAcceptanceJson -Path (Join-Path $fixture 'toolchain.json') -Value @{codeExecutable=$executable;powerShellExecutable=$executable;nodeExecutable=$executable}
+    Write-ShadowAcceptanceJson -Path (Join-Path $fixture 'toolchain.json') -Value @{codeExecutable=$executable;powerShellExecutable=$executable;nodeExecutable=$executable;gitExecutable=$executable}
     [IO.File]::WriteAllText((Join-Path $fixture 'kilo-managed/kilo.json'),'{}')
     [IO.File]::WriteAllText((Join-Path $fixture 'runtime/model-pool.json'),'{}')
     $script:prepared=0;$script:inspected=0;$script:busy=$false
     function Write-ShadowMessage {param($Message,$Level)}
+    function Assert-ShadowAcceptanceProfileClosed {param($InstallRoot,$CodePath)}
     function Start-ShadowModelRouter {param($InstallRoot,$Pool,$NodePath,$PowerShellPath) $script:prepared++;if($script:busy){throw 'SYNTHETIC_BUSY_ROUTER_PRESERVED'};return @{Status='Ready'}}
     function Get-ShadowBundledKilo {
         param($CodePath,$InstallRoot)

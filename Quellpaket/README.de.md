@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.4 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.5 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 ## Desktop-Projekte und Provisioning-Diagnose
 
@@ -32,7 +32,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.2; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.3; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
@@ -58,14 +58,25 @@ fehlgeschlagene Prüfungen werden niemals als bestanden ausgegeben.
 
 ## Installierte Toolkette prüfen
 
-Das Provisioning fragt jetzt **Run the real VS Code/Kilo/LM Studio acceptance? [Y/n]**.
+Das Provisioning fragt jetzt **Run the real VS Code/Kilo/LM Studio acceptance in your managed work profile now? [Y/n]**.
 Enter startet den Test; `n` überspringt ihn. Mit `-RunAcceptanceTest` startet er ohne
 diese Konsolenabfrage, mit `-SkipAcceptanceTest` wird er ausdrücklich übersprungen.
 Beide Schalter schließen sich aus und werden beim nächsten Update erneut gewählt.
 Überspringen bedeutet **ungeprüft**.
 
-Der Test öffnet ein normales VS-Code-Fenster mit isoliertem Testprofil und dem
-installierten LoKiEnte-Helfer. Prüfe und bestätige das Vertrauen für den erzeugten
+Schließe zuerst alle verwalteten LoKiEnte-Fenster. Der Test verwendet das
+**tatsächliche Arbeitsprofil** unter `vscode-data`, das installierte
+Erweiterungsverzeichnis sowie denselben nativen Desktop-Sammler, dieselben
+Startargumente, den Umgebungsaufbau und den Workspace-Generator wie der
+Desktop-Runner. Ein frisches Standardprofil wird nicht eingesetzt. Vorhandene
+Einstellungen, Erweiterungen und deren Aktivierungszustand bleiben erhalten.
+Der Bericht erfasst SHA-256-Prüfsummen der gemeinsamen Konfiguration/Quellen,
+vergleicht wirksame Benutzer-/Workspace-Einstellungen und inventarisiert die
+im laufenden Host sichtbaren Erweiterungen. Abweichungen blockieren die Abnahme.
+Nur das erzeugte Projekt und die Abnahmesteuerung unterscheiden sich.
+Das Testprojekt erhält ein eigenes Git-Repository mit erstem Commit, da Kilos
+Worktree-Verwaltung einen Commit als Ausgangspunkt benötigt. Benutzerprojekte
+werden durch diesen Test weder initialisiert noch committet. Prüfe und bestätige das Vertrauen für den erzeugten
 Arbeitsbereich. Bei Bedarf öffnet **Manage Workspace Trust** in der LoKiEnte-Meldung
 die Vertrauensverwaltung. Bis zu deiner Entscheidung steht im Report
 `waitingFor: workspace-trust` (höchstens zehn Minuten). Bestätige am Ende die
@@ -83,6 +94,15 @@ werden geschwärzt; Prompt-/Antwort-JSON und Debug-/Trace-Inhalte werden ausgela
 Meldungen, die ein Drittprogramm gar nicht protokolliert, lassen sich daraus nicht
 rekonstruieren. Ein erreichbarer API-Port allein belegt keine funktionierende Inferenz.
 
+Identische VS-Code-Warnungen und -Fehler samt Stacktrace werden je Quelle
+einmal weitergeleitet. Stille Wiederholungszähler und Quellpfade stehen im
+Abnahmebericht; die Original-Logs behalten alle Vorkommnisse. Weitergeleitete
+Drittprogrammfehler öffnen Output nicht wiederholt. Dadurch können Handler für
+Dokumentänderungen ihre Renderer-Fehler nicht endlos über Output zurückkoppeln.
+Am Ende verweist eine sichtbare PASS-/FAIL-/BLOCKED-Meldung auf den gespeicherten
+Bericht. Die Weiterleitung im Testfenster stoppt; ein Neuladen startet einen
+abgeschlossenen Lauf nicht erneut.
+
 Ältere Logeinträge tragen `[history INFO/WARN/ERROR]` und lösen keine neue
 Live-Fehlermeldung aus. Neue Fehler behalten ihre tatsächliche Schwere. Der
 absichtliche LM-Studio-Fähigkeitstest ohne Modell behält Exitcode 1 mit dem
@@ -94,8 +114,12 @@ Fehler. GPU-Schätzungen werden gegen VRAM und der verbleibende Hostanteil
 Die lokalen Nachweise liegen unter `diagnostics/toolchain/latest.json` und
 `latest.junit.xml`, außerdem in einem eigenen Ordner je Lauf. `PASS` erfordert alle
 Pflichtprüfungen einschließlich der als manuell gekennzeichneten Sichtprüfung.
-`FAIL`, `BLOCKED` und `SKIPPED` gelten niemals als bestanden. Wiederholen kannst du
-den Test in der LoKiEnte-Seitenleiste (**Run toolchain acceptance**) oder in PowerShell 7:
+`FAIL`, `BLOCKED` und `SKIPPED` gelten niemals als bestanden.
+**Run toolchain acceptance** in der Seitenleiste fragt nach dem Schließen des
+aktuellen Fensters und startet einen unsichtbaren Runner. Dieser wartet bis zu
+60 Sekunden auf das geschlossene Arbeitsprofil und startet danach dieselbe native
+Abnahme. Weitere verwaltete Fenster müssen ebenfalls geschlossen sein.
+Alternativ alle Fenster selbst schließen und in PowerShell 7 starten:
 
 ```powershell
 pwsh -NoProfile -File D:\LoKi\app\Test-Toolchain.ps1 -InstallRoot D:\LoKi

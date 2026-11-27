@@ -4,20 +4,29 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { redact, loopback, readJsonResponse, LogTail } = require('./diagnostics.cjs');
+const { waitForKilo, installedKilo } = require('./kilo-startup.cjs');
+const { prepareAcceptanceProject } = require('./acceptance-project.cjs');
+const { verifyAcceptanceConfiguration } = require('./acceptance-configuration.cjs');
 
-async function withDeadline(action, milliseconds, message) {
+async function withDeadline(action, milliseconds, message, signal) {
     let timer;
-    try { return await Promise.race([Promise.resolve().then(action), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), milliseconds); timer.unref?.(); })]); }
+    try {
+        if (signal?.aborted) throw cancellationError(signal);
+        const pending = Promise.race([Promise.resolve().then(action), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), milliseconds); timer.unref?.(); })]);
+        return await (signal ? withCancellation(() => pending, signal) : pending);
+    }
     finally { clearTimeout(timer); }
 }
 
-async function waitForWorkspaceTrust(vscode, logger, timeoutMs = 600000) {
+async function waitForWorkspaceTrust(vscode, logger, timeoutMs = 600000, signal) {
+    if (signal?.aborted) throw cancellationError(signal);
     if (vscode.workspace.isTrusted) return;
     logger.warn('VS Code', 'Waiting for you to trust the generated acceptance workspace in the VS Code Workspace Trust dialog.');
     await new Promise((resolve, reject) => {
         let subscription, settled = false;
-        const finish = error => { if (settled) return; settled = true; clearTimeout(timer); subscription?.dispose(); error ? reject(error) : resolve(); };
+        const finish = error => { if (settled) return; settled = true; clearTimeout(timer); subscription?.dispose(); signal?.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
         const timer = setTimeout(() => finish(Object.assign(new Error('Workspace trust was not granted before the acceptance deadline. No trust setting was changed.'), { blocked: true })), timeoutMs);
+        const abort = () => finish(cancellationError(signal)); signal?.addEventListener('abort', abort, { once: true });
         subscription = vscode.workspace.onDidGrantWorkspaceTrust(() => finish());
         if (vscode.workspace.isTrusted) finish();
         void vscode.window.showWarningMessage('LoKiEnte acceptance is waiting for Workspace Trust. Review and trust this generated test workspace in VS Code to continue.', 'Manage Workspace Trust', 'Cancel acceptance')
@@ -29,19 +38,33 @@ async function waitForWorkspaceTrust(vscode, logger, timeoutMs = 600000) {
     if (!vscode.workspace.isTrusted) throw Object.assign(new Error('Workspace trust is still unavailable.'), { blocked: true });
 }
 
-function runNative(file, args, { cwd, env = process.env, timeoutMs = 120000 } = {}) {
+function cancellationError(signal) {
+    return Object.assign(new Error(signal?.reason?.message || 'Acceptance was cancelled. No successful result was assumed.'), { blocked: true, code: 'LOKIENTE_ACCEPTANCE_CANCELLED' });
+}
+
+async function withCancellation(action, signal) {
+    if (signal.aborted) throw cancellationError(signal);
+    let abort;
+    try { return await Promise.race([Promise.resolve().then(action), new Promise((_, reject) => { abort = () => reject(cancellationError(signal)); signal.addEventListener('abort', abort, { once: true }); })]); }
+    finally { signal.removeEventListener('abort', abort); }
+}
+
+function runNative(file, args, { cwd, env = process.env, timeoutMs = 120000, signal } = {}) {
+    if (signal?.aborted) return Promise.reject(cancellationError(signal));
     return new Promise((resolve, reject) => {
         const started = Date.now();
         const child = spawn(file, args, { cwd, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
         let stdout = '', stderr = '', settled = false;
         const finish = (error, value) => {
-            if (settled) return; settled = true; clearTimeout(timer);
+            if (settled) return; settled = true; clearTimeout(timer); signal?.removeEventListener('abort', abort);
             if (error) { error.nativeResult = { code: child.exitCode, stdout, stderr, durationMs: Date.now() - started }; child.stdout.destroy(); child.stderr.destroy(); reject(error); } else resolve(value);
         };
         const timer = setTimeout(() => {
             if (child.exitCode === null) child.kill();
             finish(Object.assign(new Error(`Command deadline exceeded: ${path.basename(file)} (${child.exitCode === null ? 'process still running' : 'output remained open after process exit'}). No successful result was assumed.`), { code: 'LOKIENTE_NATIVE_TIMEOUT', processExited: child.exitCode !== null }));
         }, timeoutMs);
+        const abort = () => { if (child.exitCode === null) child.kill(); finish(cancellationError(signal)); };
+        signal?.addEventListener('abort', abort, { once: true });
         child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
         child.stdout.on('data', text => { stdout += text; if (stdout.length > 6 * 1024 * 1024) { child.kill(); finish(new Error('Command output limit exceeded.')); } });
         child.stderr.on('data', text => { stderr += text; if (stderr.length > 2 * 1024 * 1024) { child.kill(); finish(new Error('Command error output limit exceeded.')); } });
@@ -82,24 +105,41 @@ async function atomic(file, text) {
     finally { await fs.unlink(temporary).catch(() => {}); }
 }
 
-async function checkToolchain({ vscode, root, logger, env = process.env, reportPath, project, runId, interactive = true }) {
+async function checkToolchain({ vscode, root, logger, env = process.env, reportPath, project, runId, interactive = true, diagnostics = () => ({}), signal: outerSignal }) {
     runId ||= crypto.randomUUID().replaceAll('-', '');
     const directory = path.join(root, 'diagnostics', 'toolchain', runId);
     reportPath ||= path.join(directory, 'acceptance.json');
     project ||= path.join(directory, 'project');
     await fs.mkdir(project, { recursive: true });
-    const required = ['vscode-host', 'workspace-trust', 'kilo-activation', 'installed-runtime', 'dependencies', 'model-catalog', 'kilo-webview-request', 'kilo-visible-response'];
+    const prelaunch = await fs.readFile(reportPath, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    const required = ['vscode-host', 'workspace-trust', 'managed-helper', 'acceptance-project-git', 'kilo-discovery', 'production-configuration', 'kilo-activation', 'installed-runtime', 'dependencies', 'model-catalog', 'kilo-webview-request', 'kilo-visible-response'];
     const report = { schema: 1, kind: 'live-toolchain-acceptance', runId, status: 'RUNNING', startedAtUtc: new Date().toISOString(),
         executionMode: 'native-windows-applications', requirements: { docker: false, hyperV: false },
         versions: { vscode: vscode.version, node: process.versions.node, electron: process.versions.electron || null }, cases: [], nativeCommands: [], reportPath };
+    if (prelaunch?.runId === runId && prelaunch.launch) report.launch = prelaunch.launch;
     const secrets = Object.entries(env).filter(([name]) => /token|key|password/i.test(name)).map(([, value]) => value);
-    const save = async () => {
-        await atomic(reportPath, JSON.stringify(report, null, 2));
-        await atomic(reportPath.replace(/\.json$/i, '') + '.junit.xml', junit(report));
+    const controller = new AbortController(), signal = controller.signal;
+    const abort = () => controller.abort(outerSignal.reason);
+    outerSignal?.addEventListener('abort', abort, { once: true }); if (outerSignal?.aborted) abort();
+    const deadline = Date.parse(env.LOKIENTE_TOOLCHAIN_DEADLINE_UTC || '');
+    const deadlineTimer = Number.isFinite(deadline) ? setTimeout(() => controller.abort(new Error('The overall acceptance deadline expired.')), Math.max(0, deadline - Date.now())) : null;
+    deadlineTimer?.unref?.();
+    const cancelPoll = setInterval(() => {
+        void fs.readFile(path.join(directory, 'cancellation.json'), 'utf8').then(JSON.parse).then(value => {
+            if (value.runId === runId) controller.abort(new Error(value.reason || 'Acceptance cancelled by its native runner.'));
+        }).catch(error => { if (error.code !== 'ENOENT') controller.abort(new Error('Acceptance cancellation state is unreadable.')); });
+    }, 500); cancelPoll.unref?.();
+    let saving = Promise.resolve();
+    const save = () => {
+        const pending = saving.then(async () => {
+            await atomic(reportPath, JSON.stringify(report, null, 2));
+            await atomic(reportPath.replace(/\.json$/i, '') + '.junit.xml', junit(report));
+        });
+        saving = pending.catch(() => {}); return pending;
     };
     const native = async (file, args, options) => {
         const start = Date.now(); let result, failure;
-        try { result = await runNative(file, args, options); return result; }
+        try { result = await runNative(file, args, { ...options, signal }); return result; }
         catch (error) { failure = error; result = error.nativeResult; throw error; }
         finally {
             const streams = {};
@@ -123,23 +163,26 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
     };
     const check = async (id, component, action) => {
         logger.info(component, `START: ${id}`);
-        try { return await record(id, component, 'PASS', await action()); }
+        try { return await record(id, component, 'PASS', await withCancellation(action, signal)); }
         catch (e) { return await record(id, component, e.blocked ? 'BLOCKED' : 'FAIL', e.message); }
     };
     const blocked = message => Object.assign(new Error(message), { blocked: true });
+    try {
     try {
         const host = await record('vscode-host', 'VS Code', vscode.env.appHost === 'desktop' && !!process.versions.electron ? 'PASS' : 'BLOCKED',
             'Requires the real desktop VS Code Extension Host, not a simulated API.', { appHost: vscode.env.appHost });
         if (host.status !== 'PASS') throw blocked('This test must run in the actual desktop Extension Host.');
         report.waitingFor = 'workspace-trust'; await save();
         const trust = await check('workspace-trust', 'VS Code', async () => {
-            await waitForWorkspaceTrust(vscode, logger);
+            await waitForWorkspaceTrust(vscode, logger, 600000, signal);
             return 'The test workspace is trusted by a user decision in VS Code.';
         });
         delete report.waitingFor; await save();
         if (trust.status !== 'PASS') throw blocked('Workspace Trust is required before Kilo can run. Review trust in the test window and rerun acceptance.');
         const config = JSON.parse(env.KILO_CONFIG_CONTENT || '{}');
         const chain = JSON.parse(await fs.readFile(path.join(root, 'toolchain.json'), 'utf8'));
+        const preparationPath = path.join(directory, 'project-preparation.json');
+        report.projectPreparation = await fs.readFile(preparationPath, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
         const options = config.provider?.lmstudio?.options;
         if (!options?.baseURL || config.enabled_providers?.length !== 1 || config.enabled_providers[0] !== 'lmstudio') throw new Error('A single managed local provider is required.');
         const base = loopback(options.baseURL), models = config.provider.lmstudio.models;
@@ -148,20 +191,52 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         required.push(...aliases.map(alias => `model-roundtrip:${alias}`));
         if (config.indexing?.enabled) required.push('embeddings', 'lancedb');
         report.configurationSha256 = crypto.createHash('sha256').update(JSON.stringify(config)).digest('hex');
-        for (const file of ['extension.cjs', 'diagnostics.cjs', 'toolchain-check.cjs']) {
-            report.sourceSha256 ||= {};
-            report.sourceSha256[file] = crypto.createHash('sha256').update(await fs.readFile(path.join(__dirname, file))).digest('hex');
-        }
-        const kilo = vscode.extensions.getExtension('kilocode.kilo-code');
-        if (!kilo) throw blocked('Kilo Code is not installed in this VS Code profile.');
+        const helper = await check('managed-helper', 'LoKiEnte', async () => {
+            for (const file of ['extension.cjs', 'diagnostics.cjs', 'toolchain-check.cjs', 'kilo-startup.cjs', 'acceptance-project.cjs', 'acceptance-lifecycle.cjs', 'acceptance-configuration.cjs']) {
+                report.sourceSha256 ||= {}; report.expectedSourceSha256 ||= {};
+                report.sourceSha256[file] = crypto.createHash('sha256').update(await fs.readFile(path.join(__dirname, file))).digest('hex');
+                report.expectedSourceSha256[file] = crypto.createHash('sha256').update(await fs.readFile(path.join(root, 'app', 'vscode-startup', file))).digest('hex');
+                if (report.sourceSha256[file] !== report.expectedSourceSha256[file]) throw new Error(`Running LoKiEnte helper differs from the deployed source package: ${file}. Close managed windows and reprovision.`);
+            }
+            report.versions.expectedHelper = env.LOKIENTE_STARTUP_VERSION || null;
+            return 'Running acceptance/helper modules match the deployed package byte for byte (SHA-256).';
+        });
+        if (helper.status !== 'PASS') throw blocked('The current helper code was not verified; no Kilo/model acceptance was started.');
+        const prepared = await check('acceptance-project-git', 'Git', async () => {
+            const evidence = await prepareAcceptanceProject({ root, runId, git: chain.gitExecutable, env, run: native });
+            if (path.resolve(evidence.project).toLowerCase() !== path.resolve(project).toLowerCase()) throw new Error('Unexpected acceptance workspace.');
+            report.projectGit = evidence;
+            return `Generated Git workspace has a verified initial commit: ${evidence.head}`;
+        });
+        if (prepared.status !== 'PASS') throw blocked('The generated Git test workspace is unavailable. No Kilo/model check was started.');
+        let kilo;
+        report.waitingFor = 'kilo-discovery'; await save();
+        const discovery = await check('kilo-discovery', 'Kilo Code', async () => {
+            const started = Date.now();
+            report.kiloDiscovery = { installed: await installedKilo(root), visibleBefore: (vscode.extensions.all || []).map(e => e.id) };
+            try { kilo = await waitForKilo({ vscode, root, logger, isDisposed: () => signal.aborted }); }
+            catch (error) { report.kiloDiscovery.errorCode = error.code; throw Object.assign(error, { blocked: true }); }
+            finally { report.kiloDiscovery.durationMs = Date.now() - started; report.kiloDiscovery.visibleAfter = (vscode.extensions.all || []).map(e => e.id); }
+            if (!kilo) throw blocked('Kilo discovery ended without an extension.');
+            return 'The installed Kilo extension was discovered in the real running host before activation.';
+        });
+        delete report.waitingFor; await save();
+        if (discovery.status !== 'PASS') throw blocked('Kilo was not discovered; dependent checks were not executed. See kiloDiscovery and Extension Host logs.');
+        const configuration = await check('production-configuration', 'VS Code -> LoKiEnte', async () => {
+            report.productionConfiguration = await verifyAcceptanceConfiguration({ vscode, root, runId, env, kilo });
+            return 'The actual work profile and installed extension directory are in use. File hashes and effective user/workspace settings match the shared desktop launch baseline.';
+        });
+        if (configuration.status !== 'PASS') throw blocked('Production configuration parity was not established. No model acceptance was claimed.');
         const activation = await check('kilo-activation', 'Kilo Code', async () => {
-            await withDeadline(() => kilo.activate(), 90000, 'Kilo activation exceeded 90 seconds.');
+            await withDeadline(() => kilo.activate(), 90000, 'Kilo activation exceeded 90 seconds.', signal);
+            if (signal.aborted) throw cancellationError(signal);
             if (!kilo.isActive) throw new Error('Kilo did not become active.');
             report.versions.kilo = kilo.packageJSON.version;
             for (const id of kilo.packageJSON.extensionDependencies || []) {
+                if (signal.aborted) throw cancellationError(signal);
                 const dependency = vscode.extensions.getExtension(id);
                 if (!dependency) throw new Error(`Required extension is missing: ${id}`);
-                await withDeadline(() => dependency.activate(), 90000, `Extension dependency activation timed out: ${id}`);
+                await withDeadline(() => dependency.activate(), 90000, `Extension dependency activation timed out: ${id}`, signal);
                 if (!dependency.isActive) throw new Error(`Required extension did not activate: ${id}`);
             }
             return 'The installed Kilo extension and its declared extension dependencies activated in the real host.';
@@ -237,7 +312,8 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
             const commands = await vscode.commands.getCommands(true);
             if (!commands.includes('kilo-code.new.terminalExplainCommand')) throw blocked('This Kilo version does not expose the tested explanation command.');
             // This explains supplied text. It never creates or executes a terminal command.
-            await withDeadline(() => vscode.commands.executeCommand('kilo-code.new.terminalExplainCommand', { selection: `printf '${marker}'\n# Include this exact literal marker in the explanation.` }), 90000, 'Kilo webview did not become ready.');
+            await withDeadline(() => vscode.commands.executeCommand('kilo-code.new.terminalExplainCommand', { selection: `printf '${marker}'\n# Include this exact literal marker in the explanation.` }), 90000, 'Kilo webview did not become ready.', signal);
+            if (signal.aborted) throw cancellationError(signal);
             const pool = await fs.readFile(path.join(root, 'runtime', 'model-pool.json'), 'utf8').then(JSON.parse).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
             if (!pool) return 'The real Kilo webview accepted the explanation action. Single-mode response delivery requires the following visible check.';
             let completion, failure;
@@ -247,12 +323,13 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
                 if (event.event === 'request_failed') failure = event.code;
                 if (event.event === 'request_completed' && event.probeReplyMatched === true) completion = event;
             }, { replayBytes: 1024 * 1024 });
-            while (Date.now() - started < 300000) {
+            while (Date.now() - started < 300000 && !signal.aborted) {
                 await tail.read();
                 if (failure) throw new Error(`The real Kilo webview request failed: ${failure}`);
                 if (completion) return 'A nonce-correlated real webview request reached LM Studio and completed with the expected literal response.';
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
+            if (signal.aborted) throw cancellationError(signal);
             throw new Error('No completed nonce-correlated Kilo webview -> router -> LM Studio exchange was observed.');
         });
         if (webview.status !== 'PASS') await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'The webview request failed; no visible response can be accepted.');
@@ -265,12 +342,15 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         }
     } catch (e) { await record('acceptance-prerequisite', 'LoKiEnte', e.blocked ? 'BLOCKED' : 'FAIL', e.message); }
     for (const id of required) if (!report.cases.some(c => c.id === id)) await record(id, 'LoKiEnte', 'BLOCKED', 'Not executed because a prerequisite was unavailable.');
+    if (signal.aborted) await record('acceptance-cancelled', 'LoKiEnte', 'BLOCKED', cancellationError(signal).message);
     report.status = summarize(report.cases, required); report.required = required; report.finishedAtUtc = new Date().toISOString();
+    report.diagnostics = diagnostics();
     await save();
     await atomic(path.join(root, 'diagnostics', 'toolchain', 'latest.json'), JSON.stringify(report, null, 2));
     await atomic(path.join(root, 'diagnostics', 'toolchain', 'latest.junit.xml'), junit(report));
     logger[report.status === 'PASS' ? 'info' : 'error']('LoKiEnte', `Toolchain acceptance: ${report.status}. Report: ${reportPath}`);
     return report;
+    } finally { clearInterval(cancelPoll); clearTimeout(deadlineTimer); outerSignal?.removeEventListener('abort', abort); }
 }
 
 module.exports = { runNative, inspectKiloEvents, summarize, junit, atomic, checkToolchain, withDeadline, waitForWorkspaceTrust };

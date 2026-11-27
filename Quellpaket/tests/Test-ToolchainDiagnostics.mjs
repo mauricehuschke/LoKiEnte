@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, writeFile, appendFile, rename, rm } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
+import { appendFileSync } from 'node:fs';
 const { redact, createLogger, LogTail, logFiles, consumeLine, loopback, readJsonResponse, startDiagnostics } = createRequire(import.meta.url)('../vscode-startup/diagnostics.cjs');
 const temporary = async action => { const root = await mkdtemp(path.join(tmpdir(), 'lokiente-diagnostics-')); try { return await action(root); } finally { await rm(root, { recursive: true, force: true }); } };
 test('unified output redacts known secrets and credential formats and reveals errors', () => {
@@ -77,4 +78,32 @@ test('managed monitor logs real connection failure and recovery once per transit
         await appendFile(path.join(data, 'logs', 'exthost.log'), '[ERROR] new host failure\n'); await monitor.poll();
         assert.ok(values.some(v => v.level === 'error' && /new host failure/.test(v.message)));
     } finally { monitor.dispose(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+}));
+
+test('document-change errors cannot feed a renderer -> Output -> renderer loop, including repeated stack lines', async () => temporary(async root => {
+    const data = path.join(root, 'vscode-data'), logs = path.join(data, 'logs'); await mkdir(logs, { recursive: true });
+    const file = path.join(logs, 'renderer.log'); await writeFile(file, '');
+    let changes = 0, shown = 0; const values = [];
+    // Real file writes model the third-party document-change handler from the
+    // report. Every Output mutation produces a fresh renderer error + stack.
+    const documentChanged = message => {
+        values.push(message); changes++;
+        appendFileSync(file, `${new Date(Date.now() + changes).toISOString()} [error] [Extension Host] Error updating swagger content: TypeError: Class is not a constructor\n\tat Object.bundle (synthetic/swagger.js:207:18)\n\tat PreviewServer.update (synthetic/server.js:96:58)\n`);
+    };
+    const logger = createLogger({ info: documentChanged, warn: documentChanged, error: documentChanged, show() { shown++; } });
+    const monitor = startDiagnostics({ root, dataDirectory: data, logger, intervalMs: 100000, env: { LOKIENTE_LOG_SINCE_UTC: '2000-01-01T00:00:00Z' } });
+    try {
+        await monitor.ready; await monitor.poll(); await monitor.poll();
+        const stable = changes, reveals = shown;
+        for (let i = 0; i < 8; i++) await monitor.poll();
+        assert.equal(changes, stable, 'no Output mutation remains to retrigger the third-party handler');
+        assert.equal(shown, reveals, 'forwarded repeats cannot repeatedly reveal Output');
+        assert.equal(values.filter(value => /Error updating swagger content/.test(value)).length, 1);
+        assert.equal(values.filter(value => /Object.bundle/.test(value)).length, 1);
+        const source = monitor.snapshot().sources.find(source => source.source === file);
+        assert.ok(source.suppressedBlocks >= 2); assert.ok(source.suppressedLines >= 6);
+        await appendFile(file, `${new Date().toISOString()} [error] a distinct host error\n\tat Other.stack (synthetic/other.js:1:1)\n`); await monitor.poll();
+        assert.ok(values.some(value => /a distinct host error/.test(value))); assert.ok(values.some(value => /Other.stack/.test(value)));
+        monitor.dispose(); const stopped = changes; await monitor.poll(); assert.equal(changes, stopped);
+    } finally { monitor.dispose(); }
 }));

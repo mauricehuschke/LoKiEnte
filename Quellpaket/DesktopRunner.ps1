@@ -1,5 +1,46 @@
 Set-StrictMode -Version Latest
 
+function Get-ShadowVsCodeLaunchArguments {
+    param([string]$InstallRoot,[string]$OpenPath)
+    return @('--user-data-dir',(Join-Path $InstallRoot 'vscode-data'),
+        '--extensions-dir',(Join-Path $InstallRoot 'vscode-extensions'),
+        '--telemetry-level','off','--disable-extension','GitHub.copilot',
+        '--disable-extension','GitHub.copilot-chat','--new-window',$OpenPath)
+}
+
+function Get-ShadowEditorEnvironment {
+    param([string]$InstallRoot,[string]$ConfigJson,[string]$BundledKilo,[Collections.IDictionary]$Toolchain)
+    $environment=Get-ShadowLocalEnvironment -InstallRoot $InstallRoot -ConfigJson $ConfigJson
+    if($Toolchain['npmVersion']){
+        $npmBin=[IO.Path]::GetDirectoryName($Toolchain.npmEntry)
+        $npmPrefix=[IO.Directory]::GetParent($npmBin).Parent.Parent.FullName
+        $inheritedPath=if($environment.Contains('PATH')){$environment['PATH']}else{$env:PATH}
+        $environment['PATH']=$npmPrefix+';'+[IO.Path]::GetDirectoryName($Toolchain.nodeExecutable)+';'+$inheritedPath
+    }
+    $environment['LOKIENTE_MANAGED_VSCODE']='1'
+    $environment['LOKIENTE_INSTALL_ROOT']=[IO.Path]::GetFullPath($InstallRoot)
+    $environment['LOKIENTE_ET_KILO']=$BundledKilo
+    $environment['LOKIENTE_VSCODE_DATA_DIR']=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
+    $environment['LOKIENTE_STARTUP_VERSION']=(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'vscode-startup/package.json') -Raw|ConvertFrom-Json).version
+    return $environment
+}
+
+function Assert-ShadowAcceptanceProfileClosed {
+    param([string]$InstallRoot,[string]$CodePath)
+    $profile=[IO.Path]::GetFullPath((Join-Path $InstallRoot 'vscode-data'))
+    # A reused Electron instance would retain its old environment and could not
+    # prove the current launcher/configuration. Never close a user's window here.
+    $processes=@(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop | Where-Object {
+        $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath) -ieq [IO.Path]::GetFullPath($CodePath)
+    })
+    foreach($process in $processes){
+        if(-not $process.CommandLine){throw 'Cannot inspect the existing VS Code process. Close managed VS Code windows before acceptance.'}
+        if($process.CommandLine.Replace('/','\').IndexOf($profile.Replace('/','\'),[StringComparison]::OrdinalIgnoreCase) -ge 0){
+            throw 'The real managed VS Code profile is already open. Close its windows and rerun acceptance so the current launcher environment is actually tested.'
+        }
+    }
+}
+
 function Install-ShadowDesktopRunner {
     param([Parameter(Mandatory)][string]$InstallRoot,[Parameter(Mandatory)][string]$PowerShellPath)
     $directory=Join-Path $InstallRoot 'tooling/desktop-runner'
@@ -79,7 +120,12 @@ function Test-ShadowDesktopRunnerReady {
     $id=Start-ShadowEditor -InstallRoot $InstallRoot -CodePath $NodePath -Arguments @('-e',('console.log("'+$marker+'")')) -WorkingDirectory $WorkingDirectory -Environment @{}
     $log=Join-Path $InstallRoot ('runtime/launcher-logs/'+$id+'-editor.log');$watch=[Diagnostics.Stopwatch]::StartNew()
     while($watch.Elapsed.TotalSeconds -lt 15){
-        if(Test-Path -LiteralPath $log){$text=[IO.File]::ReadAllText($log);if($text.Contains($marker) -and $text.Contains('Process exited with code 0')){return}}
+        if(Test-Path -LiteralPath $log){
+            $text=[IO.File]::ReadAllText($log)
+            $statusPath=Join-Path $InstallRoot ('runtime/launch-requests/'+$id+'.status.json')
+            $status=if(Test-Path -LiteralPath $statusPath){Get-Content -LiteralPath $statusPath -Raw|ConvertFrom-Json}else{$null}
+            if($text.Contains($marker) -and $text.Contains('Process exited with code 0') -and $status -and $status.phase -ceq 'exited' -and $status.exitCode -eq 0){return}
+        }
         Start-Sleep -Milliseconds 100
     }
     throw 'The native desktop collector did not confirm its real child-process/output probe.'

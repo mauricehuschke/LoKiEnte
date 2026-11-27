@@ -1,0 +1,2 @@
+# Preserve the standalone installer's exact bytes for its published SHA-256.
+/Provision-LoKiEnte.ps1 -text

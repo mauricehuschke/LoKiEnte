@@ -3,6 +3,7 @@
 const vscode = require('vscode');
 const path = require('node:path');
 const { registerSyncGuide } = require('./sync-guide.cjs');
+const { completedAcceptance, announceAcceptance, requestAcceptanceRestart } = require('./acceptance-lifecycle.cjs');
 
 async function activate(context) {
     // Do not affect personal VS Code windows, even if this extension is copied there.
@@ -24,6 +25,7 @@ async function activate(context) {
     const monitor = startDiagnostics({ logger, root, dataDirectory });
     context.subscriptions.push(monitor, vscode.commands.registerCommand('lokiente.showOutput', () => output.show(true)));
     logger.info('VS Code', `LoKiEnte helper ${helperVersion} activated in managed VS Code ${vscode.version}. Log channel: LoKiEnte.`);
+    logger.info('VS Code', 'Identical forwarded warning/error blocks are shown once per source to prevent Output feedback. Original logs retain every repeat; acceptance reports include repeat counters and source paths.');
     void snapshot('host-started');
     try { await require('./security-view.cjs').registerSecurityView(vscode, context, dataDirectory, { output, logger, root }); }
     catch (error) { logger.error('LoKiEnte', `Settings/security view failed: ${error.message}`); }
@@ -61,13 +63,21 @@ async function activate(context) {
         }
     };
     let accepting = false;
-    const runAcceptance = async (options = {}) => {
+    const runAcceptance = async (options = {}, isolated = false) => {
+        if (process.env.LOKIENTE_TOOLCHAIN_RUN_ID && !isolated) throw new Error('This acceptance window cannot replay its run. Close it and start a fresh test through provisioning or Test-Toolchain.ps1.');
         if (accepting) throw new Error('A live toolchain acceptance is already running in this window.');
         accepting = true; output.show(true);
-        try { return await require('./toolchain-check.cjs').checkToolchain({ vscode, root, logger, ...options }); }
-        finally { accepting = false; }
+        const controller = new AbortController();
+        context.subscriptions.push({ dispose() { controller.abort(new Error('The acceptance window was closed.')); } });
+        try {
+            const report = await require('./toolchain-check.cjs').checkToolchain({ vscode, root, logger, diagnostics: () => monitor.snapshot(), signal: controller.signal, ...options });
+            if (isolated) monitor.dispose();
+            announceAcceptance({ vscode, report, isolated, logger });
+            return report;
+        }
+        finally { accepting = false; if (isolated) monitor.dispose(); }
     };
-    context.subscriptions.push(vscode.commands.registerCommand('lokiente.toolchain.check', () => runAcceptance().catch(error => {
+    context.subscriptions.push(vscode.commands.registerCommand('lokiente.toolchain.check', () => requestAcceptanceRestart({ vscode, root, logger }).catch(error => {
         logger.error('LoKiEnte', `Acceptance could not complete: ${error.message}`);
         void vscode.window.showErrorMessage(`LoKiEnte acceptance failed: ${error.message}`);
     })));
@@ -76,14 +86,23 @@ async function activate(context) {
         const runId = process.env.LOKIENTE_TOOLCHAIN_RUN_ID;
         const directory = path.join(root, 'diagnostics', 'toolchain', runId);
         const equal = (left, right) => typeof left === 'string' && path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
-        if (!/^[a-f0-9]{32}$/.test(runId) || !equal(dataDirectory, path.join(directory, 'vscode-data')) ||
+        if (!/^[a-f0-9]{32}$/.test(runId) || !equal(dataDirectory, path.join(root, 'vscode-data')) ||
             !equal(process.env.LOKIENTE_TOOLCHAIN_REPORT, path.join(directory, 'acceptance.json')) ||
             !equal(process.env.LOKIENTE_TOOLCHAIN_PROJECT, path.join(directory, 'project')) ||
             !equal(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath, path.join(directory, 'project'))) {
-            logger.error('LoKiEnte', 'Acceptance launch does not match its isolated profile, report and workspace. No test started.');
+            logger.error('LoKiEnte', 'Acceptance launch does not match its production profile, report and workspace. No test started.');
         } else {
-            void runAcceptance({ runId, reportPath: process.env.LOKIENTE_TOOLCHAIN_REPORT, project: process.env.LOKIENTE_TOOLCHAIN_PROJECT })
-                .catch(error => logger.error('LoKiEnte', `Acceptance could not complete: ${error.message}`));
+            try {
+                const completed = await completedAcceptance(process.env.LOKIENTE_TOOLCHAIN_REPORT, runId);
+                if (completed) {
+                    monitor.dispose();
+                    logger.info('LoKiEnte', `Acceptance ${completed.status} was already saved for this run. It will not restart after an Extension Host reload.`);
+                    announceAcceptance({ vscode, report: completed, isolated: true, logger });
+                } else {
+                    void runAcceptance({ runId, reportPath: process.env.LOKIENTE_TOOLCHAIN_REPORT, project: process.env.LOKIENTE_TOOLCHAIN_PROJECT }, true)
+                        .catch(error => { logger.error('LoKiEnte', `Acceptance could not complete: ${error.message}`); void vscode.window.showErrorMessage(`LoKiEnte acceptance stopped: ${error.message}`); });
+                }
+            } catch (error) { monitor.dispose(); logger.error('LoKiEnte', `Cannot inspect the acceptance report; no test restarted: ${error.message}`); }
         }
     } else if (process.env.LOKIENTE_STARTUP_DIAGNOSTICS_ONLY === '1') output.show(true);
     else if (!process.env.LOKIENTE_TOOLCHAIN_RUN_ID && vscode.workspace.getConfiguration('lokiente.startup').get('openKilo', true)) await openKilo();

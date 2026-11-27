@@ -58,10 +58,16 @@ internal static class Launcher {
             // The managed VS Code Output tails these logs; PS worker events use its own JSONL writer.
         }
     }
-    private static void EditorStatus(string phase, string error) {
+    private static void EditorStatus(string phase, string error, int? exitCode = null) {
         if(Component != "editor") return;
         string file = Path.Combine(Root, "runtime", "launch-requests", RunId + ".status.json");
-        File.WriteAllText(file, "{\"phase\":" + Json(phase) + ",\"error\":" + Json(Safe(error ?? "")) + "}", new UTF8Encoding(false));
+        // Keep the temporary name shorter than the destination: Windows .NET
+        // Framework still imposes legacy path limits in some installations.
+        string temporary = Path.Combine(Path.GetDirectoryName(file), Guid.NewGuid().ToString("N") + ".tmp");
+        try {
+            File.WriteAllText(temporary, "{\"phase\":" + Json(phase) + ",\"error\":" + Json(Safe(error ?? "")) + ",\"exitCode\":" + (exitCode.HasValue ? exitCode.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null") + "}", new UTF8Encoding(false));
+            if(File.Exists(file)) File.Replace(temporary, file, null); else File.Move(temporary, file);
+        } finally { if(File.Exists(temporary)) File.Delete(temporary); }
     }
     private static int Capture(string file, string[] args, string cwd, int timeout) {
         ProcessStartInfo info = new ProcessStartInfo(file, Arguments(args));
@@ -83,7 +89,7 @@ internal static class Launcher {
             bool drainedOut = outDone.WaitOne(1000), drainedErr = errDone.WaitOne(1000);
             if(!drainedOut || !drainedErr) Log("WARN", "Output handles remain open after process exit; output draining was stopped at its deadline.");
             try { process.CancelOutputRead(); process.CancelErrorRead(); } catch(InvalidOperationException) {}
-            int code = process.ExitCode; Log(code == 0 ? "INFO" : "ERROR", "Process exited with code " + code); return code;
+            int code = process.ExitCode; Log(code == 0 ? "INFO" : "ERROR", "Process exited with code " + code); EditorStatus("exited", null, code); return code;
             }
         }
     }

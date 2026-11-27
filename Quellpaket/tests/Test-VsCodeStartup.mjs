@@ -7,10 +7,10 @@ import { createRequire } from 'node:module';
 const { createLogger } = createRequire(import.meta.url)('../vscode-startup/diagnostics.cjs');
 
 const source = await readFile(new URL('../vscode-startup/extension.cjs', import.meta.url), 'utf8');
-function fixture({ managed = true, open = true, available = true, focus = true, failure = false, foreignProfile = false, scheme = 'file', activation, focusAction, shortDeadline = false, acceptance = false, wrongAcceptancePath = false } = {}) {
-    const calls = [], warnings = [], lines = [], registrations = new Map(), acceptanceRuns = [];
+function fixture({ managed = true, open = true, available = true, focus = true, failure = false, foreignProfile = false, scheme = 'file', activation, focusAction, shortDeadline = false, acceptance = false, wrongAcceptancePath = false, completed = null } = {}) {
+    const calls = [], warnings = [], lines = [], registrations = new Map(), acceptanceRuns = [], results = []; let monitorStops = 0;
     const root = path.resolve('synthetic-install'), runId = 'a'.repeat(32), directory = path.join(root, 'diagnostics', 'toolchain', runId);
-    const dataDirectory = acceptance ? path.join(directory, 'vscode-data') : path.resolve('synthetic-managed-profile');
+    const dataDirectory = acceptance ? path.join(root, 'vscode-data') : path.resolve('synthetic-managed-profile');
     const context = { subscriptions: [], globalStorageUri: { scheme, fsPath: path.join(foreignProfile ? dataDirectory + '-personal' : dataDirectory, 'User', 'globalStorage', 'lokiente.managed-startup') } };
     const api = {
         window: {
@@ -28,12 +28,12 @@ function fixture({ managed = true, open = true, available = true, focus = true, 
         },
         workspace: { workspaceFolders: [{ uri: { fsPath: path.join(directory, 'project') } }], getConfiguration(section) { assert.equal(section, 'lokiente.startup'); return { get: () => open }; } },
     };
-    const sandbox = { module: { exports: {} }, setTimeout: (fn, ms) => setTimeout(fn, shortDeadline ? 20 : ms), clearTimeout, process: { env: managed ? { LOKIENTE_MANAGED_VSCODE: '1', LOKIENTE_VSCODE_DATA_DIR: dataDirectory } : {} },
-        require(id) { if (id === 'node:path') return path; if (id === './toolchain-check.cjs') return { async checkToolchain(options) { acceptanceRuns.push(options); return { status: 'synthetic' }; } }; if (id === './kilo-startup.cjs') return { startupSnapshot: async () => {}, async waitForKilo() { const kilo=api.extensions.getExtension('kilocode.kilo-code'); if(!kilo)throw new Error('Kilo is not installed.');return kilo; } }; if (id === './diagnostics.cjs') return { createLogger, startDiagnostics() { return { dispose() {} }; } }; if (id === './security-view.cjs') return { registerSecurityView() {} }; if (id === './sync-guide.cjs') return { registerSyncGuide() {} }; assert.equal(id, 'vscode'); return api; } };
+    const sandbox = { AbortController, module: { exports: {} }, setTimeout: (fn, ms) => setTimeout(fn, shortDeadline ? 20 : ms), clearTimeout, process: { env: managed ? { LOKIENTE_MANAGED_VSCODE: '1', LOKIENTE_VSCODE_DATA_DIR: dataDirectory } : {} },
+        require(id) { if (id === 'node:path') return path; if (id === './acceptance-lifecycle.cjs') return { completedAcceptance: async () => completed, requestAcceptanceRestart: async () => results.push({ restart: true }), announceAcceptance: options => results.push(options) }; if (id === './toolchain-check.cjs') return { async checkToolchain(options) { acceptanceRuns.push(options); return { status: 'BLOCKED' }; } }; if (id === './kilo-startup.cjs') return { startupSnapshot: async () => {}, async waitForKilo() { const kilo=api.extensions.getExtension('kilocode.kilo-code'); if(!kilo)throw new Error('Kilo is not installed.');return kilo; } }; if (id === './diagnostics.cjs') return { createLogger, startDiagnostics() { return { snapshot: () => ({}), dispose() { monitorStops++; } }; } }; if (id === './security-view.cjs') return { registerSecurityView() {} }; if (id === './sync-guide.cjs') return { registerSyncGuide() {} }; assert.equal(id, 'vscode'); return api; } };
     if (acceptance) Object.assign(sandbox.process.env, { LOKIENTE_INSTALL_ROOT: root, LOKIENTE_TOOLCHAIN_RUN_ID: runId,
         LOKIENTE_TOOLCHAIN_PROJECT: path.join(directory, 'project'), LOKIENTE_TOOLCHAIN_REPORT: path.join(directory, wrongAcceptancePath ? 'other.json' : 'acceptance.json') });
     vm.runInNewContext(source, sandbox);
-    return { run: () => sandbox.module.exports.activate(context), context, calls, warnings, lines, registrations, acceptanceRuns };
+    return { run: () => sandbox.module.exports.activate(context), context, calls, warnings, lines, registrations, acceptanceRuns, results, get monitorStops() { return monitorStops; } };
 }
 
 test('personal windows are untouched even if the helper is installed', async () => {
@@ -61,11 +61,13 @@ test('startup preference is respected and a manual retry stays available', async
     await f.registrations.get('lokiente.openKilo')(); assert.deepEqual(f.calls, ['activate', 'kilo-code.SidebarProvider.focus']);
 });
 
-test('installed helper starts acceptance in its ordinary isolated window without a development host', async () => {
+test('installed helper starts acceptance in its ordinary production-profile window without a development host', async () => {
     const f = fixture({ acceptance: true }); await f.run();
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(f.acceptanceRuns.length, 1); assert.deepEqual(f.calls, []);
     assert.equal(f.acceptanceRuns[0].runId, 'a'.repeat(32));
     assert.equal(path.basename(f.acceptanceRuns[0].reportPath), 'acceptance.json');
+    assert.ok(f.monitorStops >= 1); assert.equal(f.results[0].report.status, 'BLOCKED'); assert.equal(f.results[0].isolated, true);
 });
 
 test('acceptance environment cannot start a test for another report or workspace', async () => {
@@ -95,4 +97,16 @@ test('a hanging Kilo sidebar reports a visible timeout instead of leaving startu
         assert.equal(f.warnings.length, 1); assert.ok(f.lines.some(line => line.includes('sidebar focus timed out')));
         assert.ok(!f.lines.some(line => line.includes('sidebar focus command completed')));
     } finally { clearInterval(keepAlive); }
+});
+
+test('Extension Host reload does not replay a completed acceptance and stops background forwarding', async () => {
+    const f = fixture({ acceptance: true, completed: { runId: 'a'.repeat(32), status: 'BLOCKED' } }); await f.run();
+    assert.equal(f.acceptanceRuns.length, 0); assert.equal(f.monitorStops, 1); assert.equal(f.results[0].report.status, 'BLOCKED');
+});
+test('normal desktop diagnostics stay active after startup', async () => {
+    const f = fixture(); await f.run(); assert.equal(f.monitorStops, 0);
+});
+
+test('sidebar command restarts through native acceptance instead of testing a different profile in place', async () => {
+    const f=fixture(); await f.run(); await f.registrations.get('lokiente.toolchain.check')(); assert.equal(f.results[0].restart, true); assert.equal(f.acceptanceRuns.length, 0);
 });

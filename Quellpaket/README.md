@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.27.4 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.5 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 ## Desktop projects and provisioning diagnostics
 
@@ -25,7 +25,7 @@ Startup is confirmed only by a launch-specific handshake from the expected
 LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
 not establish a running extension. Kilo discovery waits for registration and
 Workspace Trust before activation. Installed-but-unavailable, missing and activation
-failures have separate diagnostics. The helper version is 0.3.2; fully close old
+failures have separate diagnostics. The helper version is 0.3.3; fully close old
 managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
 
 **Output → LoKiEnte** receives launcher/editor console logs as well as the managed
@@ -50,13 +50,22 @@ failed case is never presented as a passed test.
 
 ## Verify the installed toolchain
 
-Provisioning now asks **Run the real VS Code/Kilo/LM Studio acceptance? [Y/n]**.
+Provisioning now asks **Run the real VS Code/Kilo/LM Studio acceptance in your managed work profile now? [Y/n]**.
 Enter runs it; `n` skips it. Use `-RunAcceptanceTest` to run without this question,
 or `-SkipAcceptanceTest` to skip explicitly. These switches are mutually exclusive
 and are not retained for the next update. A skipped test means **unverified**.
 
-The test opens an ordinary VS Code window with an isolated test profile and the
-installed LoKiEnte helper. Review and trust its generated workspace when asked.
+Close all managed LoKiEnte windows first. The test uses the **actual work profile**
+at `vscode-data`, the installed extension directory and the same native desktop
+collector, launch arguments, environment builder and workspace generator as the
+desktop shortcut. It does not substitute a fresh default profile. Existing
+settings, extensions and their enablement state are preserved. The report records
+shared configuration/source SHA-256 hashes, compares effective user/workspace
+settings and inventories the extensions visible in the running host. Any mismatch
+blocks acceptance. Only the generated project and acceptance controls differ.
+The generated project receives its own Git repository and first commit because
+Kilo's worktree manager requires a commit as a starting point. No user project
+is initialized or committed by this test. Review and trust its generated workspace when asked.
 If needed, choose **Manage Workspace Trust** in the LoKiEnte notification. The
 report records `waitingFor: workspace-trust` until you decide (up to ten minutes).
 Confirm the completed response in the actual Kilo chat at the end.
@@ -73,6 +82,14 @@ prompt/response JSON and debug/trace payloads are excluded. It cannot recover
 messages that a third-party process never logs. A reachable API alone is not an
 inference PASS.
 
+Identical VS Code warning/error blocks (including their stacks) are forwarded
+once per source, with silent repeat counters and source paths in the acceptance
+report. The original logs retain every occurrence. Forwarded third-party errors
+do not repeatedly reveal Output. This prevents document-change handlers from
+feeding their own renderer errors back through Output. At completion a visible
+PASS/FAIL/BLOCKED result points to the saved report; background forwarding stops
+in the test window. Reloading that window does not replay the completed run.
+
 Existing log backfill is labelled `[history INFO/WARN/ERROR]` and does not raise
 a new live error notification. New errors retain their actual severity. The
 intentional no-model LM Studio capability probe keeps exit code 1 with the report
@@ -84,7 +101,10 @@ GPU estimates are checked against VRAM and the remaining host allocation
 Results are local: `diagnostics/toolchain/latest.json` and `latest.junit.xml`, plus
 a separate directory for each run. `PASS` requires all mandatory checks, including
 the manual visual observation; `FAIL`, `BLOCKED` and `SKIPPED` never count as PASS.
-Run again from the LoKiEnte sidebar (**Run toolchain acceptance**) or PowerShell 7:
+The sidebar's **Run toolchain acceptance** asks to close the current window and
+starts a hidden runner. It waits up to 60 seconds for the work profile to close
+before starting the same native acceptance. Other managed windows must also be
+closed. Alternatively, close them yourself and run from PowerShell 7:
 
 ```powershell
 pwsh -NoProfile -File D:\LoKi\app\Test-Toolchain.ps1 -InstallRoot D:\LoKi
