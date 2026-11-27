@@ -74,7 +74,7 @@ for($i=0;$i -lt $statements.Count;$i++){
 if($start -lt 0){throw 'Setup LM Studio entry missing'}
 $body=@($statements[$start..($statements.Count-1)]|ForEach-Object {$_.Extent.Text}) -join "`n"
 Assert-Models ($body.IndexOf('Assert-ShadowSetupModels') -lt $body.IndexOf('Stop-ShadowModelRouter') -and
-    ([regex]::Matches($body,'-DownloadModel:\$false')).Count -eq 2) 'Actual setup checks all models before router stop and disables both automatic download paths'
+    ([regex]::Matches($body,'-DownloadModel:\$false')).Count -eq 2) 'Explicit missing custom models are checked before router stop; runtime auto-download paths remain disabled'
 $root=Join-Path ([IO.Path]::GetTempPath()) ('shadow-manual-models-'+[guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory((Join-Path $root 'runtime'))
 try{

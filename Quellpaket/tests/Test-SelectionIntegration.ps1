@@ -32,12 +32,13 @@ $SkipModelDownload=$false;$ContextLength=32768;$Port=1234;$RouterPort=1235;$ApiT
 $ProjectPath=@();$NoShortcut=$true;$node='node-fixture';$toolchain=@{powerShellExecutable='pwsh-fixture'}
 $kilo=@{kiloExecutable='cli-fixture';kiloArgumentPrefix=@()};$bundledKilo='gui-fixture'
 $RunAcceptanceTest=$true;$SkipAcceptanceTest=$false
+$WorkspaceTrust=$false;$UseRecommendedModelsBasedOnGPU=$Scenario -eq 'recommended'
 # Synthetic acceptance boundary: this suite proves model-selection propagation only.
 function Select-ShadowAcceptanceMode {param($RunAcceptanceTest,$SkipAcceptanceTest) return 'Run'}
 function Invoke-ShadowToolchainAcceptance {param($InstallRoot) return @{status='PASS'}}
 function Install-ShadowDesktopRunner {param($InstallRoot,$PowerShellPath) return (Join-Path $InstallRoot 'synthetic-desktop-runner.exe')}
 $script:selectionPrompt=0
-function Read-Host {param($Prompt) if($Prompt -like '*Confirm*'){return 'y'};$script:selectionPrompt++;if($script:selectionPrompt -eq 1){return '3'};return ''}
+function Read-Host {param($Prompt) if($UseRecommendedModelsBasedOnGPU){throw 'Unexpected automatic-model prompt'};if($Prompt -like '*Confirm*'){return 'y'};$script:selectionPrompt++;if($script:selectionPrompt -eq 1){return '3'};return ''}
 '@
     $harness+="`n. '$commonFile'`n. '$runtimeFile'`n. '$selectionFile'`n. '$poolFile'`n. '$indexingFile'`n"
     $harness+=@'
@@ -46,7 +47,8 @@ if($Scenario -like 'keep-*'){
     $ModelMode=if ($Scenario -eq 'keep-single') {'Single'} else {'Dual'}
 }
 function Resolve-ShadowSetupLms {param($StudioPath) if ($ModelAction -eq 'Keep'){throw 'Keep contacted LM Studio'}; return 'fixture'}
-function Get-LocalNvidiaGpu {param($LogDirectory) return [pscustomobject]@{Gpu=[pscustomobject]@{FreeBytes=19GB};FreeRamBytes=21.6GB}}
+function Reset-ShadowSetupLoadedModels {param($InstallRoot,$LmsPath,$Port,$ApiTokenEnvironmentVariable) if($ModelAction -ne 'Configure'){throw 'Keep must not reset models'};[IO.File]::AppendAllText((Join-Path $InstallRoot 'reset-seen'),"reset`n");return @{status='PASS';port=1234}}
+function Get-LocalNvidiaGpu {param($LogDirectory) if(-not(Test-Path -LiteralPath (Join-Path $InstallRoot 'reset-seen'))){throw 'Models must be unloaded before recommendation hardware measurement'};return [pscustomobject]@{Gpu=[pscustomobject]@{FreeBytes=19GB};FreeRamBytes=21.6GB}}
 function Get-LrDownloadedModels {param($LmsPath,$LogDirectory) return @()}
 function Install-ShadowSelectedModels {param($Definitions,$LmsPath,$InstallRoot,[switch]$SkipModelDownload) [IO.File]::WriteAllText((Join-Path $InstallRoot 'install-seen'),($Definitions.Count.ToString()))}
 function Configure-LocalModelPool {
@@ -84,6 +86,9 @@ function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPat
        [IO.File]::ReadAllText((Join-Path $root 'install-seen')) -cne '5'){
         throw 'Confirmed choices were not saved or propagated into setup'
     }
+    $automatic=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root,'-Scenario','recommended') -AllowFailure -Quiet -TimeoutSeconds 30
+    $autoSelection=Get-Content -LiteralPath (Join-Path $root 'model-selection.json') -Raw|ConvertFrom-Json
+    if($automatic.ExitCode -ne 1 -or $automatic.StdErr -notmatch 'SYNTHETIC_POOL_REACHED' -or $autoSelection.selectionMode -cne 'automatic-gpu-ram-recommendations' -or $autoSelection.roles[0].Id -cne 'qwen3-14b'){throw "Automatic recommendations did not reach the actual pool boundary without prompts: $($automatic.StdErr)"}
     $warning=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root,'-Scenario','warning') -AllowFailure -Quiet -TimeoutSeconds 30
     $report=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw|ConvertFrom-Json
     if($warning.ExitCode -ne 0 -or $report.status -cne 'PROVISIONED_WITH_WARNINGS' -or
@@ -95,6 +100,7 @@ function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPat
     [void][IO.Directory]::CreateDirectory($runtimeDir)
     $savedOptions=Join-Path $root 'provisioning-options.json'
     $beforeOptions=[IO.File]::ReadAllText($savedOptions)
+    $beforeReset=[IO.File]::ReadAllText((Join-Path $root 'reset-seen'))
     foreach ($variant in @('single','dual')) {
         $savedRuntime=if ($variant -eq 'single') {
             @{Status='Ready';ModelId='saved-model';ApiBaseUrl='http://127.0.0.1:1234/v1';ContextLength=8192;ApiTokenEnvironmentVariable=''}
@@ -108,7 +114,7 @@ function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPat
         $run=Invoke-ShadowNative -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile','-NonInteractive','-File',$harnessPath,'-InstallRoot',$root,'-Scenario',"keep-$variant",'-IndexingMode','Off') -AllowFailure -Quiet
         if($run.ExitCode){throw "Keep $variant failed: $($run.StdErr)"}
         $report=Get-Content -LiteralPath (Join-Path $root 'provisioning-report.json') -Raw|ConvertFrom-Json
-        if($report.smokeTests -cne 'NotRun' -or $report.status -ne 'PROVISIONED' -or [IO.File]::ReadAllText($file) -cne $savedJson -or [IO.File]::ReadAllText($savedOptions) -cne $beforeOptions){throw "Keep changed or verified $variant models"}
+        if($report.smokeTests -cne 'NotRun' -or $report.status -ne 'PROVISIONED' -or [IO.File]::ReadAllText($file) -cne $savedJson -or [IO.File]::ReadAllText($savedOptions) -cne $beforeOptions -or [IO.File]::ReadAllText((Join-Path $root 'reset-seen')) -cne $beforeReset){throw "Keep changed or verified $variant models"}
         [IO.File]::Delete($file)
     }
     foreach($mode in @('Off','OnDemand')){
@@ -121,5 +127,5 @@ function Get-ShadowStartCommands {param($PowerShellPath,$InstallRoot,$ProjectPat
         if((Test-Path -LiteralPath (Join-Path $root 'embedding-called')) -or $desired.IndexingMode -cne $mode -or
            [IO.File]::ReadAllText((Join-Path $root 'install-seen')) -cne $expectedCount -or $report.indexingMode -cne $mode){throw "Optional indexing policy was not propagated: $mode"}
     }
-    [pscustomobject]@{suite='Selection setup integration';passed=$true;checks=5}|ConvertTo-Json
+    [pscustomobject]@{suite='Selection setup integration';passed=$true;checks=6}|ConvertTo-Json
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}

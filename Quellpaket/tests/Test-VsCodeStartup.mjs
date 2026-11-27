@@ -7,9 +7,10 @@ import { createRequire } from 'node:module';
 const { createLogger } = createRequire(import.meta.url)('../vscode-startup/diagnostics.cjs');
 
 const source = await readFile(new URL('../vscode-startup/extension.cjs', import.meta.url), 'utf8');
-function fixture({ managed = true, open = true, available = true, focus = true, failure = false, foreignProfile = false, scheme = 'file', activation, focusAction, shortDeadline = false, acceptance = false, wrongAcceptancePath = false, completed = null } = {}) {
+function fixture({ managed = true, open = true, available = true, focus = true, failure = false, foreignProfile = false, scheme = 'file', activation, focusAction, shortDeadline = false, acceptance = false, wrongAcceptancePath = false, completed = null, projectOwner } = {}) {
     const calls = [], warnings = [], lines = [], registrations = new Map(), acceptanceRuns = [], results = []; let monitorStops = 0;
     const root = path.resolve('synthetic-install'), runId = 'a'.repeat(32), directory = path.join(root, 'diagnostics', 'toolchain', runId);
+    const project = path.join(root, 'diagnostics', 'toolchain', projectOwner || runId, 'project');
     const dataDirectory = acceptance ? path.join(root, 'vscode-data') : path.resolve('synthetic-managed-profile');
     const context = { subscriptions: [], globalStorageUri: { scheme, fsPath: path.join(foreignProfile ? dataDirectory + '-personal' : dataDirectory, 'User', 'globalStorage', 'lokiente.managed-startup') } };
     const api = {
@@ -26,12 +27,12 @@ function fixture({ managed = true, open = true, available = true, focus = true, 
             getCommands: async () => focus ? ['kilo-code.SidebarProvider.focus'] : [],
             executeCommand: async id => { calls.push(id); await focusAction; },
         },
-        workspace: { workspaceFolders: [{ uri: { fsPath: path.join(directory, 'project') } }], getConfiguration(section) { assert.equal(section, 'lokiente.startup'); return { get: () => open }; } },
+        workspace: { workspaceFolders: [{ uri: { fsPath: project } }], getConfiguration(section) { assert.equal(section, 'lokiente.startup'); return { get: () => open }; } },
     };
     const sandbox = { AbortController, module: { exports: {} }, setTimeout: (fn, ms) => setTimeout(fn, shortDeadline ? 20 : ms), clearTimeout, process: { env: managed ? { LOKIENTE_MANAGED_VSCODE: '1', LOKIENTE_VSCODE_DATA_DIR: dataDirectory } : {} },
         require(id) { if (id === 'node:path') return path; if (id === './acceptance-lifecycle.cjs') return { completedAcceptance: async () => completed, requestAcceptanceRestart: async () => results.push({ restart: true }), announceAcceptance: options => results.push(options) }; if (id === './toolchain-check.cjs') return { async checkToolchain(options) { acceptanceRuns.push(options); return { status: 'BLOCKED' }; } }; if (id === './kilo-startup.cjs') return { startupSnapshot: async () => {}, async waitForKilo() { const kilo=api.extensions.getExtension('kilocode.kilo-code'); if(!kilo)throw new Error('Kilo is not installed.');return kilo; } }; if (id === './diagnostics.cjs') return { createLogger, startDiagnostics() { return { snapshot: () => ({}), dispose() { monitorStops++; } }; } }; if (id === './security-view.cjs') return { registerSecurityView() {} }; if (id === './sync-guide.cjs') return { registerSyncGuide() {} }; assert.equal(id, 'vscode'); return api; } };
     if (acceptance) Object.assign(sandbox.process.env, { LOKIENTE_INSTALL_ROOT: root, LOKIENTE_TOOLCHAIN_RUN_ID: runId,
-        LOKIENTE_TOOLCHAIN_PROJECT: path.join(directory, 'project'), LOKIENTE_TOOLCHAIN_REPORT: path.join(directory, wrongAcceptancePath ? 'other.json' : 'acceptance.json') });
+        LOKIENTE_TOOLCHAIN_PROJECT: project, LOKIENTE_TOOLCHAIN_REPORT: path.join(directory, wrongAcceptancePath ? 'other.json' : 'acceptance.json'), ...(projectOwner ? { LOKIENTE_TOOLCHAIN_PROJECT_OWNER: projectOwner } : {}) });
     vm.runInNewContext(source, sandbox);
     return { run: () => sandbox.module.exports.activate(context), context, calls, warnings, lines, registrations, acceptanceRuns, results, get monitorStops() { return monitorStops; } };
 }
@@ -109,4 +110,10 @@ test('normal desktop diagnostics stay active after startup', async () => {
 
 test('sidebar command restarts through native acceptance instead of testing a different profile in place', async () => {
     const f=fixture(); await f.run(); await f.registrations.get('lokiente.toolchain.check')(); assert.equal(f.results[0].restart, true); assert.equal(f.acceptanceRuns.length, 0);
+});
+test('a new acceptance can use the previous generated project without changing the work profile or reusing the report ID', async () => {
+    const f = fixture({ acceptance: true, projectOwner: 'b'.repeat(32) }); await f.run(); await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.acceptanceRuns.length, 1); assert.equal(f.acceptanceRuns[0].runId, 'a'.repeat(32));
+    assert.equal(path.basename(path.dirname(f.acceptanceRuns[0].project)), 'b'.repeat(32));
+    const invalid = fixture({ acceptance: true, projectOwner: '../outside' }); await invalid.run(); assert.equal(invalid.acceptanceRuns.length, 0);
 });

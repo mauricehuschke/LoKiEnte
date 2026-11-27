@@ -72,7 +72,7 @@ function Get-ShadowRecommendedModel {
 }
 
 function Select-ShadowModels {
-        param([Parameter(Mandatory)]$Hardware,[object[]]$Downloaded,[object[]]$PreviousProfiles,[switch]$IncludeFastModel,[switch]$Single,[switch]$AllowPartialGpuOffload,[string]$PreferredId)
+        param([Parameter(Mandatory)]$Hardware,[object[]]$Downloaded,[object[]]$PreviousProfiles,[switch]$IncludeFastModel,[switch]$Single,[switch]$AllowPartialGpuOffload,[string]$PreferredId,[switch]$UseRecommendedModelsBasedOnGPU)
         $catalog=@(Get-ShadowModelCatalog)
         $roles=if($Single){@('coder')}else{@('coder-high','coder-fast','review')}
         if(-not $Single -and $IncludeFastModel){$roles+=@('fast')}
@@ -85,6 +85,13 @@ function Select-ShadowModels {
             $ranking=@(Get-ShadowModelRanking -Role $role)
             $ordered=@(foreach($id in $ranking){$catalog|Where-Object {$_.Id -ceq $id}})
             $recommendation=Get-ShadowRecommendedModel -Role $role -Catalog $catalog -Hardware $Hardware -AllowPartialGpuOffload:$AllowPartialGpuOffload
+            if($UseRecommendedModelsBasedOnGPU){
+                if($PreferredId){throw 'Automatic GPU recommendations cannot be combined with an explicit preferred model.'}
+                if(-not $recommendation){throw "No recommended model fits the approximate GPU/RAM reserves for role $role. No model selection or memory reserve was overridden."}
+                Write-Host "Automatic GPU/RAM recommendation: [$role] $($recommendation.Name)"
+                $chosen.Add(@{Alias=$role;Name=$recommendation.Name;Definition=$recommendation})
+                continue
+            }
             if($Single -and $PreferredId){
                 $requested=@($catalog|Where-Object {$_.Id -ceq $PreferredId})
                 if($requested.Count -ne 1){throw "Unknown explicitly selected model: $PreferredId"}
@@ -158,7 +165,7 @@ function Select-ShadowModels {
         Write-Host "`nSelected roles:"
         foreach($item in $chosen){Write-Host "  $($item.Alias): $($item.Name)"}
         Write-Host 'Model selection will be offered again later based on current hardware.'
-        if((Read-Host 'Confirm this model selection with y') -cne 'y'){throw 'Model selection cancelled. No model files deleted or downloaded.'}
+        if(-not $UseRecommendedModelsBasedOnGPU -and (Read-Host 'Confirm this model selection with y') -cne 'y'){throw 'Model selection cancelled. No model files deleted or downloaded.'}
         return $chosen.ToArray()
     }
 
@@ -307,7 +314,7 @@ function Copy-ShadowModelFile {
             }
 
 function Install-ShadowSelectedModels {
-                param([object[]]$Definitions,[string]$LmsPath,[string]$InstallRoot,[switch]$SkipModelDownload)
+                param([object[]]$Definitions,[string]$LmsPath,[string]$InstallRoot,[switch]$SkipModelDownload,[ValidateRange(1,60)][int]$DiscoveryAttempts=30)
                 $modelsRoot=Resolve-ShadowModelDirectory
                 $downloadRoot=Join-Path $InstallRoot 'model-downloads'
                 $logs=Join-Path $InstallRoot 'runtime/model-precheck-logs'
@@ -363,8 +370,8 @@ function Install-ShadowSelectedModels {
                         }else{@(Get-LrDownloadedModels -LmsPath $LmsPath -LogDirectory $logs)}
                         if(Find-LrModel -Models $models -Profile $item.Definition){break}
                         $attempt++
-                        Write-Host "Waiting for LM Studio discovery: $($item.Definition.ExpectedPath) (attempt $attempt; Ctrl+C to cancel)."
-                        Write-Host 'If a different variant is selected, activate the chosen file in LM Studio.'
+                        if($attempt -ge $DiscoveryAttempts){throw "LM Studio did not discover the exact model $($item.Definition.ExpectedPath) after $DiscoveryAttempts checks. Model directory: $modelsRoot. Verified files were preserved; no model test was started."}
+                        Write-Host "Waiting for LM Studio discovery: $($item.Definition.ExpectedPath) (attempt $attempt/$DiscoveryAttempts)."
                         Start-Sleep -Seconds 10
                     }
                 }

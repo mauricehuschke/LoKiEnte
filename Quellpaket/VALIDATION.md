@@ -2,6 +2,48 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Automatic model options and Configure model reset - package 2026.11.27.6
+
+The next target setup stopped after verifying existing model files: a manually
+loaded LM Studio model had no surviving LoKiEnte ownership record after runtime
+state was deleted. Configure now stops the known idle managed router, unloads
+uniquely identified local LM Studio instances through bounded targeted REST calls
+and verifies an empty loaded-model list before recommendation hardware measurement
+and smoke tests. This is an explicit Configure operation; active local inference
+may be interrupted. Model files and normal runner/controller ownership guards are
+preserved. Missing explicit custom Single-model files still produce the manual
+download instructions before disrupting a running model. Keep never resets models.
+
+New switches pass through the PS5.1 bootstrap, JSON child request and PS7 setup:
+UseRecommendedModelsBasedOnGPU selects current GPU/RAM recommendations without model
+prompts (Configure, exact existing-file reuse and missing-file downloads);
+SilentMode explicitly confirms the initial installation prompt for this invocation;
+WorkspaceTrust prefers an owned previously trusted acceptance project in the same
+work profile. Reports keep fresh run IDs while the project/workspace path stays
+unchanged. VS Code must still confirm actual current trust; new/deleted profiles,
+revocation and missing history may require the ordinary trust interaction. No
+trust database or global security option is edited. The visible Kilo-response
+check remains manual and is covered by cancellation/the overall deadline.
+LM Studio catalog discovery is bounded to 30 checks. Confirmation origin, automatic
+selection strategy/hardware and model-reset outcomes are recorded locally.
+
+Local regressions: 92 JavaScript tests passed in the combined 13-file run.
+The PowerShell group passed 27 suites; native Git clone and junction creation
+remain BLOCKED by this development host. Additional existing model-selection and
+bootstrap junction branches share that host restriction. New option tests passed
+20 checks with actual hashes/files and a real JSON/PowerShell handoff; Configure
+reset passed 23 checks reproducing the lost-ownership error, targeted unload,
+post-unload evidence and unchanged normal ownership rejection. The production
+launch suite passed 53 checks, including actual Git project reuse with a fresh
+report ID. Model-pool lifecycle 51, native failure handling 29 and partial GPU
+offload 14 checks passed; real setup integration proves automatic recommendations
+reach the pool without prompts and Keep does not call the reset.
+
+This candidate does not change a running installation/test on another computer.
+Actual GPU/model unload, inference and GUI acceptance must be rerun there with
+this exact package. Target acceptance remains UNVERIFIED; PR, main merge and
+release wait for successful target evidence. Docker and Hyper-V are not required.
+
 ## Startup discovery, Output feedback and production-profile acceptance - package 2026.11.27.5
 
 The next target diagnostics showed a trusted host, then BLOCKED acceptance in

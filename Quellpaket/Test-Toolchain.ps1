@@ -4,6 +4,7 @@ param(
     [string]$InstallRoot=(Split-Path -Parent $PSScriptRoot),
     [switch]$DependenciesOnly,
     [switch]$WaitForProfileClose,
+    [switch]$WorkspaceTrust,
     [string]$WorkingDirectory,
     [string]$ResultPath
 )
@@ -24,7 +25,7 @@ try{
                 try{Assert-ShadowAcceptanceProfileClosed -InstallRoot $InstallRoot -CodePath $chain.codeExecutable;break}catch{Start-Sleep -Milliseconds 500}
             }
         }
-        $result=Invoke-ShadowToolchainAcceptance -InstallRoot $InstallRoot
+        $result=Invoke-ShadowToolchainAcceptance -InstallRoot $InstallRoot -WorkspaceTrust:$WorkspaceTrust
     }
     $result|ConvertTo-Json -Depth 30
     if($result.status -eq 'PASS'){exit 0}

@@ -84,6 +84,43 @@ Speicherreserven und ist keine Qualitätseinstellung. Details stehen unter
 
 Für einen automatischen Download mit Prüfsummenprüfung verwende den folgenden Abschnitt.
 
+### Automatische Empfehlungen und erste Bestätigung
+
+Benötigt Paket **2026.11.27.6 oder neuer**.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LoKi -ModelAction Configure -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off -UpdatePolicy lts -UseRecommendedModelsBasedOnGPU -SilentMode -WorkspaceTrust -RunAcceptanceTest
+```
+
+- `-UseRecommendedModelsBasedOnGPU` wählt für alle angeforderten Rollen aktuelle
+  GPU-/RAM-Empfehlungen ohne Modellabfrage und Bestätigung. Das impliziert Configure.
+  Geprüfte identische Modelldateien werden verwendet; nur fehlende Dateien werden
+  heruntergeladen. Gespeicherte Modellwahlen überschreiben diesen expliziten Modus
+  nicht. Passt keine Empfehlung zu den geschätzten Reserven, endet Setup mit einem
+  Nachweis statt einer Rückfrage zum Erzwingen. Echte Fit-/Runtime-Tests bleiben aktiv.
+- `-SilentMode` bestätigt die erste Installationsabfrage `y` ausdrücklich für diesen
+  Aufruf. Zielprüfungen, Migrationswahl und Testbeobachtungen behalten ihr Verhalten;
+  der Schalter wird nicht als Zustimmung für spätere Installationen gespeichert.
+- `-WorkspaceTrust` versucht, ein eigenes Testprojekt mit protokollierter erfolgreicher
+  Vertrauensprüfung im gleichen Arbeitsprofil wiederzuverwenden. Bericht und Lauf-ID
+  bleiben neu. VS Code prüft den aktuellen Vertrauensstatus erneut. Ein neues/gelöschtes
+  Profil, widerrufenes Vertrauen oder fehlende Nachweise können die normale erste
+  Bestätigung erfordern. Vertrauensdatenbanken und globale Sicherheitsoptionen werden
+  nicht bearbeitet.
+
+`-RunAcceptanceTest` startet die Abnahme automatisch. Die abschließende Sichtprüfung
+der Kilo-Antwort bleibt eine manuelle Beobachtung und wird durch diese Optionen
+nicht zu einem automatischen PASS. Vor Provisioning/Test verwaltete VS-Code-Fenster schließen.
+
+Configure entlädt aktuell geladene lokale LM-Studio-Instanzen **vor** der GPU-/RAM-Messung
+für Empfehlungen und den Modelltests. Das funktioniert auch nach dem Löschen der
+LoKiEnte-Laufzeitdaten bei weiterhin in LM Studio geladenem Modell. Der Bericht erfasst
+gezieltes Entladen und prüft, dass keine Instanz geladen bleibt. Aktive lokale Inferenz
+kann unterbrochen werden; Modelldateien bleiben erhalten. Keep und die normalen
+Eigentumsprüfungen des Desktop-Runners/Routers behalten ihr bisheriges Verhalten.
+LM Studios Modellverzeichnis muss weiterhin auf die erhaltenen Dateien zeigen.
+Die Katalogerkennung endet spätestens nach 30 Prüfungen statt endlos zu warten.
+
 ### Optionale Indizierung: Aus, bei Bedarf oder automatisch
 
 Die Indizierung ist **standardmäßig für alle Projekte aus**, auch bei bestehenden
@@ -566,6 +603,9 @@ Setup-Parameter.
 | `-UpdatePolicy` | `frozen` (Standard), `latest`, `lts` | Gilt dauerhaft für diese Installation. Alle Zielversionen müssen mindestens 48 Stunden alt sein. |
 | `-UpdateManaged` | Schalter | Kompatibilität mit älteren Startbefehlen; aktuell keine zusätzliche Wirkung. Der normale Lauf aktualisiert verwaltete Dateien/Arbeitsbereiche ohnehin. |
 | `-NoShortcut` | Schalter | Desktopverknüpfung in diesem Lauf nicht erzeugen/erneuern. Eine bestehende Verknüpfung wird dadurch nicht gelöscht. |
+| `-UseRecommendedModelsBasedOnGPU` | Schalter | GPU-/RAM-Empfehlungen ohne Modellabfragen wählen; Configure, geprüfte Dateien nutzen, fehlende herunterladen. |
+| `-SilentMode` | Schalter | Erste Installationsbestätigung für diesen Aufruf ausdrücklich akzeptieren. |
+| `-WorkspaceTrust` | Schalter | Früher vertrautes eigenes Testprojekt im selben Profil bevorzugen; tatsächliches Vertrauen wird weiter geprüft. |
 | `-RunAcceptanceTest` | Schalter | Echte Abnahme nach dem Provisioning ohne erste Konsolenabfrage starten; Vertrauen/Sichtprüfung in VS Code bleiben erforderlich. |
 | `-SkipAcceptanceTest` | Schalter | Echte Abnahme ausdrücklich überspringen; Ergebnis SKIPPED und Umgebung weiterhin ungeprüft. |
 

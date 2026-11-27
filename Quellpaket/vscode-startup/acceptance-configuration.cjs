@@ -13,6 +13,8 @@ const merge = (base, extra) => object(base) && object(extra) ? Object.fromEntrie
 const contains = (actual, expected) => object(expected) ? object(actual) && Object.keys(expected).every(key => contains(actual[key], expected[key])) : stable(actual) === stable(expected);
 
 async function verifyAcceptanceConfiguration({ vscode, root, runId, env, kilo }) {
+    const ownerRunId = env.LOKIENTE_TOOLCHAIN_PROJECT_OWNER || runId;
+    if (!/^[a-f0-9]{32}$/.test(ownerRunId)) throw new Error('Invalid generated project owner.');
     const file = path.join(root, 'diagnostics', 'toolchain', runId, 'configuration-baseline.json');
     const baseline = JSON.parse(await fs.readFile(file, 'utf8'));
     if (!object(baseline.userSettings) || !object(baseline.workspaceSettings) || !Array.isArray(baseline.files)) throw new Error('Invalid production configuration baseline.');
@@ -25,7 +27,7 @@ async function verifyAcceptanceConfiguration({ vscode, root, runId, env, kilo })
     if (baseline.runId !== runId || !equalPath(env.LOKIENTE_VSCODE_DATA_DIR, path.join(root, 'vscode-data')) ||
         !equalPath(baseline.dataDirectory, env.LOKIENTE_VSCODE_DATA_DIR) || !equalPath(vscode.workspace.workspaceFile?.fsPath, baseline.workspace) ||
         !equalPath(path.dirname(kilo.extensionPath), path.join(root, 'vscode-extensions')) ||
-        !equalPath(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath, path.join(root, 'diagnostics', 'toolchain', runId, 'project'))) throw new Error('Acceptance does not use the production managed profile, extension directory and generated production workspace.');
+        !equalPath(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath, path.join(root, 'diagnostics', 'toolchain', ownerRunId, 'project'))) throw new Error('Acceptance does not use the production managed profile, extension directory and generated production workspace.');
     const files = [];
     for (const item of baseline.files) {
         const hash = crypto.createHash('sha256').update(await fs.readFile(item.path)).digest('hex');

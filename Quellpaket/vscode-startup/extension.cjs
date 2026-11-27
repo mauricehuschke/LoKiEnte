@@ -84,12 +84,13 @@ async function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('lokiente.openKilo', openKilo));
     if (process.env.LOKIENTE_TOOLCHAIN_RUN_ID) {
         const runId = process.env.LOKIENTE_TOOLCHAIN_RUN_ID;
+        const projectOwner = process.env.LOKIENTE_TOOLCHAIN_PROJECT_OWNER || runId;
         const directory = path.join(root, 'diagnostics', 'toolchain', runId);
         const equal = (left, right) => typeof left === 'string' && path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
-        if (!/^[a-f0-9]{32}$/.test(runId) || !equal(dataDirectory, path.join(root, 'vscode-data')) ||
+        if (![runId, projectOwner].every(id => /^[a-f0-9]{32}$/.test(id)) || !equal(dataDirectory, path.join(root, 'vscode-data')) ||
             !equal(process.env.LOKIENTE_TOOLCHAIN_REPORT, path.join(directory, 'acceptance.json')) ||
-            !equal(process.env.LOKIENTE_TOOLCHAIN_PROJECT, path.join(directory, 'project')) ||
-            !equal(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath, path.join(directory, 'project'))) {
+            !equal(process.env.LOKIENTE_TOOLCHAIN_PROJECT, path.join(root, 'diagnostics', 'toolchain', projectOwner, 'project')) ||
+            !equal(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath, process.env.LOKIENTE_TOOLCHAIN_PROJECT)) {
             logger.error('LoKiEnte', 'Acceptance launch does not match its production profile, report and workspace. No test started.');
         } else {
             try {

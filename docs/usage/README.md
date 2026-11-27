@@ -82,6 +82,42 @@ without proven memory reserves and is not a quality setting. See
 
 For an automated download with checksum verification, use the following section.
 
+### Automatic recommendations and initial confirmation
+
+Requires package **2026.11.27.6 or later**.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LoKi -ModelAction Configure -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off -UpdatePolicy lts -UseRecommendedModelsBasedOnGPU -SilentMode -WorkspaceTrust -RunAcceptanceTest
+```
+
+- `-UseRecommendedModelsBasedOnGPU` selects current GPU/RAM recommendations for
+  every requested role without model-choice or confirmation prompts. It implies
+  Configure. Verified exact model files are reused; only missing files are downloaded.
+  Previous model choices do not override this explicit recommendation mode.
+  If no recommendation meets the approximate reserves, setup fails with evidence
+  instead of asking for an unsafe fallback. Exact runtime fit/tests still apply.
+- `-SilentMode` explicitly confirms the initial installation `y` prompt for this
+  invocation. Destination checks, migration choices and test observations retain
+  their normal behavior; this switch is not saved as future installation consent.
+- `-WorkspaceTrust` tries to reuse an owned acceptance project with a recorded
+  successful trust check in the same work profile. The report/run ID remains fresh.
+  VS Code verifies current trust again. A fresh/deleted profile, revoked trust or
+  missing evidence can still require the normal first trust confirmation. Trust
+  databases and global security settings are never edited.
+
+`-RunAcceptanceTest` starts acceptance automatically. Its final visible Kilo-response
+check remains a manual observation. These options do not turn that observation
+into an automatic PASS. Close managed VS Code windows before provisioning/testing.
+
+Configure unloads currently loaded local LM Studio instances **before** measuring
+free GPU/RAM for recommendations and running model tests. This also works after
+LoKiEnte runtime state was deleted while a model stayed loaded in LM Studio.
+The report records targeted unloads and verifies that no instance remains loaded.
+Active local inference can be interrupted; model files are preserved. Keep mode
+and normal desktop/router ownership checks retain their existing behavior.
+The model directory configured in LM Studio must still point to retained files.
+Catalog discovery is bounded to 30 checks rather than waiting indefinitely.
+
 ### Optional indexing: Off, OnDemand or Automatic
 
 Indexing is **Off by default for every project**, including existing installations.
@@ -531,6 +567,9 @@ over defaults when the parameter was not supplied explicitly.
 | `-UpdatePolicy` | `frozen` (default), `latest`, `lts` | Saved for this installation. All targets must be at least 48 hours old. |
 | `-UpdateManaged` | Switch | Compatibility with older commands; currently no additional effect. Normal runs already update managed files/workspaces. |
 | `-NoShortcut` | Switch | Do not create/refresh the desktop shortcut in this run. Does not delete an existing shortcut. |
+| `-UseRecommendedModelsBasedOnGPU` | Switch | Select GPU/RAM recommendations without model prompts; Configure, reuse verified files and download missing files. |
+| `-SilentMode` | Switch | Explicitly accept the initial installation confirmation for this invocation. |
+| `-WorkspaceTrust` | Switch | Prefer a previously trusted owned test workspace in the same profile; actual trust remains verified. |
 | `-RunAcceptanceTest` | Switch | Run live acceptance after provisioning without the initial console question; trust/visual confirmation in VS Code remains required. |
 | `-SkipAcceptanceTest` | Switch | Explicitly skip live acceptance; report SKIPPED and leave the toolchain unverified. |
 

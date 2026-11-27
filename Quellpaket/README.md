@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.27.5 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.6 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 ## Desktop projects and provisioning diagnostics
 
@@ -25,7 +25,7 @@ Startup is confirmed only by a launch-specific handshake from the expected
 LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
 not establish a running extension. Kilo discovery waits for registration and
 Workspace Trust before activation. Installed-but-unavailable, missing and activation
-failures have separate diagnostics. The helper version is 0.3.3; fully close old
+failures have separate diagnostics. The helper version is 0.3.4; fully close old
 managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
 
 **Output → LoKiEnte** receives launcher/editor console logs as well as the managed
@@ -47,6 +47,40 @@ Provisioning acceptance uses native Windows applications and a synthetic local G
 clone. **Docker and Hyper-V are not required or started.** The optional offline-VM
 feature is separate and is never an acceptance prerequisite. A skipped, blocked or
 failed case is never presented as a passed test.
+
+### Automatic recommendations and initial confirmation
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LoKi -ModelAction Configure -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off -UpdatePolicy lts -UseRecommendedModelsBasedOnGPU -SilentMode -WorkspaceTrust -RunAcceptanceTest
+```
+
+- `-UseRecommendedModelsBasedOnGPU` selects current GPU/RAM recommendations for
+  every requested role without model-choice or confirmation prompts. It implies
+  Configure. Verified exact model files are reused; only missing files are downloaded.
+  Previous model choices do not override this explicit recommendation mode.
+  If no recommendation meets the approximate reserves, setup fails with evidence
+  instead of asking for an unsafe fallback. Exact runtime fit/tests still apply.
+- `-SilentMode` explicitly confirms the initial installation `y` prompt for this
+  invocation. Destination checks, migration choices and test observations retain
+  their normal behavior; this switch is not saved as future installation consent.
+- `-WorkspaceTrust` tries to reuse an owned acceptance project with a recorded
+  successful trust check in the same work profile. The report/run ID remains fresh.
+  VS Code verifies current trust again. A fresh/deleted profile, revoked trust or
+  missing evidence can still require the normal first trust confirmation. Trust
+  databases and global security settings are never edited.
+
+`-RunAcceptanceTest` starts acceptance automatically. Its final visible Kilo-response
+check remains a manual observation. These options do not turn that observation
+into an automatic PASS. Close managed VS Code windows before provisioning/testing.
+
+Configure unloads currently loaded local LM Studio instances **before** measuring
+free GPU/RAM for recommendations and running model tests. This also works after
+LoKiEnte runtime state was deleted while a model stayed loaded in LM Studio.
+The report records targeted unloads and verifies that no instance remains loaded.
+Active local inference can be interrupted; model files are preserved. Keep mode
+and normal desktop/router ownership checks retain their existing behavior.
+The model directory configured in LM Studio must still point to retained files.
+Catalog discovery is bounded to 30 checks rather than waiting indefinitely.
 
 ## Verify the installed toolchain
 

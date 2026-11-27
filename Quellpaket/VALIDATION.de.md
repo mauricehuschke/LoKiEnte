@@ -1,3 +1,46 @@
+## Automatische Modelloptionen und Configure-Modellreset - Paket 2026.11.27.6
+
+Das nächste Ziel-Setup brach nach der Prüfung vorhandener Modelldateien ab: Ein
+manuell geladenes LM-Studio-Modell hatte nach dem Löschen der Laufzeitdaten keinen
+erhaltenen LoKiEnte-Eigentumsnachweis. Configure stoppt nun den bekannten inaktiven
+verwalteten Router, entlädt eindeutig identifizierte lokale Instanzen gezielt per
+zeitlich begrenzter REST-Anfrage und prüft die leere Modellliste vor GPU-/RAM-Messung
+für Empfehlungen und Smoke-Tests. Dieser explizite Configure-Schritt kann aktive
+lokale Inferenz unterbrechen. Modelldateien und die normalen Eigentumsprüfungen
+des Runners/Controllers bleiben erhalten. Fehlende ausdrücklich gewählte eigene
+Single-Modelldateien liefern weiterhin vor einer Unterbrechung die manuellen
+Downloadhinweise. Keep führt keinen Modellreset aus.
+
+Neue Schalter durchlaufen PS5.1-Bootstrap, JSON-Kindprozess und PS7-Setup:
+UseRecommendedModelsBasedOnGPU wählt aktuelle GPU-/RAM-Empfehlungen ohne Modellfragen
+(Configure, identische vorhandene Dateien nutzen, fehlende herunterladen);
+SilentMode bestätigt die erste Installationsabfrage ausdrücklich für diesen Aufruf;
+WorkspaceTrust bevorzugt ein eigenes früher vertrautes Testprojekt im selben
+Arbeitsprofil. Die Berichtslauf-ID bleibt neu; Projekt und Workspace-Pfad bleiben
+gleich. VS Code muss das tatsächliche aktuelle Vertrauen bestätigen. Neue/gelöschte
+Profile, Widerruf und fehlende Historie können die normale Rückfrage erfordern.
+Keine Vertrauensdatenbank oder globale Sicherheitsoption wird bearbeitet. Die
+Kilo-Sichtprüfung bleibt manuell und beachtet Abbruch/Gesamtfrist. LM Studios
+Katalogerkennung endet nach höchstens 30 Prüfungen. Bestätigungsquelle, automatische
+Auswahlstrategie/Hardware und Reset-Ergebnis werden lokal protokolliert.
+
+Lokale Regressionen: 92 JavaScript-Tests im gemeinsamen Lauf von 13 Dateien bestanden.
+Die PowerShell-Gruppe bestand 27 Suiten; nativer Git-Klon und Junction-Anlage bleiben
+durch diesen Entwicklungshost BLOCKED. Zusätzliche bestehende Modellwahl- und
+Bootstrap-Junction-Zweige haben dieselbe Hosteinschränkung. Neue Optionsprüfungen
+bestanden 20 Checks mit echten Hashes/Dateien und realer JSON-/PowerShell-Übergabe;
+der Configure-Reset bestand 23 Checks zu fehlender Eigentumsdatei, gezieltem Entladen,
+Nachkontrolle und unveränderten normalen Eigentumsprüfungen. Die Startsuite bestand
+53 Checks einschließlich echtem Git-Projekt-Reuse bei neuer Berichtslauf-ID.
+Modellpool 51, native Fehlerbehandlung 29 und Teil-GPU-Offload 14 Checks bestanden.
+Echte Setup-Integrationsschritte belegen automatische Empfehlungen ohne Rückfragen
+bis zur Pool-Grenze und keinen Reset unter Keep.
+
+Dieser Kandidat verändert keinen laufenden Test/Installation auf einem anderen PC.
+Echtes GPU-/Modellentladen, Inferenz und GUI-Abnahme sind dort mit genau diesem Paket
+neu zu prüfen. Die Zielabnahme bleibt UNVERIFIED. Erst erfolgreiche Nachweise erlauben
+PR, Main-Merge und Release. Docker und Hyper-V sind nicht erforderlich.
+
 ## Kilo-Start, Output-Rückkopplung und Abnahme im Arbeitsprofil - Paket 2026.11.27.5
 
 Die nächste Zieldiagnose zeigt einen vertrauten Host und danach eine in weniger

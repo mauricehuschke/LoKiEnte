@@ -170,6 +170,41 @@ function Ensure-SmpServer {
     Assert-LrLoopbackListener -Port $port
 }
 
+# Provisioning Configure explicitly resets local loaded models before selection
+# and smoke tests. Normal runner/controller ownership checks remain unchanged.
+function Reset-ShadowSetupLoadedModels {
+    [CmdletBinding()]
+    param([string]$InstallRoot,[string]$LmsPath,[int]$Port,[string]$ApiTokenEnvironmentVariable)
+    $lock=Enter-SmpLock -InstallRoot $InstallRoot
+    try{
+        $logs=Join-Path $InstallRoot 'runtime/setup-model-reset-logs'
+        $server=Invoke-LrJson -LmsPath $LmsPath -Arguments @('server','status','--json') -LogDirectory $logs
+        if([bool](Get-LrProperty $server 'running' $false)){$Port=[int](Get-LrProperty $server 'port' 0)}
+        if($Port -lt 1024 -or $Port -gt 65535){throw 'Invalid LM Studio port for the provisioning model reset.'}
+        $pool=[pscustomobject]@{LmsPath=$LmsPath;BackendApiBaseUrl="http://127.0.0.1:$Port/v1";ApiTokenEnvironmentVariable=$ApiTokenEnvironmentVariable}
+        Ensure-SmpServer -Pool $pool -LogDirectory $logs
+        $loaded=@(Invoke-LrJson -LmsPath $LmsPath -Arguments @('ps','--json') -LogDirectory $logs)
+        $ids=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        foreach($item in $loaded){
+            $id=[string](Get-LrProperty $item 'identifier')
+            if($null -ne (Get-LrProperty $item 'deviceIdentifier' '__unknown__') -or -not $id -or -not $ids.Add($id)){
+                throw 'Loaded models cannot be identified as unique local instances. No model was unloaded by provisioning.'
+            }
+        }
+        $headers=Get-LrApiHeaders -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable
+        foreach($item in $loaded){
+            $id=[string](Get-LrProperty $item 'identifier')
+            Write-ShadowMessage "Configure: unloading local LM Studio model '$id' before model selection and tests."
+            $response=Invoke-LrApi -Uri "http://127.0.0.1:$Port/api/v1/models/unload" -Headers $headers -Method POST -Body @{instance_id=$id} -TimeoutSeconds 120
+            if((Get-LrProperty $response 'instance_id') -cne $id){throw "LM Studio did not confirm unloading the configured instance '$id'."}
+        }
+        $after=@(Invoke-LrJson -LmsPath $LmsPath -Arguments @('ps','--json') -LogDirectory $logs)
+        if($after.Count){throw 'LM Studio still reports loaded models after the Configure reset. No model test was started.'}
+        Write-ShadowMessage "Configure model reset verified: $($loaded.Count) local model(s) unloaded; no loaded instance remains." 'OK'
+        return [pscustomobject]@{status='PASS';port=$Port;unloaded=@($loaded|ForEach-Object {[string](Get-LrProperty $_ 'identifier')});loadedAfter=0;scope='ModelAction Configure only'}
+    }finally{$lock.Dispose()}
+}
+
 function Get-SmpOwnedLoaded {
     param($Pool,$Owner,[string]$LogDirectory,[int]$IdleTimeoutSeconds=60)
     $watch=[Diagnostics.Stopwatch]::StartNew()

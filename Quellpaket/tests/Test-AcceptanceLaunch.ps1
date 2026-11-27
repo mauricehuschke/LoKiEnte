@@ -49,15 +49,20 @@ try{
         $workspace=Get-Content -LiteralPath $baseline.workspace -Raw|ConvertFrom-Json
         Assert-Launch ($workspace.folders[0].path -ieq $WorkingDirectory -and $workspace.tasks.tasks.Count -gt 0 -and $workspace.settings.'chat.disableAIFeatures') 'The real workspace generator must produce the test project settings and tasks.'
         $report=Get-Content -LiteralPath $Environment.LOKIENTE_TOOLCHAIN_REPORT -Raw|ConvertFrom-Json -AsHashtable
-        Assert-Launch ($report.projectGit.head -match '^[a-f0-9]{40,64}$' -and $report.projectGit.nativeCommands.Count -ge 6) 'Actual Git init/commit evidence must exist before the GUI launch.'
-        $report.status='BLOCKED';$report.cases+=@(@{id='synthetic-gui-boundary';status='BLOCKED';evidence='GUI/model execution intentionally not performed by this regression test.'})
+        Assert-Launch ($report.projectGit.head -match '^[a-f0-9]{40,64}$' -and (($report.projectGit.initialized -and $report.projectGit.nativeCommands.Count -ge 6) -or (-not $report.projectGit.initialized -and $report.projectGit.nativeCommands.Count -eq 2))) 'Actual Git init/commit or verified reuse evidence must exist before the GUI launch.'
+        if(-not $script:firstProject){$script:firstProject=$WorkingDirectory}else{Assert-Launch ($WorkingDirectory -ieq $script:firstProject -and $report.workspaceTrust.reused) 'WorkspaceTrust must reuse the prior owned project while keeping a fresh report.'}
+        $report.status='BLOCKED';$report.cases+=@(@{id='workspace-trust';status='PASS';evidence='Synthetic trust history for the launch regression, not a target observation.'},@{id='synthetic-gui-boundary';status='BLOCKED';evidence='GUI/model execution intentionally not performed by this regression test.'})
         Write-ShadowAcceptanceJson -Path $Environment.LOKIENTE_TOOLCHAIN_REPORT -Value $report
         return 'b'*32
     }
     $script:simulateExit=$false
+    $script:firstProject=$null
     $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root
     Assert-Launch ($result.status -ceq 'BLOCKED' -and $result.cases[-1].id -ceq 'synthetic-gui-boundary') 'Native preparation must reach the intended GUI boundary; it must never claim real acceptance.'
     Assert-Launch ((Get-FileHash -LiteralPath $settings).Hash -ceq $before) 'Acceptance preparation must preserve real profile settings byte for byte.'
+    $priorRunId=$result.runId
+    $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root -WorkspaceTrust
+    Assert-Launch ($result.status -ceq 'BLOCKED' -and $result.runId -cne $priorRunId -and $result.projectGit.ownerRunId -ceq $priorRunId) 'A reused trusted project must retain its owner and use a new report/run ID.'
     $script:simulateExit=$true
     $result=Invoke-ShadowToolchainAcceptance -InstallRoot $root
     Assert-Launch ($result.status -ceq 'BLOCKED' -and $result.cases[-1].evidence -match 'VS Code exited before acceptance completed') 'Closing the real editor before completion must block promptly instead of leaving a RUNNING report until the global deadline.'

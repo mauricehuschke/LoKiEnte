@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.5 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.6 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 ## Desktop-Projekte und Provisioning-Diagnose
 
@@ -32,7 +32,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.3; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.4; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
@@ -55,6 +55,41 @@ Die Provisioning-Abnahme verwendet native Windows-Anwendungen und einen syntheti
 lokalen Git-Klon. **Docker und Hyper-V werden weder benötigt noch gestartet.** Die
 optionale Offline-VM-Funktion bleibt davon getrennt. Übersprungene, blockierte und
 fehlgeschlagene Prüfungen werden niemals als bestanden ausgegeben.
+
+### Automatische Empfehlungen und erste Bestätigung
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Provision-LoKiEnte.ps1 -InstallRoot D:\LoKi -ModelAction Configure -ModelMode Dual -IncludeFastModel -AllowPartialGpuOffload -IndexingMode Off -UpdatePolicy lts -UseRecommendedModelsBasedOnGPU -SilentMode -WorkspaceTrust -RunAcceptanceTest
+```
+
+- `-UseRecommendedModelsBasedOnGPU` wählt für alle angeforderten Rollen aktuelle
+  GPU-/RAM-Empfehlungen ohne Modellabfrage und Bestätigung. Das impliziert Configure.
+  Geprüfte identische Modelldateien werden verwendet; nur fehlende Dateien werden
+  heruntergeladen. Gespeicherte Modellwahlen überschreiben diesen expliziten Modus
+  nicht. Passt keine Empfehlung zu den geschätzten Reserven, endet Setup mit einem
+  Nachweis statt einer Rückfrage zum Erzwingen. Echte Fit-/Runtime-Tests bleiben aktiv.
+- `-SilentMode` bestätigt die erste Installationsabfrage `y` ausdrücklich für diesen
+  Aufruf. Zielprüfungen, Migrationswahl und Testbeobachtungen behalten ihr Verhalten;
+  der Schalter wird nicht als Zustimmung für spätere Installationen gespeichert.
+- `-WorkspaceTrust` versucht, ein eigenes Testprojekt mit protokollierter erfolgreicher
+  Vertrauensprüfung im gleichen Arbeitsprofil wiederzuverwenden. Bericht und Lauf-ID
+  bleiben neu. VS Code prüft den aktuellen Vertrauensstatus erneut. Ein neues/gelöschtes
+  Profil, widerrufenes Vertrauen oder fehlende Nachweise können die normale erste
+  Bestätigung erfordern. Vertrauensdatenbanken und globale Sicherheitsoptionen werden
+  nicht bearbeitet.
+
+`-RunAcceptanceTest` startet die Abnahme automatisch. Die abschließende Sichtprüfung
+der Kilo-Antwort bleibt eine manuelle Beobachtung und wird durch diese Optionen
+nicht zu einem automatischen PASS. Vor Provisioning/Test verwaltete VS-Code-Fenster schließen.
+
+Configure entlädt aktuell geladene lokale LM-Studio-Instanzen **vor** der GPU-/RAM-Messung
+für Empfehlungen und den Modelltests. Das funktioniert auch nach dem Löschen der
+LoKiEnte-Laufzeitdaten bei weiterhin in LM Studio geladenem Modell. Der Bericht erfasst
+gezieltes Entladen und prüft, dass keine Instanz geladen bleibt. Aktive lokale Inferenz
+kann unterbrochen werden; Modelldateien bleiben erhalten. Keep und die normalen
+Eigentumsprüfungen des Desktop-Runners/Routers behalten ihr bisheriges Verhalten.
+LM Studios Modellverzeichnis muss weiterhin auf die erhaltenen Dateien zeigen.
+Die Katalogerkennung endet spätestens nach 30 Prüfungen statt endlos zu warten.
 
 ## Installierte Toolkette prüfen
 

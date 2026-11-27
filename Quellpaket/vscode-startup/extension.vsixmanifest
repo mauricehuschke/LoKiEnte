@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
   <Metadata>
-    <Identity Language="en-US" Id="managed-startup" Version="0.3.3" Publisher="lokiente" />
+    <Identity Language="en-US" Id="managed-startup" Version="0.3.4" Publisher="lokiente" />
     <DisplayName>LoKiEnte</DisplayName>
     <Description xml:space="preserve">Local settings, Kilo startup and Windows isolation.</Description>
     <Properties><Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.105.1" /></Properties>

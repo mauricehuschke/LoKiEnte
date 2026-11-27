@@ -22,6 +22,9 @@ param(
     [switch]$SkipModelDownload,
     [switch]$UpdateManaged,
     [switch]$NoShortcut,
+    [switch]$UseRecommendedModelsBasedOnGPU,
+    [switch]$SilentMode,
+    [switch]$WorkspaceTrust,
     [switch]$RunAcceptanceTest,
     [switch]$SkipAcceptanceTest,
     [hashtable]$BootstrapEvidence
@@ -29,6 +32,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 if($RunAcceptanceTest -and $SkipAcceptanceTest){throw 'RunAcceptanceTest and SkipAcceptanceTest are mutually exclusive.'}
+if($UseRecommendedModelsBasedOnGPU -and ($ModelAction -eq 'Keep' -or $ModelKey -or $PreferredModel -ne 'Auto')){throw 'UseRecommendedModelsBasedOnGPU requires Configure with automatic model selection.'}
 $IndexingMode=switch($IndexingMode){'Off'{'Off'} 'OnDemand'{'OnDemand'} 'Automatic'{'Automatic'}}
 $PSNativeCommandUseErrorActionPreference=$false
 . (Join-Path $PSScriptRoot 'Common.ps1')
@@ -426,6 +430,14 @@ try {
         if(Test-Path -LiteralPath $poolPath){
             $previousPool=Get-Content -LiteralPath $poolPath -Raw|ConvertFrom-Json
         }
+        if($ModelMode -eq 'Single' -and $ModelKey){
+            # Missing explicit custom files cannot be downloaded from the catalog.
+            # Report that manual step before interrupting an existing model.
+            Assert-ShadowSetupModels -LmsPath $lms -InstallRoot $InstallRoot -ModelMode $ModelMode -PreferredModel $PreferredModel -ModelKey $ModelKey -IncludeFastModel:$IncludeFastModel
+        }
+        if($previousPool){Stop-ShadowModelRouter -InstallRoot $InstallRoot -Pool $previousPool}
+        $report.modelReset=Invoke-ShadowProvisionStep -Id 'lmstudio-model-reset-1' -Action { Reset-ShadowSetupLoadedModels -InstallRoot $InstallRoot -LmsPath $lms -Port $Port -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable }
+        $Port=[int]$report.modelReset.port
         if($previousPool -and $IndexingMode -ne 'Automatic'){Stop-ShadowEmbeddingModel -InstallRoot $InstallRoot -Pool $previousPool}
         $selectedDefinitions=@()
         if($ModelMode -eq 'Dual' -or ($ModelMode -eq 'Single' -and -not $ModelKey)){
@@ -441,8 +453,8 @@ try {
                 $previousProfiles=@($savedSelection.roles)
             }else{$previousProfiles=if($previousPool){@(Get-LrProperty $previousPool 'Profiles' @())}else{@()}}
             $preferredId=switch($PreferredModel){'Qwen27B'{'qwen38-27b'} 'GptOss20B'{'gpt-oss-20b'} default{''}}
-            $selectedDefinitions=@(Select-ShadowModels -Hardware $hardware -Downloaded $downloaded -PreviousProfiles $previousProfiles -IncludeFastModel:$IncludeFastModel -Single:($ModelMode -eq 'Single') -AllowPartialGpuOffload:$AllowPartialGpuOffload -PreferredId $preferredId)
-            $selectedState=[ordered]@{schema=1;roles=@($selectedDefinitions|ForEach-Object {
+            $selectedDefinitions=@(Select-ShadowModels -Hardware $hardware -Downloaded $downloaded -PreviousProfiles $previousProfiles -IncludeFastModel:$IncludeFastModel -Single:($ModelMode -eq 'Single') -AllowPartialGpuOffload:$AllowPartialGpuOffload -PreferredId $preferredId -UseRecommendedModelsBasedOnGPU:$UseRecommendedModelsBasedOnGPU)
+            $selectedState=[ordered]@{schema=1;selectionMode=$(if($UseRecommendedModelsBasedOnGPU){'automatic-gpu-ram-recommendations'}else{'interactive'});hardware=$hardware;roles=@($selectedDefinitions|ForEach-Object {
                 [ordered]@{Alias=$_.Alias;Id=$_.Definition.Id;Name=$_.Name;ExpectedPath=$_.Definition.ExpectedPath}
             })}
             $null=Write-ShadowManagedFile -Path $selectionFile -Content ($selectedState|ConvertTo-Json -Depth 10) -BackupRoot (Join-Path $InstallRoot 'backups/model-selection')
@@ -451,9 +463,6 @@ try {
             $null=Invoke-ShadowProvisionStep -Id 'model-downloads-1' -Action { Install-ShadowSelectedModels -Definitions $downloadDefinitions -LmsPath $lms -InstallRoot $InstallRoot -SkipModelDownload:$SkipModelDownload }
         }else{
             Assert-ShadowSetupModels -LmsPath $lms -InstallRoot $InstallRoot -ModelMode $ModelMode -PreferredModel $PreferredModel -ModelKey $ModelKey -IncludeFastModel:$IncludeFastModel
-        }
-        if($previousPool){
-            Stop-ShadowModelRouter -InstallRoot $InstallRoot -Pool $previousPool
         }
         if($ModelMode -eq 'Dual'){
             $pool=Invoke-ShadowProvisionStep -Id 'model-pool-1' -Action { Configure-LocalModelPool -InstallRoot $InstallRoot -ContextLength $ContextLength -Port $Port -RouterPort $RouterPort -IncludeFastModel:$IncludeFastModel -AllowPartialGpuOffload:$AllowPartialGpuOffload -AllowUnfitAttempt:$AllowUnfitAttempt -SelectedDefinitions $selectedDefinitions -DownloadModel:$false -LmsPath $lms -ApiTokenEnvironmentVariable $ApiTokenEnvironmentVariable }
@@ -564,7 +573,7 @@ try {
     }
     $acceptanceMode=Select-ShadowAcceptanceMode -RunAcceptanceTest:$RunAcceptanceTest -SkipAcceptanceTest:$SkipAcceptanceTest
     if($acceptanceMode -eq 'Run'){
-        $report.acceptance=Invoke-ShadowProvisionStep -Id 'live-acceptance-1' -Action { Invoke-ShadowToolchainAcceptance -InstallRoot $InstallRoot }
+        $report.acceptance=Invoke-ShadowProvisionStep -Id 'live-acceptance-1' -Action { Invoke-ShadowToolchainAcceptance -InstallRoot $InstallRoot -WorkspaceTrust:$WorkspaceTrust }
     }else{
         $report.acceptance=@{schema=1;kind='live-toolchain-acceptance';status=$(if($acceptanceMode -eq 'Skip'){'SKIPPED'}else{'BLOCKED'});cases=@();reason=$(if($acceptanceMode -eq 'Skip'){'Explicitly skipped. The installed toolchain has not passed live acceptance.'}else{'No interactive answer available. Use RunAcceptanceTest or SkipAcceptanceTest explicitly.'})}
         $report.acceptance.finishedAtUtc=[DateTime]::UtcNow.ToString('o')

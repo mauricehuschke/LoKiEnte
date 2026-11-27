@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import crypto from 'node:crypto';
@@ -58,4 +58,13 @@ test('inherited object defaults are allowed while configured nested values, scop
     options.vscode.workspace.getConfiguration = () => ({ get: key => actual[key] });
     options.env.KILO_CONFIG_CONTENT = '{"changed":true}';
     await assert.rejects(verifyAcceptanceConfiguration(options), /Kilo configuration differs/);
+}));
+test('configuration parity accepts the same owned/trusted project with a fresh report ID and rejects path redirection', async () => fixture(async options => {
+    const runId = 'b'.repeat(32), directory = path.join(options.root, 'diagnostics', 'toolchain', runId); await mkdir(directory);
+    const baseline = JSON.parse(await readFile(path.join(options.root, 'diagnostics', 'toolchain', id, 'configuration-baseline.json'), 'utf8'));
+    baseline.runId = runId; await writeFile(path.join(directory, 'configuration-baseline.json'), JSON.stringify(baseline));
+    const reused = { ...options, runId, env: { ...options.env, LOKIENTE_TOOLCHAIN_PROJECT_OWNER: id } };
+    assert.equal((await verifyAcceptanceConfiguration(reused)).mode, 'same-production-profile');
+    await assert.rejects(verifyAcceptanceConfiguration({ ...reused, env: { ...reused.env, LOKIENTE_TOOLCHAIN_PROJECT_OWNER: '../other' } }), /Invalid generated project owner/);
+    await assert.rejects(verifyAcceptanceConfiguration({ ...reused, env: { ...reused.env, LOKIENTE_TOOLCHAIN_PROJECT_OWNER: runId } }), /production managed profile/);
 }));

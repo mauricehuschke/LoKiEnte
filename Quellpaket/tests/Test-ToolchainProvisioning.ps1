@@ -15,6 +15,7 @@ $end=@(0..($statements.Count-1)|Where-Object {$statements[$_].Extent.Text.Starts
 $actual=[scriptblock]::Create(($statements[$start..$end]|ForEach-Object {$_.Extent.Text}) -join "`n")
 $root=Join-Path ([IO.Path]::GetTempPath()) ('lokiente-provision-acceptance-'+[guid]::NewGuid().ToString('N'))
 $checks=0
+$WorkspaceTrust=$false
 function Assert-Provision($Value,$Message){if(-not $Value){throw $Message};$script:checks++}
 function Read-Host {param($Prompt) throw 'Explicit options must not ask again.'}
 function Write-ShadowMessage {param($Message,$Level)}

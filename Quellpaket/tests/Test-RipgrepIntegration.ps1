@@ -33,6 +33,7 @@ if($Scenario -eq 'single-deferred'){$ModelMode='Single';$runtime=[pscustomobject
 if($Scenario -eq 'reserve'){$pool.Profiles=@([pscustomobject]@{Estimate=[pscustomobject]@{ReserveOverride=$true}});$report.warnings=@('Synthetic reserve override')}
 $ProjectPath=@();$NoShortcut=$true
 $RunAcceptanceTest=$true;$SkipAcceptanceTest=$false
+$WorkspaceTrust=$false
 # This suite isolates the search/setup gate. Live acceptance is tested separately.
 function Select-ShadowAcceptanceMode {param($RunAcceptanceTest,$SkipAcceptanceTest) return 'Run'}
 function Invoke-ShadowToolchainAcceptance {param($InstallRoot) return @{status='PASS'}}

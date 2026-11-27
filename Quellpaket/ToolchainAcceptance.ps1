@@ -83,7 +83,7 @@ function Get-ShadowAcceptanceLaunchArguments {
 
 function Invoke-ShadowToolchainAcceptance {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$InstallRoot,[ValidateRange(60,3600)][int]$TimeoutSeconds=3600)
+    param([Parameter(Mandatory)][string]$InstallRoot,[ValidateRange(60,3600)][int]$TimeoutSeconds=3600,[switch]$WorkspaceTrust)
     $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
     $id=[guid]::NewGuid().ToString('N')
     $directory=Join-Path $InstallRoot ('diagnostics/toolchain/'+$id)
@@ -116,8 +116,13 @@ function Invoke-ShadowToolchainAcceptance {
             $manifest.publisher -ceq 'lokiente' -and $manifest.name -ceq 'managed-startup' -and $manifest.version -ceq $expected.version
         })
         if($helper.Count -ne 1){throw 'The current LoKiEnte startup extension is missing or ambiguous. Reprovision before acceptance.'}
-        $preparation=Invoke-ShadowNative -FilePath $chain.nodeExecutable -ArgumentList @((Join-Path $InstallRoot 'app/vscode-startup/acceptance-project.cjs'),$InstallRoot,$id,$chain.gitExecutable) -WorkingDirectory $directory -TimeoutSeconds 180 -Quiet
+        $prepareArguments=@((Join-Path $InstallRoot 'app/vscode-startup/acceptance-project.cjs'),$InstallRoot,$id,$chain.gitExecutable)
+        if($WorkspaceTrust){$prepareArguments+='--reuse-trusted'}
+        $preparation=Invoke-ShadowNative -FilePath $chain.nodeExecutable -ArgumentList $prepareArguments -WorkingDirectory $directory -TimeoutSeconds 180 -Quiet
         $gitEvidence=$preparation.StdOut|ConvertFrom-Json
+        $project=$gitEvidence.project
+        $ownerRunId=[string]$gitEvidence.ownerRunId
+        $initial.workspaceTrust=$gitEvidence.workspaceTrust
         Write-ShadowAcceptanceJson -Path (Join-Path $directory 'project-preparation.json') -Value $gitEvidence
         $initial.projectGit=$gitEvidence
         $initial.cases=@(@{id='acceptance-project-git';component='Git';status='PASS';evidence="Generated test project initialized with commit $($gitEvidence.head)."})
@@ -137,6 +142,7 @@ function Invoke-ShadowToolchainAcceptance {
         $environment.LOKIENTE_ET_KILO=$bundled
         $environment.LOKIENTE_TOOLCHAIN_REPORT=$resultPath
         $environment.LOKIENTE_TOOLCHAIN_PROJECT=$project
+        $environment.LOKIENTE_TOOLCHAIN_PROJECT_OWNER=$ownerRunId
         $environment.LOKIENTE_TOOLCHAIN_RUN_ID=$id
         $environment.LOKIENTE_TOOLCHAIN_DEADLINE_UTC=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds).ToString('o')
         $environment.LOKIENTE_TOOLCHAIN_WORKSPACE=$workspace.workspace

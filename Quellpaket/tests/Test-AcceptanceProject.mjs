@@ -6,7 +6,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { prepareAcceptanceProject, acceptanceGitEnvironment } = require('../vscode-startup/acceptance-project.cjs');
+const { prepareAcceptanceProject, acceptanceGitEnvironment, selectAcceptanceProjectOwner } = require('../vscode-startup/acceptance-project.cjs');
 const { runNative } = require('../vscode-startup/toolchain-check.cjs');
 const id = 'a'.repeat(32), head = 'b'.repeat(40);
 const git = process.env.LOKIENTE_TEST_GIT || (process.platform === 'win32' ? path.join(process.env.ProgramFiles, 'Git', 'cmd', 'git.exe') : '/usr/bin/git');
@@ -76,4 +76,29 @@ test('native Git really creates and verifies a first commit in the generated tes
         if (/Cannot start|Win32 error 5|could not create.*pipe|Access is denied|Zugriff verweigert/i.test(error.message)) t.skip(`BLOCKED by development host: ${error.message}`);
         else throw error;
     }
+}));
+test('WorkspaceTrust reuses only an owned previously trusted project in the same work profile, with a fresh report ID', async () => temporary(async root => {
+    const b = boundary(root), previous = await prepareAcceptanceProject({ root, runId: id, git, run: b.run });
+    const file = path.join(root, 'diagnostics', 'toolchain', id, 'acceptance.json');
+    const report = { runId: id, finishedAtUtc: new Date().toISOString(), projectGit: previous, launch: { dataDirectory: path.join(root, 'vscode-data') }, cases: [{ id: 'workspace-trust', status: 'PASS' }] };
+    await writeFile(file, JSON.stringify(report));
+    const runId = 'c'.repeat(32), before = b.calls.length;
+    const choice = await selectAcceptanceProjectOwner({ root, runId, reuseTrusted: true });
+    assert.equal(choice.ownerRunId, id); assert.equal(choice.workspaceTrust.reused, true);
+    const reused = await prepareAcceptanceProject({ root, runId, ownerRunId: choice.ownerRunId, git, run: b.run });
+    assert.equal(reused.runId, runId); assert.equal(reused.ownerRunId, id); assert.equal(reused.project, previous.project);
+    assert.equal(reused.initialized, false); assert.equal(b.calls.length - before, 2);
+    assert.equal((await selectAcceptanceProjectOwner({ root, runId })).ownerRunId, runId);
+    for (const changed of [
+        { launch: { dataDirectory: path.join(root, 'other-profile') } },
+        { cases: [{ id: 'workspace-trust', status: 'BLOCKED' }] },
+        { cases: { status: 'PASS' } },
+        { projectGit: { ...previous, project: path.join(root, 'user-project') } },
+    ]) {
+        await writeFile(file, JSON.stringify({ ...report, ...changed }));
+        assert.equal((await selectAcceptanceProjectOwner({ root, runId, reuseTrusted: true })).workspaceTrust.reused, false);
+    }
+    await writeFile(file, JSON.stringify(report));
+    await writeFile(path.join(previous.project, '.lokiente-acceptance.json'), '{"kind":"other-owner"}');
+    assert.equal((await selectAcceptanceProjectOwner({ root, runId, reuseTrusted: true })).ownerRunId, runId);
 }));

@@ -116,7 +116,7 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
     const report = { schema: 1, kind: 'live-toolchain-acceptance', runId, status: 'RUNNING', startedAtUtc: new Date().toISOString(),
         executionMode: 'native-windows-applications', requirements: { docker: false, hyperV: false },
         versions: { vscode: vscode.version, node: process.versions.node, electron: process.versions.electron || null }, cases: [], nativeCommands: [], reportPath };
-    if (prelaunch?.runId === runId && prelaunch.launch) report.launch = prelaunch.launch;
+    if (prelaunch?.runId === runId) { if (prelaunch.launch) report.launch = prelaunch.launch; if (prelaunch.workspaceTrust) report.workspaceTrust = prelaunch.workspaceTrust; }
     const secrets = Object.entries(env).filter(([name]) => /token|key|password/i.test(name)).map(([, value]) => value);
     const controller = new AbortController(), signal = controller.signal;
     const abort = () => controller.abort(outerSignal.reason);
@@ -203,7 +203,7 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         });
         if (helper.status !== 'PASS') throw blocked('The current helper code was not verified; no Kilo/model acceptance was started.');
         const prepared = await check('acceptance-project-git', 'Git', async () => {
-            const evidence = await prepareAcceptanceProject({ root, runId, git: chain.gitExecutable, env, run: native });
+            const evidence = await prepareAcceptanceProject({ root, runId, ownerRunId: env.LOKIENTE_TOOLCHAIN_PROJECT_OWNER || runId, git: chain.gitExecutable, env, run: native });
             if (path.resolve(evidence.project).toLowerCase() !== path.resolve(project).toLowerCase()) throw new Error('Unexpected acceptance workspace.');
             report.projectGit = evidence;
             return `Generated Git workspace has a verified initial commit: ${evidence.head}`;
@@ -335,8 +335,8 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         if (webview.status !== 'PASS') await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'The webview request failed; no visible response can be accepted.');
         else if (!interactive) await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'Visible webview rendering has not been observed. Noninteractive checks cannot claim this evidence.');
         else {
-            const answer = await vscode.window.showInformationMessage(`LoKiEnte acceptance: is the completed Kilo explanation containing ${marker} visible in this test window?`,
-                { modal: true, detail: 'Confirm the actual Kilo chat response, not the Output log or this question. A missing/unconfirmed response prevents full acceptance.' }, 'Response is visible', 'Response is missing', 'Skip visual check');
+            const answer = await withCancellation(() => vscode.window.showInformationMessage(`LoKiEnte acceptance: is the completed Kilo explanation containing ${marker} visible in this test window?`,
+                { modal: true, detail: 'Confirm the actual Kilo chat response, not the Output log or this question. A missing/unconfirmed response prevents full acceptance.' }, 'Response is visible', 'Response is missing', 'Skip visual check'), signal);
             await record('kilo-visible-response', 'Kilo Code UI', answer === 'Response is visible' ? 'PASS' : answer === 'Response is missing' ? 'FAIL' : 'BLOCKED',
                 answer === 'Response is visible' ? 'User observed the nonce-bearing response in the real Kilo webview.' : 'The real Kilo response was not confirmed visible.', { evidenceKind: 'manual-visual-observation' });
         }
