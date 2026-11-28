@@ -2,7 +2,7 @@
 
 [Deutsch](README.de.md)
 
-Version: 2026.11.27.11 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
+Version: 2026.11.27.12 · Target: Windows x64 (PC, workstation or suitable VM) · Default language: English
 
 ## Fresh installation and reprovisioning
 
@@ -45,7 +45,7 @@ Startup is confirmed only by a launch-specific handshake from the expected
 LoKiEnte helper in the managed VS Code profile. A CLI installation list alone does
 not establish a running extension. Kilo discovery waits for registration and
 Workspace Trust before activation. Installed-but-unavailable, missing and activation
-failures have separate diagnostics. The helper version is 0.3.9; fully close old
+failures have separate diagnostics. The helper version is 0.3.10; fully close old
 managed VS Code windows after updating from 0.2.6. No SQLite enablement state is edited.
 
 **Output → LoKiEnte** receives launcher/editor console logs as well as the managed
@@ -170,6 +170,17 @@ sharing/permission failures for up to five seconds without deleting the previous
 snapshot. A persistent failure stops acceptance with FAIL in
 `acceptance.failure.json` and its JUnit file; the complete pending snapshot remains
 for diagnosis. Provisioning and restart detection consume this failure report.
+
+Acceptance opens the real Kilo sidebar before dependency/model checks so its
+backend can initialize before the final UI task. Sidebar focus alone is not a
+connection PASS. `webviewExchange` records the nonce hash, request ID, route,
+receipt/switch/completion events and reply-match status without prompt/response
+bodies. A request not observed within 60 seconds fails with a distinct error;
+observed requests retain the five-minute completion deadline. Request failures,
+unfinished replies and replies without the required marker remain failures.
+Trailing user-role editor context cannot hide the original user nonce; assistant
+or tool echoes alone cannot establish correlation. Router runtime 2026.11.27.3
+replaces an idle older router through the guarded lifecycle; busy work is preserved.
 
 Foreground provisioning and `Test-Toolchain.ps1` print each acceptance step's
 START and PASS/FAIL/BLOCKED result with its component and duration. Individual

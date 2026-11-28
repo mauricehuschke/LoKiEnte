@@ -2,6 +2,62 @@
 
 [Deutsch](VALIDATION.de.md)
 
+## Kilo webview initialization and request correlation - package 2026.11.27.12
+
+The new target report uses helper 0.3.9, VS Code 1.148.0 and Kilo 7.8.32. All ten
+installed dependency checks pass. The real work profile, extension activation,
+catalog and embedded Kilo read-tool/final-answer round trips pass for coder-high,
+coder-fast, review and fast. The sole FAIL is the five-minute webview correlation
+timeout; visible-response observation is consequently BLOCKED. Indexing is Off,
+so embedding evidence is NOT_APPLICABLE. Complete target acceptance remains open.
+
+Two implementation gaps are addressed. Previously the test opened Kilo only
+when submitting its final UI prompt. Kilo 7.8.32's terminal action awaits the
+webview-ready handshake, while its PromptInput ignores triggerTask when the
+backend is disconnected. Focus is now a separate step before dependency/model
+checks, allowing initialization during those checks. Focus is explicitly not
+counted as backend/inference evidence; the real nonce exchange remains mandatory.
+Separately, the router looked only in the last user message. Later user-role
+context could hide the actual prompt's nonce, including on tool follow-ups. It
+now finds the most recent user nonce across string/text-part messages and never
+uses assistant/tool-only echoes. Real local HTTP regressions reproduce the old
+correlation defect and verify these cases. The supplied report alone cannot
+establish which gap caused the target's missing correlation; it lacks request
+phase evidence. No claim is made that the target UI has passed.
+
+The router records request_received and correlated timeout metadata without
+payloads. webviewExchange retains bounded, whitelisted receipt/switch/completion/
+failure evidence with hash, route, request ID and reply-match flags. No observed
+request has a separate 60-second failure; received requests keep the five-minute
+completion deadline. Unfinished and completed-but-unmatched responses are
+distinguished. Unrelated requests, invalid hashes and cancellation cannot produce
+PASS. The native terminal retains phase updates through the existing progress
+stream. No task is automatically retried or duplicated. The final actual visual
+confirmation remains required. Router runtime 2026.11.27.3 forces guarded restart
+of idle older processes so the deployed fix is active, including Keep mode; busy
+older routers are preserved. Fresh-process readiness also checks runtime version.
+
+Pinned primary contracts inspected: Kilo v7.8.32
+[terminal action](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/src/services/code-actions/register-terminal-actions.ts),
+[PromptInput](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/webview-ui/src/components/chat/PromptInput.tsx),
+and [KiloProvider](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/src/KiloProvider.ts).
+
+Validation: 112 JavaScript tests across 16 files PASS (0 skipped) and all 17
+selected PowerShell suites PASS. This includes eight new real HTTP/file webview
+evidence regressions and 20 router lifecycle checks, including idle-old-version
+replacement and busy-old-version preservation. The existing full acceptance
+regression also verifies sidebar focus before native/model checks. A separate
+side-by-side run of the previously committed router and current source completes
+the same HTTP request with trailing user context: the old implementation loses
+the correlation, while the current implementation verifies nonce hash and reply.
+All pre-existing model, native launch, configuration parity, reporting, secrets,
+security/sync and unattended-provisioning regressions remain in the selection.
+
+New regressions use real Node/HTTP/files with explicit synthetic model/UI
+boundaries. Full target VS Code/Kilo/LM Studio UI acceptance remains UNVERIFIED
+until rerun on the target PC. Docker and Hyper-V are not used or required.
+PR, main merge and release remain gated on successful complete target evidence.
+
 ## Isolated dependency imports and terminal progress - package 2026.11.27.11
 
 The supplied target report (helper 0.3.8, VS Code 1.148.0, Kilo 7.8.32) passes

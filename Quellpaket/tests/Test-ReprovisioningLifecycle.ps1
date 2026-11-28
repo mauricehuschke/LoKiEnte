@@ -34,7 +34,7 @@ const digest=get('--routing-digest'),secret=process.env.SHADOW_LOCAL_ROUTER_CONT
 const server=http.createServer((req,res)=>{
  let state={};try{state=JSON.parse(fs.readFileSync(path.join(root,'fixture-state.json'),'utf8'));}catch{}
  res.setHeader('content-type','application/json');
- if(req.url==='/health'){res.end(JSON.stringify({service:'shadow-local-model-router',version:'2026.11.27.2',configDigest:digest,pid:process.pid,ready:true,busy:!!state.busy,queued:0}));return;}
+ if(req.url==='/health'){res.end(JSON.stringify({service:'shadow-local-model-router',version:'2026.11.27.3',configDigest:digest,pid:process.pid,ready:true,busy:!!state.busy,queued:0}));return;}
  if(req.url==='/admin/shutdown'&&req.headers['x-shadow-control']===secret){res.end('{"stopping":true}');server.close();return;}
  res.writeHead(403);res.end('{}');
 });server.listen(Number(get('--port')),'127.0.0.1');

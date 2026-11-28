@@ -124,6 +124,47 @@ async function atomic(file, text, { io = fs, timeoutMs = 5000, retryDelayMs = 25
     }
 }
 
+async function waitForWebviewExchange({ file, probeHash, evidence, signal, onUpdate = async () => {}, timeoutMs = 300000, requestTimeoutMs = 60000, pollMs = 500 }) {
+    if (!/^[a-f0-9]{64}$/.test(probeHash || '')) throw new Error('A valid nonce hash is required for webview evidence.');
+    const started = Date.now();
+    Object.assign(evidence, { stage: 'waiting-for-router-request', probeHash, routerLog: file, requestTimeoutMs, timeoutMs, events: [], unmatchedEvents: 0 });
+    const tail = new LogTail(file, line => {
+        let event; try { event = JSON.parse(line); } catch { return; }
+        if (!['request_received', 'model_switch_started', 'request_completed', 'request_failed', 'request_timed_out'].includes(event.event)) return;
+        if (event.probeHash !== probeHash) { evidence.unmatchedEvents++; return; }
+        // Preserve connection metadata, never request/response bodies or headers.
+        const value = Object.fromEntries(['event', 'utc', 'alias', 'modelId', 'requestId', 'code', 'status', 'elapsedMs', 'probeReplyMatched']
+            .filter(key => event[key] !== undefined).map(key => [key, event[key]]));
+        if (evidence.events.length < 64) evidence.events.push(value);
+        evidence.requestObserved = true;
+        if (event.event === 'request_completed') {
+            if (event.probeReplyMatched === true) { evidence.replyMatched = true; evidence.stage = 'completed'; }
+            else { evidence.completedWithoutMarker = (evidence.completedWithoutMarker || 0) + 1; }
+        } else if (['request_failed', 'request_timed_out'].includes(event.event)) {
+            evidence.failureCode = event.code || event.event; evidence.stage = 'router-request-failed';
+        } else if (!evidence.replyMatched) evidence.stage = event.event === 'request_received' ? 'request-received' : 'model-switch-or-inference';
+    }, { replayBytes: 1024 * 1024 });
+    let last = '';
+    while (Date.now() - started < timeoutMs) {
+        if (signal?.aborted) throw cancellationError(signal);
+        await tail.read();
+        const state = JSON.stringify(evidence);
+        if (state !== last) { await onUpdate(evidence); last = state; }
+        if (signal?.aborted) throw cancellationError(signal);
+        if (evidence.failureCode) throw Object.assign(new Error(`The real Kilo webview request failed at the router: ${evidence.failureCode}. See webviewExchange.`), { code: 'KILO_WEBVIEW_ROUTER_FAILED' });
+        if (evidence.replyMatched) return evidence;
+        if (!evidence.requestObserved && Date.now() - started >= requestTimeoutMs) {
+            evidence.stage = 'request-not-observed'; await onUpdate(evidence);
+            throw Object.assign(new Error(`No nonce-correlated Kilo webview request was observed at the router within ${Math.ceil(requestTimeoutMs / 1000)} seconds. Check Kilo backend/provider readiness and the Kilo chat error. See webviewExchange and managed logs.`), { code: 'KILO_WEBVIEW_REQUEST_NOT_OBSERVED' });
+        }
+        await new Promise(resolve => setTimeout(resolve, pollMs));
+    }
+    evidence.stage = evidence.completedWithoutMarker ? 'completed-without-marker' : 'response-not-completed'; await onUpdate(evidence);
+    throw Object.assign(new Error(evidence.completedWithoutMarker
+        ? 'Correlated Kilo webview requests completed, but no response contained the expected nonce. See webviewExchange.'
+        : 'The correlated Kilo webview request reached the router but did not complete before its deadline. See webviewExchange.'), { code: 'KILO_WEBVIEW_RESPONSE_NOT_VERIFIED' });
+}
+
 async function checkToolchain({ vscode, root, logger, env = process.env, reportPath, project, runId, interactive = true, diagnostics = () => ({}), signal: outerSignal, persistenceOptions }) {
     runId ||= crypto.randomUUID().replaceAll('-', '');
     const directory = path.join(root, 'diagnostics', 'toolchain', runId);
@@ -131,7 +172,7 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
     project ||= path.join(directory, 'project');
     await fs.mkdir(project, { recursive: true });
     const prelaunch = await fs.readFile(reportPath, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
-    const required = ['vscode-host', 'workspace-trust', 'managed-helper', 'acceptance-project-git', 'kilo-discovery', 'production-configuration', 'kilo-activation', 'installed-runtime', 'dependencies', 'model-catalog', 'kilo-webview-request', 'kilo-visible-response'];
+    const required = ['vscode-host', 'workspace-trust', 'managed-helper', 'acceptance-project-git', 'kilo-discovery', 'production-configuration', 'kilo-activation', 'kilo-webview-open', 'installed-runtime', 'dependencies', 'model-catalog', 'kilo-webview-request', 'kilo-visible-response'];
     const report = { schema: 1, kind: 'live-toolchain-acceptance', runId, status: 'RUNNING', startedAtUtc: new Date().toISOString(),
         executionMode: 'native-windows-applications', requirements: { docker: false, hyperV: false },
         versions: { vscode: vscode.version, node: process.versions.node, electron: process.versions.electron || null }, cases: [], progress: [], nativeCommands: [], reportPath };
@@ -278,6 +319,17 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
             return 'The installed Kilo extension and its declared extension dependencies activated in the real host.';
         });
         if (activation.status !== 'PASS') throw blocked('Kilo activation failed; dependent live checks were not executed.');
+        // Resolve the actual sidebar before the dependency/model checks. Kilo's
+        // webview-ready handshake can precede its backend connection; opening it
+        // only when dispatching triggerTask can silently discard that first task.
+        const opened = await check('kilo-webview-open', 'VS Code -> Kilo Code UI', async () => {
+            const command = 'kilo-code.SidebarProvider.focus';
+            if (!(await vscode.commands.getCommands(true)).includes(command)) throw blocked('Kilo sidebar focus command is unavailable.');
+            report.webviewInitialization = { command, startedAtUtc: new Date().toISOString() };
+            await withDeadline(() => vscode.commands.executeCommand(command), 90000, 'Kilo sidebar initialization did not complete.', signal);
+            report.webviewInitialization.openedAtUtc = new Date().toISOString();
+            return 'The real Kilo sidebar was opened before dependency and model checks. Backend connectivity is verified separately by the final nonce request.';
+        });
         const binary = path.join(kilo.extensionPath, 'bin', process.platform === 'win32' ? 'kilo.exe' : 'kilo');
         const runtime = await check('installed-runtime', 'Kilo Code', async () => {
             if (path.resolve(binary).toLowerCase() !== path.resolve(env.LOKIENTE_ET_KILO || '').toLowerCase()) throw new Error('The tested CLI is not the runtime bundled with this Kilo extension.');
@@ -351,30 +403,26 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
         } else await record('embeddings', 'Kilo indexing', 'NOT_APPLICABLE', 'Indexing is disabled in the prepared configuration.');
         const marker = `LOKIENTE_ACCEPTANCE_${crypto.randomBytes(16).toString('hex')}`;
         const hash = crypto.createHash('sha256').update(marker).digest('hex');
-        const started = Date.now();
         const webview = await check('kilo-webview-request', 'VS Code -> Kilo webview -> LM Studio', async () => {
+            if (opened.status !== 'PASS') throw blocked('The Kilo sidebar could not be opened. See kilo-webview-open.');
             const commands = await vscode.commands.getCommands(true);
             if (!commands.includes('kilo-code.new.terminalExplainCommand')) throw blocked('This Kilo version does not expose the tested explanation command.');
+            report.webviewExchange = { stage: 'dispatching-to-webview', command: 'kilo-code.new.terminalExplainCommand', probeHash: hash,
+                dispatchedAtUtc: new Date().toISOString(), expectedModel: config.model, expectedAgent: config.default_agent };
+            await save();
             // This explains supplied text. It never creates or executes a terminal command.
-            await withDeadline(() => vscode.commands.executeCommand('kilo-code.new.terminalExplainCommand', { selection: `printf '${marker}'\n# Include this exact literal marker in the explanation.` }), 90000, 'Kilo webview did not become ready.', signal);
+            try { await withDeadline(() => vscode.commands.executeCommand('kilo-code.new.terminalExplainCommand', { selection: `printf '${marker}'\n# Include this exact literal marker in the explanation.` }), 90000, 'Kilo webview did not become ready.', signal); }
+            catch (error) { report.webviewExchange.stage = 'webview-command-failed'; report.webviewExchange.errorCode = error.code || 'KILO_WEBVIEW_DISPATCH_FAILED'; throw error; }
+            report.webviewExchange.commandCompletedAtUtc = new Date().toISOString();
             if (signal.aborted) throw cancellationError(signal);
             const pool = await fs.readFile(path.join(root, 'runtime', 'model-pool.json'), 'utf8').then(JSON.parse).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
-            if (!pool) return 'The real Kilo webview accepted the explanation action. Single-mode response delivery requires the following visible check.';
-            let completion, failure;
-            const tail = new LogTail(path.join(root, 'runtime', 'router-events.jsonl'), line => {
-                let event; try { event = JSON.parse(line); } catch { return; }
-                if (event.probeHash !== hash) return;
-                if (event.event === 'request_failed') failure = event.code;
-                if (event.event === 'request_completed' && event.probeReplyMatched === true) completion = event;
-            }, { replayBytes: 1024 * 1024 });
-            while (Date.now() - started < 300000 && !signal.aborted) {
-                await tail.read();
-                if (failure) throw new Error(`The real Kilo webview request failed: ${failure}`);
-                if (completion) return 'A nonce-correlated real webview request reached LM Studio and completed with the expected literal response.';
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            if (signal.aborted) throw cancellationError(signal);
-            throw new Error('No completed nonce-correlated Kilo webview -> router -> LM Studio exchange was observed.');
+            if (!pool) { report.webviewExchange.stage = 'awaiting-single-mode-visual-observation'; return 'The real Kilo webview accepted the explanation action. Single-mode response delivery requires the following visible check.'; }
+            try {
+                await waitForWebviewExchange({ file: path.join(root, 'runtime', 'router-events.jsonl'), probeHash: hash, evidence: report.webviewExchange, signal,
+                    onUpdate: async value => { report.waitingFor = `kilo-webview-request: ${value.stage}`; await save(); } });
+            } catch (error) { report.webviewExchange.errorCode = error.code || 'KILO_WEBVIEW_EXCHANGE_FAILED'; throw error; }
+            finally { delete report.waitingFor; }
+            return 'A nonce-correlated real webview request reached LM Studio and completed with the expected literal response.';
         });
         if (webview.status !== 'PASS') await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'The webview request failed; no visible response can be accepted.');
         else if (!interactive) await record('kilo-visible-response', 'Kilo Code UI', 'BLOCKED', 'Visible webview rendering has not been observed. Noninteractive checks cannot claim this evidence.');
@@ -418,4 +466,4 @@ async function checkToolchain({ vscode, root, logger, env = process.env, reportP
     } finally { clearInterval(cancelPoll); clearTimeout(deadlineTimer); outerSignal?.removeEventListener('abort', abort); }
 }
 
-module.exports = { runNative, inspectKiloEvents, summarize, junit, atomic, checkToolchain, withDeadline, waitForWorkspaceTrust };
+module.exports = { runNative, inspectKiloEvents, summarize, junit, atomic, checkToolchain, withDeadline, waitForWorkspaceTrust, waitForWebviewExchange };

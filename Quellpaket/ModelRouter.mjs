@@ -9,7 +9,7 @@ import { once } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const ROUTER_VERSION = '2026.11.27.2';
+export const ROUTER_VERSION = '2026.11.27.3';
 const BODY_LIMIT = 4 * 1024 * 1024;
 const RESPONSE_LIMIT = 16 * 1024 * 1024;
 const ALLOWED_FIELDS = new Set(['model','messages','stream','stream_options','max_tokens',
@@ -183,11 +183,19 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
     if(queue.length>=maxQueued)throw new RouterError(429,'queue_full','The single-GPU request queue is full. Retry after current work completes.');
     const abort=new AbortController();
     const requestId=randomUUID(),requestStarted=Date.now();
-    const lastUser=[...body.messages].reverse().find(m=>m?.role==='user');
-    const userText=typeof lastUser?.content==='string'?lastUser.content:Array.isArray(lastUser?.content)?lastUser.content.filter(p=>p?.type==='text').map(p=>p.text).join('\n'):'';
-    const probe=/LOKIENTE_ACCEPTANCE_[a-f0-9]{32}/.exec(userText)?.[0];
+    // Kilo may append user-role editor/context blocks after the actual prompt,
+    // including on a later tool turn. Correlate the most recent user nonce;
+    // assistant/tool echoes alone must never create acceptance evidence.
+    let probe;
+    for(const message of [...body.messages].reverse()){
+      if(message?.role!=='user')continue;
+      const text=typeof message.content==='string'?message.content:Array.isArray(message.content)?message.content.filter(p=>p?.type==='text'&&typeof p.text==='string').map(p=>p.text).join('\n'):'';
+      probe=[...text.matchAll(/LOKIENTE_ACCEPTANCE_[a-f0-9]{32}/g)].at(-1)?.[0];
+      if(probe)break;
+    }
     const probeHash=probe?createHash('sha256').update(probe).digest('hex'):undefined;
     let probeTail='',probeReplyMatched=false;
+    log({event:'request_received',alias:profile.Alias,requestId,probeHash});
     const observeReply=text=>{
       if(!probe||typeof text!=='string')return;
       const combined=probeTail+text;if(combined.includes(probe))probeReplyMatched=true;
@@ -199,7 +207,7 @@ export function createModelRouter({config,configDigest,switchModel,token='',cont
     const deadline=setTimeout(()=>{
       const error=new RouterError(504,'request_timeout','The local request deadline was exceeded.');
       lastError={alias:profile.Alias,code:error.code,utc:new Date().toISOString()};
-      log({event:'request_timed_out',alias:profile.Alias,code:error.code});
+      log({event:'request_timed_out',alias:profile.Alias,code:error.code,requestId,probeHash});
       abort.abort(error);errorResponse(res,error);
     },requestTimeoutMs);
     const disconnect=()=>{if(!res.writableFinished)abort.abort(new Error('Client disconnected.'));};

@@ -6,7 +6,7 @@
 Die Programmausgaben sind Englisch. Diese Datei ist die deutsche Dokumentation.
 <!-- /lokiente-language -->
 
-Version: 2026.11.27.11 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
+Version: 2026.11.27.12 · Zielsystem: Windows x64 (PC, Workstation oder geeignete VM) · Standardsprache der Arbeitsanweisungen: Englisch
 
 ## Erstinstallation und erneute Provisionierung
 
@@ -54,7 +54,7 @@ VS-Code-Profil eine zum Start gehörende Bestätigung geschrieben hat. Die CLI-L
 installierter Extensions allein belegt keine laufende Extension. Kilos Erkennung
 wartet auf Registrierung und Workspace Trust. Installiert, aber nicht verfügbar,
 fehlend und Aktivierungsfehler werden getrennt diagnostiziert. Der Helfer hat Version
-0.3.9; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
+0.3.10; nach dem Update von 0.2.6 müssen alte verwaltete VS-Code-Fenster vollständig
 geschlossen werden. Interne SQLite-Aktivierungszustände werden nicht verändert.
 
 Unter **Ausgabe → LoKiEnte** stehen auch Konsolenausgaben des Launchers und Editors.
@@ -191,6 +191,18 @@ Schnappschuss zu löschen. Eine dauerhafte Sperre beendet die Abnahme mit FAIL i
 `acceptance.failure.json` samt JUnit-Datei; der vollständige ausstehende Schnappschuss
 bleibt zur Diagnose erhalten. Provisioning und Neustarterkennung werten diesen
 Fehlerbericht aus.
+
+Die Abnahme öffnet die echte Kilo-Seitenleiste vor Abhängigkeits-/Modelltests,
+damit sich ihr Backend vor der abschließenden UI-Anfrage initialisieren kann.
+Fokus allein belegt keine Verbindung. `webviewExchange` erfasst Nonce-Hash,
+Request-ID, Route, Eingangs-/Wechsel-/Abschlussereignisse und Antwortabgleich ohne
+Prompt-/Antwortinhalte. Eine innerhalb von 60 Sekunden nicht beobachtete Anfrage
+scheitert mit eigener Fehlermeldung; für beobachtete Anfragen bleibt die
+Abschlussfrist von fünf Minuten. Anfragefehler, unfertige Antworten und Antworten
+ohne Testkennung bleiben Fehler. Nachgestellter User-Kontext verdeckt die
+ursprüngliche User-Kennung nicht; reine Assistant-/Tool-Echos belegen keine
+Zuordnung. Router-Runtime 2026.11.27.3 ersetzt ältere inaktive Router über den
+geschützten Lebenszyklus; laufende Arbeit bleibt erhalten.
 
 Provisioning im Vordergrund und `Test-Toolchain.ps1` zeigen für jeden
 Abnahmeschritt START und PASS/FAIL/BLOCKED mit Komponente und Laufzeit im Terminal.

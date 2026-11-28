@@ -1,3 +1,63 @@
+## Kilo-Webview-Start und Anfragezuordnung - Paket 2026.11.27.12
+
+Der neue Zielbericht verwendet Helper 0.3.9, VS Code 1.148.0 und Kilo 7.8.32.
+Alle zehn installierten Abhängigkeitsprüfungen bestehen. Echtes Arbeitsprofil,
+Aktivierung, Katalog sowie echte Datei-Leseaufrufe mit abschließenden Antworten
+des eingebetteten Kilo bestehen für coder-high, coder-fast, review und fast.
+Einziges FAIL ist der fünfminütige Webview-Zuordnungstimeout; die Sichtbestätigung
+ist deshalb BLOCKED. Indexing ist Off und Embedding somit NOT_APPLICABLE.
+Die vollständige Zielabnahme bleibt offen.
+
+Zwei Implementierungslücken werden behoben. Bisher öffnete der Test Kilo erst
+beim abschließenden UI-Prompt. Kilos Terminalaktion in Version 7.8.32 wartet auf
+den Webview-Handshake; PromptInput ignoriert triggerTask bei getrenntem Backend.
+Fokus ist nun ein eigener Schritt vor Abhängigkeits-/Modelltests und ermöglicht
+die Initialisierung während dieser Tests. Fokus gilt ausdrücklich nicht als
+Backend-/Inferenznachweis; die echte Nonce-Anfrage bleibt Pflicht. Zudem suchte
+der Router nur in der letzten User-Nachricht. Nachgestellter User-Kontext konnte
+die Kennung des eigentlichen Prompts auch nach Werkzeugaufrufen verdecken. Nun
+wird die neueste User-Kennung in String-/Textteil-Nachrichten gesucht, ohne reine
+Assistant-/Tool-Echos zu nutzen. Echte lokale HTTP-Regressionen reproduzieren den
+alten Zuordnungsfehler und prüfen diese Fälle. Welcher der beiden Punkte den
+Ziel-Timeout verursachte, belegt der angehängte Bericht allein mangels
+Anfragephasen nicht. Eine bestandene Ziel-UI wird nicht behauptet.
+
+Der Router erfasst request_received und zugeordnete Timeout-Metadaten ohne
+Nutzdaten. webviewExchange behält begrenzte, erlaubte Eingangs-/Wechsel-/Abschluss-/
+Fehlernachweise mit Hash, Route, Request-ID und Antwortabgleich. Nicht beobachtete
+Anfragen erhalten einen eigenen Fehler nach 60 Sekunden; für eingegangene
+Anfragen bleiben fünf Minuten bis zum Abschluss. Unfertige und abgeschlossene,
+aber unpassende Antworten werden unterschieden. Fremde Anfragen, ungültige Hashes
+und Abbruch erzeugen kein PASS. Das Terminal erhält die Phasen über die bestehende
+Fortschrittsanzeige. Keine Aufgabe wird automatisch wiederholt oder dupliziert;
+die echte Sichtbestätigung bleibt Pflicht. Router-Runtime 2026.11.27.3 erzwingt
+auch in Keep einen geschützten Neustart inaktiver älterer Prozesse, damit der Fix
+wirklich aktiv ist. Aktive alte Router bleiben erhalten. Auch die
+Bereitschaftsprüfung neuer Prozesse kontrolliert die Runtime-Version.
+
+Geprüfte Primärverträge aus Kilo v7.8.32:
+[Terminalaktion](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/src/services/code-actions/register-terminal-actions.ts),
+[PromptInput](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/webview-ui/src/components/chat/PromptInput.tsx)
+und [KiloProvider](https://github.com/Kilo-Org/kilocode/blob/v7.8.32/packages/kilo-vscode/src/KiloProvider.ts).
+
+Validierung: 112 JavaScript-Tests in 16 Dateien PASS (0 übersprungen) und alle
+17 ausgewählten PowerShell-Suiten PASS. Darunter sind acht neue Webview-Nachweis-
+Regressionen mit echten HTTP-/Dateioperationen und 20 Router-Lebenszyklusprüfungen
+einschließlich Ersatz inaktiver alter Versionen und Erhalt aktiver alter
+Versionen. Die bestehende Abnahmeregression prüft zusätzlich den Seitenleisten-
+Fokus vor nativen/Modellprüfungen. Ein separater Vorher-/Nachher-Lauf führt die
+gleiche HTTP-Anfrage mit nachgestelltem User-Kontext mit dem zuvor committeten
+Router und dem aktuellen Code aus: zuvor geht die Zuordnung verloren, nun werden
+Nonce-Hash und Antwort erkannt. Bestehende Modell-, Start-, Konfigurations-,
+Reporting-, Sicherheits-/Sync- und unbeaufsichtigte Provisioning-Regressionen
+bleiben Teil der Auswahl.
+
+Die neuen Regressionen verwenden echte Node-/HTTP-/Dateioperationen mit
+ausdrücklichen Modell-/UI-Simulationen. Die vollständige Ziel-UI-Abnahme von
+VS Code/Kilo/LM Studio bleibt bis zum nächsten Lauf UNVERIFIED. Docker und Hyper-V
+werden nicht verwendet oder benötigt. PR, Main-Merge und Release setzen weiterhin
+erfolgreiche vollständige Zielnachweise voraus.
+
 ## Isolierte Testimporte und Terminal-Fortschritt - Paket 2026.11.27.11
 
 Der angehängte Zielbericht (Helper 0.3.8, VS Code 1.148.0, Kilo 7.8.32) besteht

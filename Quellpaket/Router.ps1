@@ -202,7 +202,7 @@ function Start-ShadowModelRouter {
     $digest=Get-ShadowRoutingDigest $Pool $NodePath $PowerShellPath
     $health=Get-ShadowRouterHealth -Pool $Pool
     if($health -and (Get-LrProperty $health 'service') -ceq 'shadow-local-model-router' -and
-       (Get-LrProperty $health 'configDigest') -ceq $digest -and (Get-LrProperty $health 'version') -ceq '2026.11.27.2' -and
+       (Get-LrProperty $health 'configDigest') -ceq $digest -and (Get-LrProperty $health 'version') -ceq '2026.11.27.3' -and
        (Get-LrProperty $health 'ready' $false) -eq $true -and (Test-Path -LiteralPath (Join-Path $InstallRoot 'runtime/router-control.json'))){
         return [pscustomobject]@{Status='Ready';ApiBaseUrl=$Pool.RouterApiBaseUrl;Port=([Uri]$Pool.RouterApiBaseUrl).Port;Pid=$health.pid;ConfigDigest=$digest;Reused=$true}
     }
@@ -234,6 +234,7 @@ function Start-ShadowModelRouter {
             $health=Get-ShadowRouterHealth -Pool $Pool
             if($health -and (Get-LrProperty $health 'service') -ceq 'shadow-local-model-router' -and
                (Get-LrProperty $health 'configDigest') -ceq $digest -and (Get-LrProperty $health 'pid') -eq $process.Id -and
+               (Get-LrProperty $health 'version') -ceq '2026.11.27.3' -and
                (Get-LrProperty $health 'ready' $false) -eq $true){
                 return [pscustomobject]@{Status='Ready';ApiBaseUrl=$Pool.RouterApiBaseUrl;Port=([Uri]$Pool.RouterApiBaseUrl).Port;Pid=$process.Id;ConfigDigest=$digest;Reused=$false}
             }

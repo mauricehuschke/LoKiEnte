@@ -129,15 +129,16 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
         const installed = path.join(root, 'vscode-extensions', 'kilocode.kilo-code-synthetic'); await mkdir(installed, { recursive: true });
         await writeFile(path.join(installed, 'package.json'), JSON.stringify({ publisher: 'kilocode', name: 'kilo-code', version: 'synthetic' }));
         await writeFile(path.join(root, 'toolchain.json'), '{}');
-        let visible = false, activations = 0, hanging = false, configurationFailure = false;
-        const kilo = { extensionPath: installed, async activate() {
+        let visible = false, activations = 0, hanging = false, configurationFailure = false, activationFails = true;
+        const uiCalls = [];
+        const kilo = { extensionPath: installed, isActive: true, packageJSON: { version: 'synthetic', extensionDependencies: [] }, async activate() {
             activations++;
             const snapshot = JSON.parse(await readFile(path.join(root, 'diagnostics', 'toolchain', 'a'.repeat(32), 'acceptance.json'), 'utf8'));
             assert.equal(snapshot.status, 'RUNNING');
             assert.equal(snapshot.progress.at(-1).id, 'kilo-activation'); assert.equal(snapshot.progress.at(-1).status, 'RUNNING');
             assert.ok(snapshot.progress.some(event => event.id === 'production-configuration' && event.status === 'PASS'));
             if (hanging) await new Promise(() => {});
-            throw new Error('SYNTHETIC_STOP_BEFORE_NATIVE_OR_INFERENCE');
+            if (activationFails) throw new Error('SYNTHETIC_STOP_BEFORE_NATIVE_OR_INFERENCE');
         } };
         const sandbox = { module: { exports: {} }, __dirname: path.resolve('Quellpaket/vscode-startup'), setTimeout, clearTimeout, setInterval, clearInterval, AbortController,
             process: { versions: { electron: 'synthetic', node: process.versions.node } },
@@ -158,6 +159,7 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
         const options = { root, runId: 'a'.repeat(32), interactive: false,
             env: { KILO_CONFIG_CONTENT: JSON.stringify({ enabled_providers: ['lmstudio'], provider: { lmstudio: { options: { baseURL: 'http://127.0.0.1:1234/v1' }, models: { fast: { id: 'synthetic' } } } } }) },
             logger: { info() {}, warn() {}, error() {} }, vscode: { version: 'synthetic', env: { appHost: 'desktop' }, workspace: { isTrusted: true },
+                commands: { async getCommands() { return ['kilo-code.SidebarProvider.focus']; }, async executeCommand(command) { uiCalls.push(command); } },
                 extensions: { all: [], getExtension: () => visible ? kilo : undefined } } };
         const report = await sandbox.module.exports.checkToolchain(options);
         clearTimeout(timer);
@@ -175,6 +177,13 @@ test('acceptance itself waits for delayed Kilo discovery before activating, with
         const persisted = JSON.parse(await readFile(mismatch.reportPath, 'utf8'));
         assert.equal(persisted.productionConfiguration.settingsChanges[0].change, 'modified');
         assert.equal(persisted.nativeCommands.length, 0); configurationFailure = false;
+        activationFails = false;
+        const warm = await sandbox.module.exports.checkToolchain(options);
+        assert.equal(warm.cases.find(c => c.id === 'kilo-webview-open').status, 'PASS');
+        assert.equal(warm.cases.find(c => c.id === 'installed-runtime').status, 'FAIL');
+        assert.ok(warm.cases.findIndex(c => c.id === 'kilo-webview-open') < warm.cases.findIndex(c => c.id === 'dependencies'));
+        assert.equal(warm.nativeCommands.length, 0); assert.deepEqual(uiCalls, ['kilo-code.SidebarProvider.focus']);
+        assert.ok(warm.webviewInitialization.openedAtUtc); activationFails = true;
         hanging = true;
         const keepAlive = setInterval(() => {}, 100);
         try {

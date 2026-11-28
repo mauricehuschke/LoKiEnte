@@ -36,7 +36,7 @@ const server=http.createServer((req,res)=>{
   res.setHeader('content-type','application/json');
   if(req.url==='/health'){
     if(state.failed)res.statusCode=503;
-    res.end(JSON.stringify({service:state.service||'shadow-local-model-router',version:'2026.11.27.2',ready:!state.failed&&state.ready!==false,configDigest:digest,pid:process.pid,busy:!!state.busy,queued:state.queued||0}));return;
+    res.end(JSON.stringify({service:state.service||'shadow-local-model-router',version:state.legacyPid===process.pid?'2026.11.27.2':(state.version||'2026.11.27.3'),ready:!state.failed&&state.ready!==false,configDigest:digest,pid:process.pid,busy:!!state.busy,queued:state.queued||0}));return;
   }
   if(req.url==='/admin/shutdown'&&req.method==='POST'){
     if(req.headers['x-shadow-control']!==process.env.SHADOW_LOCAL_ROUTER_CONTROL){res.writeHead(403);res.end('{}');return;}
@@ -90,6 +90,12 @@ try {
     $third=Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh
     $created.Add($third.Pid)
     Assert-Life (-not $third.Reused -and $third.Pid -ne $first.Pid -and $script:backendStarts -eq 2) 'Idle changed config performs authenticated shutdown then fresh launch'
+    Set-Fixture @{legacyPid=$third.Pid;busy=$true}
+    Throws-Life {Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh} 'still working' 'An older busy router is preserved during an update'
+    Set-Fixture @{legacyPid=$third.Pid}
+    $updated=Start-ShadowModelRouter -InstallRoot $root -Pool $pool -NodePath $node -PowerShellPath $pwsh
+    $created.Add($updated.Pid)
+    Assert-Life (-not $updated.Reused -and $updated.Pid -ne $third.Pid -and $script:backendStarts -eq 3) 'An idle older router is restarted so the deployed correlation fix is actually active'
     Set-Fixture @{failed=$true;busy=$true}
     $failedHealth=Get-ShadowRouterHealth -Pool $pool
     Assert-Life ($null -ne $failedHealth -and -not $failedHealth.ready) 'HTTP 503 preserves the known router identity without claiming readiness'
